@@ -98,3 +98,44 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await dbConnect()
+
+    // Find all products and group by name + category
+    const allProducts = await Product.find({}).sort({ createdAt: -1 })
+    
+    const nameProductMap = new Map()
+    const productsToDelete = []
+
+    // Group by name-category combination
+    for (const product of allProducts) {
+      const key = `${product.name}-${product.category}`
+      
+      if (!nameProductMap.has(key)) {
+        nameProductMap.set(key, product._id)
+      } else {
+        // This is a duplicate, mark for deletion
+        productsToDelete.push(product._id)
+      }
+    }
+
+    // Delete duplicates
+    if (productsToDelete.length > 0) {
+      await Product.deleteMany({ _id: { $in: productsToDelete } })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Removed ${productsToDelete.length} duplicate products`,
+      deleted: productsToDelete
+    })
+  } catch (error) {
+    console.error('Error deduplicating products:', error)
+    return NextResponse.json(
+      { error: 'Failed to deduplicate products' },
+      { status: 500 }
+    )
+  }
+}

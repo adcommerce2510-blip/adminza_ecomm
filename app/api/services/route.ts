@@ -98,3 +98,44 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await dbConnect()
+
+    // Find all services and group by name + category
+    const allServices = await Service.find({}).sort({ createdAt: -1 })
+    
+    const nameServiceMap = new Map()
+    const servicesToDelete = []
+
+    // Group by name-category combination
+    for (const service of allServices) {
+      const key = `${service.name}-${service.category}`
+      
+      if (!nameServiceMap.has(key)) {
+        nameServiceMap.set(key, service._id)
+      } else {
+        // This is a duplicate, mark for deletion
+        servicesToDelete.push(service._id)
+      }
+    }
+
+    // Delete duplicates
+    if (servicesToDelete.length > 0) {
+      await Service.deleteMany({ _id: { $in: servicesToDelete } })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Removed ${servicesToDelete.length} duplicate services`,
+      deleted: servicesToDelete
+    })
+  } catch (error) {
+    console.error('Error deduplicating services:', error)
+    return NextResponse.json(
+      { error: 'Failed to deduplicate services' },
+      { status: 500 }
+    )
+  }
+}
