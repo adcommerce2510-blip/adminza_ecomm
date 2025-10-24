@@ -62,9 +62,12 @@ export async function GET(request: NextRequest) {
 
     const services = await Service.find(query).sort({ createdAt: -1 })
 
+    // Remove duplicates by _id
+    const uniqueServices = Array.from(new Map(services.map((item: any) => [item._id.toString(), item])).values())
+
     return NextResponse.json({
       success: true,
-      data: services
+      data: uniqueServices
     })
   } catch (error) {
     console.error('Error fetching services:', error)

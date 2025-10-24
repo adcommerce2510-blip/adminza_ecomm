@@ -4306,13 +4306,13 @@ export function DashboardPage() {
                       <TableBody>
                         {loading ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8">
+                            <TableCell colSpan={8} className="text-center py-8">
                               Loading quotations...
                             </TableCell>
                           </TableRow>
                         ) : quotations.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8">
+                            <TableCell colSpan={8} className="text-center py-8">
                               <div className="text-muted-foreground">
                                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No quotations found</p>
@@ -4350,28 +4350,55 @@ export function DashboardPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant={quotation.status === "pending" ? "secondary" : "default"}>
-                                    {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
-                                  </Badge>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant={quotation.status === "pending" ? "secondary" : "default"}>
+                                      {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
+                                    </Badge>
+                                    <Select
+                                      value={quotation.status}
+                                      onValueChange={(value) => updateQuotationStatus(quotation._id, value)}
+                                    >
+                                      <SelectTrigger className="w-32 h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="reviewing">Reviewing</SelectItem>
+                                        <SelectItem value="quoted">Quoted</SelectItem>
+                                        <SelectItem value="accepted">Accepted</SelectItem>
+                                        <SelectItem value="rejected">Rejected</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </TableCell>
                                 <TableCell>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="z-[100]">
-                                      <DropdownMenuItem onClick={() => handleEditQuotation(quotation)}>
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => deleteQuotation(quotation._id)} className="text-red-600">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <div className="flex items-center space-x-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleViewQuotation(quotation)}
+                                      title="View quotation details"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditQuotation(quotation)}
+                                      title="Edit quotation"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteQuotation(quotation._id)}
+                                      title="Delete quotation"
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -5090,9 +5117,24 @@ export function DashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'}>
-                              {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
-                            </Badge>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'}>
+                                {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
+                              </Badge>
+                              <Select
+                                value={enquiry.status}
+                                onValueChange={(value) => console.log('Update enquiry status:', enquiry._id, value)}
+                              >
+                                <SelectTrigger className="w-32 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="responded">Responded</SelectItem>
+                                  <SelectItem value="closed">Closed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
@@ -5100,8 +5142,26 @@ export function DashboardPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => console.log('View enquiry:', enquiry._id)}
+                                title="View enquiry details"
                               >
                                 <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => console.log('Edit enquiry:', enquiry._id)}
+                                title="Edit enquiry"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => console.log('Delete enquiry:', enquiry._id)}
+                                title="Delete enquiry"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>

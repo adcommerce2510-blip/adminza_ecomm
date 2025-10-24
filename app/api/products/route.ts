@@ -62,9 +62,12 @@ export async function GET(request: NextRequest) {
 
     const products = await Product.find(query).sort({ createdAt: -1 })
 
+    // Remove duplicates by _id
+    const uniqueProducts = Array.from(new Map(products.map((item: any) => [item._id.toString(), item])).values())
+
     return NextResponse.json({
       success: true,
-      data: products
+      data: uniqueProducts
     })
   } catch (error) {
     console.error('Error fetching products:', error)
