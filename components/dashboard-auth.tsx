@@ -1,11 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, createContext, useContext } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Lock, User, AlertCircle } from "lucide-react"
+
+// Create a context for dashboard logout
+export const DashboardLogoutContext = createContext<{ handleLogout: () => void } | null>(null)
+
+export function useDashboardLogout() {
+  const context = useContext(DashboardLogoutContext)
+  if (!context) {
+    throw new Error("useDashboardLogout must be used within DashboardAuth")
+  }
+  return context
+}
 
 interface DashboardAuthProps {
   children: React.ReactNode
@@ -131,21 +142,10 @@ export function DashboardAuth({ children }: DashboardAuthProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Logout button */}
-      <div className="fixed top-4 right-4 z-50">
-        <Button
-          onClick={handleLogout}
-          variant="outline"
-          size="sm"
-          className="bg-white shadow-lg hover:bg-gray-50"
-        >
-          <Lock className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
+    <DashboardLogoutContext.Provider value={{ handleLogout }}>
+      <div className="min-h-screen bg-background">
+        {children}
       </div>
-      
-      {children}
-    </div>
+    </DashboardLogoutContext.Provider>
   )
 }

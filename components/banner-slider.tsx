@@ -31,7 +31,7 @@ export function BannerSlider() {
   }
 
   return (
-    <section className="relative w-full h-auto bg-background py-2 md:py-4 mt-8 md:mt-12">
+    <section className="relative w-full h-auto bg-background py-2 md:py-4 mt-0 md:mt-2">
       <div className="max-w-[1400px] mx-auto px-0">
         <div className="relative w-full aspect-[16/10] md:aspect-[16/8] lg:aspect-[16/5] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-gray-100 dark:bg-gray-900">
           {/* Slider Images */}

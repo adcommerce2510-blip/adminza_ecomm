@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import { useDashboardLogout } from "@/components/dashboard-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -40,7 +41,9 @@ import {
   Users,
   BarChart3,
   ChevronDown,
-  MoreVertical
+  MoreVertical,
+  Lock,
+  LogOut
 } from "lucide-react"
 
 // API functions
@@ -120,6 +123,53 @@ const fetchQuotations = async () => {
   return data.success ? data.data : []
 }
 
+const fetchEnquiries = async () => {
+  const response = await fetch('/api/enquiries')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchCategories = async () => {
+  const response = await fetch('/api/categories')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchSubCategories = async () => {
+  const response = await fetch('/api/sub-categories')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchLevel2Categories = async () => {
+  const response = await fetch('/api/level2-categories')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchEshopInventory = async () => {
+  const response = await fetch('/api/eshop-inventory')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchCustomers = async () => {
+  const response = await fetch('/api/customers')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const updateEshopInventory = async (id: string, inventoryData: any) => {
+  const response = await fetch(`/api/eshop-inventory/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(inventoryData),
+  })
+  const data = await response.json()
+  return data
+}
 
 const mainCategories = [
   { value: "product", label: "Product" },
@@ -207,6 +257,10 @@ export function DashboardPage() {
   const [quotationSearchTerm, setQuotationSearchTerm] = useState("")
   const [isViewQuotationDialogOpen, setIsViewQuotationDialogOpen] = useState(false)
   const [viewingQuotation, setViewingQuotation] = useState<any>(null)
+  const [isEditQuotationDialogOpen, setIsEditQuotationDialogOpen] = useState(false)
+  const [editingQuotation, setEditingQuotation] = useState<any>(null)
+  const [enquiries, setEnquiries] = useState<any[]>([])
+  const [enquirySearchTerm, setEnquirySearchTerm] = useState("")
   const [isViewProductDetailsDialogOpen, setIsViewProductDetailsDialogOpen] = useState(false)
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -236,6 +290,9 @@ export function DashboardPage() {
   const [customerProducts, setCustomerProducts] = useState<any[]>([])
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null)
   const [isRetopUpMode, setIsRetopUpMode] = useState(false)
+
+  // Use logout function from context
+  const { handleLogout } = useDashboardLogout()
 
   // Get categories for products (main categories with mainUse = "product")
   const productCategories = categories
@@ -292,7 +349,7 @@ export function DashboardPage() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData] = await Promise.all([
+        const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData] = await Promise.all([
           fetchProducts(),
           fetchServices(),
           fetchCategories(),
@@ -301,7 +358,8 @@ export function DashboardPage() {
           fetchCustomers(),
           fetchEshopInventory(),
           fetchOrders(),
-          fetchQuotations()
+          fetchQuotations(),
+          fetchEnquiries()
         ])
         setProducts(productsData)
         setServices(servicesData)
@@ -312,6 +370,7 @@ export function DashboardPage() {
         setEshopInventory(eshopData)
         setOrders(ordersData)
         setQuotations(quotationsData)
+        setEnquiries(enquiriesData)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -320,36 +379,6 @@ export function DashboardPage() {
     }
     loadData()
   }, [])
-
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      if (response.ok) {
-        const data = await response.json()
-        return data.success ? data.data : []
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-      return []
-    }
-  }
-
-  // Fetch customers
-  const fetchCustomers = async () => {
-    try {
-      const response = await fetch('/api/customers')
-      if (response.ok) {
-        const data = await response.json()
-        return data.success ? data.data : []
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching customers:', error)
-      return []
-    }
-  }
 
   // Create category
   const createCategory = async (categoryData: any) => {
@@ -422,21 +451,6 @@ export function DashboardPage() {
       description: category.description || ""
     })
     setIsCategoryDialogOpen(true)
-  }
-
-  // Fetch sub-categories
-  const fetchSubCategories = async () => {
-    try {
-      const response = await fetch('/api/sub-categories')
-      if (response.ok) {
-        const data = await response.json()
-        return data.success ? data.data : []
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching sub-categories:', error)
-      return []
-    }
   }
 
   // Create sub-category
@@ -520,21 +534,6 @@ export function DashboardPage() {
       description: subCategory.description || ""
     })
     setIsSubCategoryDialogOpen(true)
-  }
-
-  // Fetch level2 categories
-  const fetchLevel2Categories = async () => {
-    try {
-      const response = await fetch('/api/level2-categories')
-      if (response.ok) {
-        const data = await response.json()
-        return data.success ? data.data : []
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching level2 categories:', error)
-      return []
-    }
   }
 
   // Create level2 category
@@ -684,44 +683,6 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting customer:', error)
       return { success: false, error: 'Error deleting customer' }
-    }
-  }
-
-
-  // Fetch E-Shop inventory
-  const fetchEshopInventory = async () => {
-    try {
-      const response = await fetch('/api/eshop-inventory')
-      if (response.ok) {
-        const data = await response.json()
-        return data.success ? data.data : []
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching eshop inventory:', error)
-      return []
-    }
-  }
-
-  // Update E-Shop inventory item
-  const updateEshopInventory = async (id: string, inventoryData: any) => {
-    try {
-      const response = await fetch(`/api/eshop-inventory/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(inventoryData),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        return data
-      }
-      return { success: false, error: 'Failed to update inventory' }
-    } catch (error) {
-      console.error('Error updating inventory:', error)
-      return { success: false, error: 'Error updating inventory' }
     }
   }
 
@@ -883,6 +844,96 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting order:', error)
       return { success: false, error: 'Error deleting order' }
+    }
+  }
+
+  // Update quotation status
+  const updateQuotationStatus = async (id: string, status: string) => {
+    try {
+      const response = await fetch(`/api/quotations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setQuotations(quotations.map((quotation: any) => 
+            quotation._id === id ? data.data : quotation
+          ))
+        }
+        return data
+      }
+      return { success: false, error: 'Failed to update quotation status' }
+    } catch (error) {
+      console.error('Error updating quotation status:', error)
+      return { success: false, error: 'Error updating quotation status' }
+    }
+  }
+
+  // Delete quotation
+  const deleteQuotation = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this quotation?')) return
+    
+    try {
+      const response = await fetch(`/api/quotations/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setQuotations(quotations.filter((quotation: any) => quotation._id !== id))
+        }
+        return data
+      }
+      return { success: false, error: 'Failed to delete quotation' }
+    } catch (error) {
+      console.error('Error deleting quotation:', error)
+      return { success: false, error: 'Error deleting quotation' }
+    }
+  }
+
+  // Handle edit quotation
+  const handleEditQuotation = (quotation: any) => {
+    setEditingQuotation({ ...quotation })
+    setIsEditQuotationDialogOpen(true)
+  }
+
+  // Save quotation changes
+  const saveQuotationChanges = async () => {
+    if (!editingQuotation) return
+    
+    try {
+      const response = await fetch(`/api/quotations/${editingQuotation._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editingQuotation),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setQuotations(quotations.map((q: any) => 
+            q._id === editingQuotation._id ? data.data : q
+          ))
+          setIsEditQuotationDialogOpen(false)
+          setEditingQuotation(null)
+          alert('Quotation updated successfully!')
+        }
+        return data
+      }
+      alert('Failed to update quotation')
+      return { success: false, error: 'Failed to update quotation' }
+    } catch (error) {
+      console.error('Error updating quotation:', error)
+      alert('Error updating quotation')
+      return { success: false, error: 'Error updating quotation' }
     }
   }
 
@@ -1096,56 +1147,6 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error fetching quotations:', error)
       return []
-    }
-  }
-
-  // Update quotation status
-  const updateQuotationStatus = async (id: string, status: string) => {
-    try {
-      const response = await fetch(`/api/quotations/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setQuotations(quotations.map((quotation: any) => 
-            quotation._id === id ? data.data : quotation
-          ))
-        }
-        return data
-      }
-      return { success: false, error: 'Failed to update quotation status' }
-    } catch (error) {
-      console.error('Error updating quotation status:', error)
-      return { success: false, error: 'Error updating quotation status' }
-    }
-  }
-
-  // Delete quotation
-  const deleteQuotation = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this quotation?')) return
-    
-    try {
-      const response = await fetch(`/api/quotations/${id}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setQuotations(quotations.filter((quotation: any) => quotation._id !== id))
-        }
-        return data
-      }
-      return { success: false, error: 'Failed to delete quotation' }
-    } catch (error) {
-      console.error('Error deleting quotation:', error)
-      return { success: false, error: 'Error deleting quotation' }
     }
   }
 
@@ -1842,7 +1843,18 @@ export function DashboardPage() {
                   }}
                 >
                   <FileText className="h-3 w-3 mr-2" />
-                  Received Quotations
+                  Quotations
+                </Button>
+                <Button 
+                  variant={activeSubSection === "enquiries" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("orders")
+                    setActiveSubSection("enquiries")
+                  }}
+                >
+                  <Mail className="h-3 w-3 mr-2" />
+                  Enquiries
                 </Button>
               </div>
             )}
@@ -1863,6 +1875,14 @@ export function DashboardPage() {
               <Button variant="outline">
                 <Download className="h-4 w-4 mr-2" />
                 Export Data
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={handleLogout}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-primary-foreground font-medium text-sm">A</span>
@@ -2132,6 +2152,7 @@ export function DashboardPage() {
                       </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -2194,6 +2215,7 @@ export function DashboardPage() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -2424,6 +2446,7 @@ export function DashboardPage() {
                       </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -2482,6 +2505,7 @@ export function DashboardPage() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -2520,6 +2544,7 @@ export function DashboardPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -2636,6 +2661,7 @@ export function DashboardPage() {
                         )}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -2874,6 +2900,7 @@ export function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     {activeSubSection === "categories" ? (
+                      <div className="overflow-visible">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -2931,7 +2958,9 @@ export function DashboardPage() {
                           )}
                         </TableBody>
                       </Table>
+                      </div>
                     ) : activeSubSection === "sub-categories" ? (
+                      <div className="overflow-visible">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -2993,7 +3022,9 @@ export function DashboardPage() {
                           )}
                         </TableBody>
                       </Table>
+                      </div>
                     ) : activeSubSection === "level2-categories" ? (
+                      <div className="overflow-visible">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -3059,6 +3090,7 @@ export function DashboardPage() {
                           )}
                         </TableBody>
                       </Table>
+                      </div>
                     ) : (
                       <div className="text-center py-8">
                         <p className="text-muted-foreground">Coming soon...</p>
@@ -3718,12 +3750,12 @@ export function DashboardPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Customer Name</TableHead>
-                          <TableHead>Email</TableHead>
+                          <TableHead>User Name</TableHead>
+                          <TableHead>Company</TableHead>
                           <TableHead>Phone</TableHead>
-                          <TableHead>Username</TableHead>
+                          <TableHead>Items</TableHead>
+                          <TableHead>Date</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Last Login</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -3826,6 +3858,7 @@ export function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-visible">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -3968,6 +4001,7 @@ export function DashboardPage() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
               )}
@@ -4256,13 +4290,13 @@ export function DashboardPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Quotation No</TableHead>
-                          <TableHead>Customer Name</TableHead>
+                          <TableHead>User Name</TableHead>
                           <TableHead>Company</TableHead>
-                          <TableHead>Contact</TableHead>
+                          <TableHead>Phone</TableHead>
                           <TableHead>Items</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Status</TableHead>
@@ -4272,13 +4306,13 @@ export function DashboardPage() {
                       <TableBody>
                         {loading ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8">
+                            <TableCell colSpan={7} className="text-center py-8">
                               Loading quotations...
                             </TableCell>
                           </TableRow>
                         ) : quotations.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8">
+                            <TableCell colSpan={7} className="text-center py-8">
                               <div className="text-muted-foreground">
                                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No quotations found</p>
@@ -4289,81 +4323,62 @@ export function DashboardPage() {
                         ) : (
                           quotations
                             .filter((quotation: any) => 
-                              quotation.quotationNo.toLowerCase().includes(quotationSearchTerm.toLowerCase()) ||
-                              quotation.customerName.toLowerCase().includes(quotationSearchTerm.toLowerCase())
+                              (quotation.userName?.toLowerCase() || '').includes(quotationSearchTerm.toLowerCase()) ||
+                              (quotation.userEmail?.toLowerCase() || '').includes(quotationSearchTerm.toLowerCase())
                             )
                             .map((quotation: any) => (
                               <TableRow key={quotation._id}>
                                 <TableCell>
-                                  <div className="font-medium">#{quotation.quotationNo}</div>
+                                  <div className="font-medium">{quotation.userName || 'Guest'}</div>
+                                  <div className="text-sm text-muted-foreground">{quotation.userEmail}</div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="font-medium">{quotation.customerName}</div>
-                                  <div className="text-sm text-muted-foreground">{quotation.customerEmail}</div>
+                                  <div className="text-sm">{quotation.company || '-'}</div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="text-sm">{quotation.companyName || '-'}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{quotation.customerPhone}</div>
+                                  <div className="text-sm">{quotation.userPhone || '-'}</div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="text-sm">{quotation.items?.length || 0} items</div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="text-sm">
-                                    {new Date(quotation.createdAt).toLocaleDateString()}
+                                    {new Date(quotation.quotationDate).toLocaleDateString()}
                                   </div>
                                   <div className="text-xs text-muted-foreground">
-                                    {new Date(quotation.createdAt).toLocaleTimeString()}
+                                    {new Date(quotation.quotationDate).toLocaleTimeString()}
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant={quotation.status === "Quoted" ? "default" : "secondary"}>
-                                    {quotation.status}
+                                  <Badge variant={quotation.status === "pending" ? "secondary" : "default"}>
+                                    {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Select
-                                      value={quotation.status}
-                                      onValueChange={(value) => updateQuotationStatus(quotation._id, value)}
-                                    >
-                                      <SelectTrigger className="w-32 h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Pending">Pending</SelectItem>
-                                        <SelectItem value="Reviewing">Reviewing</SelectItem>
-                                        <SelectItem value="Quoted">Quoted</SelectItem>
-                                        <SelectItem value="Accepted">Accepted</SelectItem>
-                                        <SelectItem value="Rejected">Rejected</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm">
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleViewQuotation(quotation)}>
-                                          <Eye className="h-4 w-4 mr-2" />
-                                          View Complete Details
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => deleteQuotation(quotation._id)}>
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Delete Quotation
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="z-[100]">
+                                      <DropdownMenuItem onClick={() => handleEditQuotation(quotation)}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => deleteQuotation(quotation._id)} className="text-red-600">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </TableCell>
                               </TableRow>
                             ))
                         )}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -4372,7 +4387,7 @@ export function DashboardPage() {
               <Dialog open={isViewQuotationDialogOpen} onOpenChange={setIsViewQuotationDialogOpen}>
                 <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Quotation Details - #{viewingQuotation?.quotationNo}</DialogTitle>
+                    <DialogTitle>Quotation Details</DialogTitle>
                   </DialogHeader>
                   {viewingQuotation && (
                     <div className="space-y-6">
@@ -4380,38 +4395,44 @@ export function DashboardPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground">Customer Name</Label>
-                          <p className="text-sm font-medium mt-1">{viewingQuotation.customerName}</p>
+                          <p className="text-sm font-medium mt-1">{viewingQuotation.userName || 'N/A'}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground">Quotation Date</Label>
-                          <p className="text-sm mt-1">{new Date(viewingQuotation.createdAt).toLocaleString()}</p>
+                          <p className="text-sm mt-1">{new Date(viewingQuotation.quotationDate).toLocaleString()}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                          <p className="text-sm mt-1">{viewingQuotation.customerEmail}</p>
+                          <p className="text-sm mt-1">{viewingQuotation.userEmail}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                          <p className="text-sm mt-1">{viewingQuotation.customerPhone}</p>
+                          <p className="text-sm mt-1">{viewingQuotation.userPhone || 'N/A'}</p>
                         </div>
-                        {viewingQuotation.companyName && (
+                        {viewingQuotation.company && (
                           <div>
                             <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
-                            <p className="text-sm mt-1">{viewingQuotation.companyName}</p>
+                            <p className="text-sm mt-1">{viewingQuotation.company}</p>
+                          </div>
+                        )}
+                        {viewingQuotation.gstNumber && (
+                          <div>
+                            <Label className="text-sm font-medium text-muted-foreground">GST Number</Label>
+                            <p className="text-sm mt-1">{viewingQuotation.gstNumber}</p>
                           </div>
                         )}
                       </div>
 
                       {/* Customer Address */}
-                      {viewingQuotation.customerAddress && (
+                      {viewingQuotation.userAddress && (
                         <div>
                           <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                           <p className="text-sm mt-1">
-                            {viewingQuotation.customerAddress?.street && `${viewingQuotation.customerAddress.street}, `}
-                            {viewingQuotation.customerAddress?.city && `${viewingQuotation.customerAddress.city}, `}
-                            {viewingQuotation.customerAddress?.state && `${viewingQuotation.customerAddress.state} - `}
-                            {viewingQuotation.customerAddress?.zipCode && `${viewingQuotation.customerAddress.zipCode}, `}
-                            {viewingQuotation.customerAddress?.country || 'India'}
+                            {viewingQuotation.userAddress?.street && `${viewingQuotation.userAddress.street}, `}
+                            {viewingQuotation.userAddress?.city && `${viewingQuotation.userAddress.city}, `}
+                            {viewingQuotation.userAddress?.state && `${viewingQuotation.userAddress.state} - `}
+                            {viewingQuotation.userAddress?.zipCode && `${viewingQuotation.userAddress.zipCode}, `}
+                            {viewingQuotation.userAddress?.country || 'India'}
                           </p>
                         </div>
                       )}
@@ -4422,67 +4443,176 @@ export function DashboardPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Product Name</TableHead>
+                              <TableHead>Item Name</TableHead>
                               <TableHead>Quantity</TableHead>
-                              <TableHead>Specifications</TableHead>
-                              <TableHead>Notes</TableHead>
+                              <TableHead>Price</TableHead>
+                              <TableHead>Subtotal</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {viewingQuotation.items?.map((item: any, index: number) => (
                               <TableRow key={index}>
                                 <TableCell>
-                                  <div className="font-medium">{item.productName}</div>
+                                  <div className="font-medium">{item.itemName}</div>
                                 </TableCell>
                                 <TableCell>{item.quantity}</TableCell>
-                                <TableCell>
-                                  <div className="text-sm max-w-xs">{item.specifications || '-'}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm max-w-xs">{item.additionalNotes || '-'}</div>
-                                </TableCell>
+                                <TableCell>₹{item.price?.toLocaleString() || '0'}</TableCell>
+                                <TableCell>₹{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       </div>
 
-                      {/* Message from Customer */}
-                      {viewingQuotation.message && (
+                      {/* Description/Notes */}
+                      {viewingQuotation.description && (
                         <div>
-                          <Label className="text-sm font-medium text-muted-foreground">Customer Message</Label>
-                          <p className="text-sm mt-1 p-3 bg-muted rounded-md">{viewingQuotation.message}</p>
+                          <Label className="text-sm font-medium text-muted-foreground">Special Requirements/Notes</Label>
+                          <p className="text-sm mt-1 p-3 bg-muted rounded-md">{viewingQuotation.description}</p>
                         </div>
                       )}
 
                       {/* Quotation Summary */}
                       <div className="border-t pt-4">
                         <div className="flex justify-between items-center mb-2">
-                          <Label className="text-sm font-medium">Estimated Value</Label>
+                          <Label className="text-sm font-medium">Total Amount</Label>
                           <p className="text-lg font-bold">
-                            {viewingQuotation.totalEstimatedValue 
-                              ? `₹${viewingQuotation.totalEstimatedValue.toLocaleString()}` 
-                              : 'To be quoted'}
+                            ₹{viewingQuotation.totalAmount?.toLocaleString() || '0'}
                           </p>
                         </div>
                         <div className="flex justify-between items-center">
                           <Label className="text-sm font-medium">Status</Label>
-                          <Badge variant={viewingQuotation.status === "Quoted" ? "default" : "secondary"}>
-                            {viewingQuotation.status}
+                          <Badge variant={viewingQuotation.status === "pending" ? "secondary" : "default"}>
+                            {viewingQuotation.status.charAt(0).toUpperCase() + viewingQuotation.status.slice(1)}
                           </Badge>
                         </div>
                       </div>
 
-                      {viewingQuotation.adminNotes && (
-                        <div>
-                          <Label className="text-sm font-medium text-muted-foreground">Admin Notes</Label>
-                          <p className="text-sm mt-1">{viewingQuotation.adminNotes}</p>
-                        </div>
-                      )}
-
                       <div className="flex justify-end">
                         <Button onClick={() => setIsViewQuotationDialogOpen(false)}>
                           Close
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Edit Quotation Dialog */}
+              <Dialog open={isEditQuotationDialogOpen} onOpenChange={setIsEditQuotationDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Edit Quotation</DialogTitle>
+                  </DialogHeader>
+                  {editingQuotation && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">User Name</Label>
+                          <Input
+                            value={editingQuotation.userName || ''}
+                            onChange={(e) => setEditingQuotation({ ...editingQuotation, userName: e.target.value })}
+                            placeholder="User name"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                          <Input
+                            value={editingQuotation.userEmail}
+                            disabled
+                            className="mt-1 bg-gray-100"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                          <Input
+                            value={editingQuotation.userPhone || ''}
+                            onChange={(e) => setEditingQuotation({ ...editingQuotation, userPhone: e.target.value })}
+                            placeholder="Phone number"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Company</Label>
+                          <Input
+                            value={editingQuotation.company || ''}
+                            onChange={(e) => setEditingQuotation({ ...editingQuotation, company: e.target.value })}
+                            placeholder="Company name"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">GST Number</Label>
+                        <Input
+                          value={editingQuotation.gstNumber || ''}
+                          onChange={(e) => setEditingQuotation({ ...editingQuotation, gstNumber: e.target.value })}
+                          placeholder="GST number"
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Total Amount</Label>
+                        <Input
+                          type="number"
+                          value={editingQuotation.totalAmount || ''}
+                          onChange={(e) => setEditingQuotation({ ...editingQuotation, totalAmount: parseFloat(e.target.value) })}
+                          placeholder="Total amount"
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Description/Notes</Label>
+                        <Textarea
+                          value={editingQuotation.description || ''}
+                          onChange={(e) => setEditingQuotation({ ...editingQuotation, description: e.target.value })}
+                          placeholder="Special requirements or notes"
+                          rows={4}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                        <Select
+                          value={editingQuotation.status || 'pending'}
+                          onValueChange={(value) => setEditingQuotation({ ...editingQuotation, status: value })}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="reviewing">Reviewing</SelectItem>
+                            <SelectItem value="quoted">Quoted</SelectItem>
+                            <SelectItem value="accepted">Accepted</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex justify-end space-x-3 pt-6">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditQuotationDialogOpen(false)
+                            setEditingQuotation(null)
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={saveQuotationChanges}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Save Changes
                         </Button>
                       </div>
                     </div>
@@ -4887,6 +5017,102 @@ export function DashboardPage() {
                 </DialogContent>
               </Dialog>
             </div>
+          )}
+
+          {/* Enquiries Tab */}
+          {activeSubSection === "enquiries" && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Enquiries</CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input
+                        placeholder="Search enquiries..."
+                        className="pl-10 w-64"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-visible">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User Email</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Item Type</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          Loading enquiries...
+                        </TableCell>
+                      </TableRow>
+                    ) : enquiries.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="text-muted-foreground">
+                            <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>No enquiries found</p>
+                            <p className="text-sm">Customer enquiries will appear here</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      enquiries.map((enquiry: any) => (
+                        <TableRow key={enquiry._id}>
+                          <TableCell>
+                            <div className="text-sm">{enquiry.userEmail}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{enquiry.itemName}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {enquiry.itemType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm max-w-xs truncate">{enquiry.message}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {new Date(enquiry.enquiryDate).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'}>
+                              {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => console.log('View enquiry:', enquiry._id)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </main>
       </div>

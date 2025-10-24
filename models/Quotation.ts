@@ -1,38 +1,50 @@
 import mongoose from 'mongoose'
 
-const QuotationItemSchema = new mongoose.Schema({
-  productName: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  specifications: { type: String },
-  additionalNotes: { type: String }
+const QuotationSchema = new mongoose.Schema({
+  userId: String,
+  userEmail: {
+    type: String,
+    required: [true, 'User email is required']
+  },
+  userName: String,
+  userPhone: String,
+  userAddress: {
+    street: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String,
+    _id: false
+  },
+  items: [{
+    itemId: String,
+    itemName: String,
+    quantity: Number,
+    price: Number,
+    _id: false
+  }],
+  totalAmount: Number,
+  description: String,
+  company: String,
+  gstNumber: String,
+  status: {
+    type: String,
+    default: 'pending'
+  },
+  quotationDate: {
+    type: Date,
+    default: Date.now
+  },
+  notes: String
+}, {
+  timestamps: true,
+  collection: 'quotations'
 })
 
-const QuotationSchema = new mongoose.Schema({
-  quotationNo: { type: String, required: true, unique: true },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
-  customerName: { type: String, required: true },
-  customerEmail: { type: String, required: true },
-  customerPhone: { type: String, required: true },
-  customerAddress: {
-    street: { type: String },
-    city: { type: String },
-    state: { type: String },
-    zipCode: { type: String },
-    country: { type: String, default: "India" }
-  },
-  companyName: { type: String },
-  items: [QuotationItemSchema],
-  totalEstimatedValue: { type: Number },
-  message: { type: String },
-  status: { 
-    type: String, 
-    enum: ['Pending', 'Reviewing', 'Quoted', 'Accepted', 'Rejected'], 
-    default: 'Pending' 
-  },
-  adminNotes: { type: String },
-  quotedAmount: { type: Number },
-  quotedDate: { type: Date }
-}, { timestamps: true })
+// Delete existing model to avoid caching issues
+if (mongoose.models.Quotation) {
+  delete mongoose.models.Quotation
+}
 
-export default mongoose.models.Quotation || mongoose.model('Quotation', QuotationSchema)
+export default mongoose.model('Quotation', QuotationSchema)
 

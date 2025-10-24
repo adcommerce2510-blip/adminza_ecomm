@@ -39,7 +39,7 @@ export function DynamicCategoriesSection() {
 
   if (loading) {
     return (
-      <section className="py-20 bg-white">
+      <section className="py-8 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <div className="animate-pulse bg-gray-200 h-8 w-64 mx-auto mb-4 rounded"></div>
@@ -61,10 +61,10 @@ export function DynamicCategoriesSection() {
   }
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-8 bg-white">
       <div className="container mx-auto px-4">
         <AnimatedWrapper animation="fade-in-up">
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="text-center max-w-3xl mx-auto mb-12 pt-12">
             <AnimatedWrapper animation="fade-in" delay={200}>
               <h2 className="text-4xl md:text-5xl font-bold mb-6">
                 Explore Our <span className="gradient-text bg-clip-text text-transparent" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)', WebkitBackgroundClip: 'text'}}>Categories</span>

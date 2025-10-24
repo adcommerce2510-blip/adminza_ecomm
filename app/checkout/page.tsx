@@ -93,59 +93,104 @@ export default function CheckoutPage() {
 
     // Get logged in user info
     const userInfo = localStorage.getItem("user")
-    let customerId = "guest"
-    let customerName = formData.name
-    let customerEmail = formData.email
-    let customerPhone = formData.phone
+    let userEmail = formData.email
 
     if (userInfo) {
       try {
         const user = JSON.parse(userInfo)
-        // Store the actual MongoDB ObjectId from the user object
-        customerId = user._id || user.id || "guest"
-        customerName = user.name || formData.name
-        customerEmail = user.email || formData.email
-        customerPhone = user.phone || formData.phone
-        
-        console.log("Logged in user placing order:", {
-          customerId,
-          customerName,
-          customerEmail
-        })
+        userEmail = user.email || formData.email
       } catch (error) {
         console.error("Error parsing user info:", error)
       }
     }
 
+    // HANDLE QUOTATION SUBMISSION
+    if (checkoutType === "quotation") {
+      const quotationData = {
+        userEmail,
+        userName: formData.name,
+        userPhone: formData.phone,
+        userAddress: {
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: "India"
+        },
+        items: cartItems.map((item: any) => ({
+          itemId: item.id,
+          itemName: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        totalAmount: getTotalPrice(),
+        description: formData.notes,
+        company: formData.company,
+        gstNumber: formData.gstNumber,
+        status: "pending",
+        quotationDate: new Date().toISOString()
+      }
+
+      console.log('Sending quotation data:', quotationData)
+
+      try {
+        const response = await fetch("/api/quotations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(quotationData)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error("API Error response:", errorData)
+          throw new Error(errorData.error || "Failed to create quotation")
+        }
+
+        const result = await response.json()
+        console.log("Quotation created:", result)
+
+        // Clear cart and redirect
+        localStorage.removeItem("cart")
+        setCartItems([])
+        alert("Quotation request submitted successfully! You can view it in your Accounts.")
+        router.push("/my-accounts")
+      } catch (error) {
+        console.error("Error creating quotation:", error)
+        const errorMsg = error instanceof Error ? error.message : "Unknown error"
+        alert(`Error submitting quotation: ${errorMsg}`)
+      }
+      return
+    }
+
+    // HANDLE BILLING/ORDER SUBMISSION
     const orderData = {
-      orderNo: `ORD${Date.now()}`,
-      customerId: customerId || "guest",
-      customerName,
-      customerEmail,
-      customerPhone,
+      userEmail,
+      items: cartItems.map((item: any) => ({
+        productId: item.id,
+        productName: item.name,
+        quantity: item.quantity,
+        price: item.price
+      })),
+      totalAmount: getTotalPrice() * 1.18, // Including 18% tax
       shippingAddress: {
+        receiverName: formData.name,
         street: formData.address,
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
         country: "India"
       },
-      items: cartItems.map((item: any) => ({
-        productId: item.id,
-        productName: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        total: item.price * item.quantity
-      })),
-      totalAmount: getTotalPrice() * 1.18, // Including 18% tax
-      status: checkoutType === "billing" ? "Order Placed" : "Pending",
-      paymentMethod: checkoutType === "billing" ? "Online" : "Quotation",
-      paymentStatus: checkoutType === "billing" ? "Pending" : "Pending",
-      notes: formData.notes || ""
+      phone: formData.phone,
+      company: formData.company,
+      gstNumber: formData.gstNumber,
+      notes: formData.notes,
+      status: "Order Placed",
+      orderDate: new Date().toISOString()
     }
 
     try {
-      // Save order to database via API
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -159,45 +204,15 @@ export default function CheckoutPage() {
       }
 
       const result = await response.json()
-      console.log("Order creation response:", result)
+      console.log("Order created:", result)
 
-      // Extract the actual order data from the API response
-      const savedOrder = result.data || result
-      const orderId = savedOrder._id || savedOrder.orderNo || orderData.orderNo
-
-      // Also save to localStorage for confirmation page
-      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-      const orderForStorage = {
-        id: orderId,
-        items: orderData.items,
-        customerInfo: {
-          name: orderData.customerName,
-          email: orderData.customerEmail,
-          phone: orderData.customerPhone,
-          address: orderData.shippingAddress.street,
-          city: orderData.shippingAddress.city,
-          state: orderData.shippingAddress.state,
-          zipCode: orderData.shippingAddress.zipCode,
-          company: formData.company,
-          gstNumber: formData.gstNumber,
-          notes: formData.notes
-        },
-        checkoutType,
-        totalAmount: orderData.totalAmount,
-        orderDate: new Date().toISOString()
-      }
-      
-      existingOrders.push(orderForStorage)
-      localStorage.setItem("orders", JSON.stringify(existingOrders))
-
-      // Clear cart
+      // Clear cart and redirect
       localStorage.removeItem("cart")
       setCartItems([])
-
-      // Redirect to confirmation
-      router.push(`/order-confirmation?orderId=${orderId}&type=${checkoutType}`)
+      alert("Order placed successfully! You can view it in your Accounts.")
+      router.push("/my-accounts")
     } catch (error) {
-      console.error("Error processing order:", error)
+      console.error("Error creating order:", error)
       alert("There was an error processing your order. Please try again.")
     }
   }
@@ -299,16 +314,194 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        required
-                      />
+
+                  {/* QUOTATION FORM - Show items */}
+                  {checkoutType === "quotation" && (
+                    <div className="mb-6">
+                      <Label className="text-base font-semibold mb-3 block">Items Requested</Label>
+                      <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+                        {cartItems.map((item) => (
+                          <div key={item.id} className="flex justify-between items-center pb-3 border-b last:border-b-0">
+                            <div>
+                              <p className="font-medium text-gray-900">{item.name}</p>
+                              <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                            </div>
+                            <p className="font-semibold text-gray-900">₹{(item.price * item.quantity).toLocaleString()}</p>
+                          </div>
+                        ))}
+                        <div className="pt-3 border-t mt-3">
+                          <div className="flex justify-between">
+                            <span className="font-semibold">Estimated Total:</span>
+                            <span className="font-bold text-lg">₹{getTotalPrice().toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* User Details Section */}
+                      <div className="mt-6 pt-6 border-t">
+                        <Label className="text-base font-semibold mb-4 block">Your Details</Label>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor="quotation-name">Full Name *</Label>
+                            <Input
+                              id="quotation-name"
+                              value={formData.name}
+                              onChange={(e) => setFormData({...formData, name: e.target.value})}
+                              placeholder="Your full name"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quotation-phone">Phone Number *</Label>
+                            <Input
+                              id="quotation-phone"
+                              type="tel"
+                              value={formData.phone}
+                              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                              placeholder="Contact number"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <Label htmlFor="quotation-company">Company Name</Label>
+                          <Input
+                            id="quotation-company"
+                            value={formData.company}
+                            onChange={(e) => setFormData({...formData, company: e.target.value})}
+                            placeholder="Company name (optional)"
+                          />
+                        </div>
+
+                        <div className="mb-4">
+                          <Label htmlFor="quotation-address">Address</Label>
+                          <Input
+                            id="quotation-address"
+                            value={formData.address}
+                            onChange={(e) => setFormData({...formData, address: e.target.value})}
+                            placeholder="Street address"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor="quotation-city">City</Label>
+                            <Input
+                              id="quotation-city"
+                              value={formData.city}
+                              onChange={(e) => setFormData({...formData, city: e.target.value})}
+                              placeholder="City"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quotation-state">State</Label>
+                            <Input
+                              id="quotation-state"
+                              value={formData.state}
+                              onChange={(e) => setFormData({...formData, state: e.target.value})}
+                              placeholder="State"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quotation-zip">ZIP Code</Label>
+                            <Input
+                              id="quotation-zip"
+                              value={formData.zipCode}
+                              onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
+                              placeholder="ZIP Code"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="quotation-gst">GST Number (Optional)</Label>
+                          <Input
+                            id="quotation-gst"
+                            value={formData.gstNumber}
+                            onChange={(e) => setFormData({...formData, gstNumber: e.target.value})}
+                            placeholder="GST registration number"
+                          />
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  {/* BILLING FORM - Show shipping fields */}
+                  {checkoutType === "billing" && (
+                    <div className="mb-6 pb-6 border-b">
+                      <Label className="text-base font-semibold mb-3 block">Shipping Address</Label>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <Label htmlFor="receiverName">Receiver Name *</Label>
+                          <Input
+                            id="receiverName"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            placeholder="Full name of recipient"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="receiverPhone">Receiver Phone *</Label>
+                          <Input
+                            id="receiverPhone"
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                            placeholder="Contact number"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="address">Delivery Address *</Label>
+                        <Input
+                          id="address"
+                          value={formData.address}
+                          onChange={(e) => setFormData({...formData, address: e.target.value})}
+                          placeholder="Street address"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <Label htmlFor="city">City *</Label>
+                          <Input
+                            id="city"
+                            value={formData.city}
+                            onChange={(e) => setFormData({...formData, city: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="state">State *</Label>
+                          <Input
+                            id="state"
+                            value={formData.state}
+                            onChange={(e) => setFormData({...formData, state: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="zipCode">ZIP Code *</Label>
+                          <Input
+                            id="zipCode"
+                            value={formData.zipCode}
+                            onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* COMMON FIELDS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="email">Email *</Label>
                       <Input
@@ -316,19 +509,6 @@ export default function CheckoutPage() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="phone">Phone *</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         required
                       />
                     </div>
@@ -343,46 +523,6 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="address">Address *</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => setFormData({...formData, city: e.target.value})}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State *</Label>
-                      <Input
-                        id="state"
-                        value={formData.state}
-                        onChange={(e) => setFormData({...formData, state: e.target.value})}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">ZIP Code *</Label>
-                      <Input
-                        id="zipCode"
-                        value={formData.zipCode}
-                        onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
                     <Label htmlFor="gstNumber">GST Number (Optional)</Label>
                     <Input
                       id="gstNumber"
@@ -392,12 +532,16 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="notes">Additional Notes</Label>
+                    <Label htmlFor="notes">
+                      {checkoutType === "quotation" ? "Special Requirements or Notes" : "Additional Notes"}
+                    </Label>
                     <Textarea
                       id="notes"
                       value={formData.notes}
                       onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                      placeholder="Any special instructions or requirements..."
+                      placeholder={checkoutType === "quotation" 
+                        ? "Describe your requirements or specifications..." 
+                        : "Any special instructions or requirements..."}
                       rows={3}
                     />
                   </div>

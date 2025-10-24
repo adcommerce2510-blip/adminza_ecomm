@@ -271,11 +271,11 @@ export function Header() {
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2 text-primary">
                 <Phone className="h-4 w-4" />
-                <span className="font-medium">+91 98765 43210</span>
+                <span className="font-medium">+91 8433661506</span>
               </div>
               <div className="flex items-center space-x-2 text-primary">
                 <Mail className="h-4 w-4" />
-                <span className="font-medium">support@adminza.com</span>
+                <span className="font-medium">customercare@adminza.in</span>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
@@ -367,20 +367,12 @@ export function Header() {
                       
                       <div className="p-2">
                         <Link 
-                          href="/my-orders" 
-                          className="flex items-center px-3 py-2 hover:bg-gray-100 rounded-md transition-colors"
-                          onClick={() => setIsUserDropdownOpen(false)}
-                        >
-                          <ShoppingCart className="h-4 w-4 mr-3 text-gray-600" />
-                          <span className="text-sm text-gray-700">My Orders</span>
-                        </Link>
-                        <Link 
-                          href="/my-profile" 
+                          href="/my-accounts" 
                           className="flex items-center px-3 py-2 hover:bg-gray-100 rounded-md transition-colors"
                           onClick={() => setIsUserDropdownOpen(false)}
                         >
                           <User className="h-4 w-4 mr-3 text-gray-600" />
-                          <span className="text-sm text-gray-700">Profile Settings</span>
+                          <span className="text-sm text-gray-700">Accounts</span>
                         </Link>
                         
                         <div className="border-t my-2"></div>
