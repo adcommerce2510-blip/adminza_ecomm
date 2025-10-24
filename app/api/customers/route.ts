@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongodb'
+import Customer from '@/models/Customer'
 
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
-    // Return empty array for now as there's no Customer model yet
+    
+    const customers = await Customer.find({}).sort({ createdAt: -1 })
+    
     return NextResponse.json({
       success: true,
-      data: []
+      data: customers
     })
   } catch (error) {
     console.error('Error fetching customers:', error)
