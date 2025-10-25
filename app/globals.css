@@ -68,14 +68,14 @@
 [data-radix-dialog-content] {
   width: 90vw !important;
   max-width: 1200px !important;
-  height: 600px !important;
+  height: 700px !important;
 }
 
 /* Additional modal width enforcement */
 .dialog-content-wide {
   width: 90vw !important;
   max-width: 1200px !important;
-  height: 600px !important;
+  height: 700px !important;
 }
 
 :root {
