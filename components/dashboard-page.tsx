@@ -5327,7 +5327,7 @@ export function DashboardPage() {
                 <DialogTitle>Edit Enquiry</DialogTitle>
               </DialogHeader>
               {editingEnquiry && (
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[calc(90vh-120px)] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>User Email</Label>
@@ -5375,7 +5375,8 @@ export function DashboardPage() {
                     <Textarea
                       value={editingEnquiry.message}
                       onChange={(e) => setEditingEnquiry({ ...editingEnquiry, message: e.target.value })}
-                      rows={4}
+                      rows={3}
+                      className="resize-none"
                     />
                   </div>
 
@@ -5401,12 +5402,13 @@ export function DashboardPage() {
                     <Textarea
                       value={editingEnquiry.responseNotes || ''}
                       onChange={(e) => setEditingEnquiry({ ...editingEnquiry, responseNotes: e.target.value })}
-                      rows={3}
+                      rows={2}
                       placeholder="Add your response notes here..."
+                      className="resize-none"
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-2">
+                  <div className="flex justify-end space-x-2 pt-4 border-t">
                     <Button
                       variant="outline"
                       onClick={() => setIsEditEnquiryDialogOpen(false)}
