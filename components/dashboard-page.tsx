@@ -5064,17 +5064,17 @@ export function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                <Table className="min-w-full">
+                <div className="overflow-visible">
+                <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[180px]">User Email</TableHead>
-                      <TableHead className="w-[150px]">Item Name</TableHead>
-                      <TableHead className="w-[120px]">Item Type</TableHead>
-                      <TableHead className="w-[300px]">Message</TableHead>
-                      <TableHead className="w-[120px]">Date</TableHead>
-                      <TableHead className="w-[200px]">Status</TableHead>
-                      <TableHead className="w-[150px]">Actions</TableHead>
+                      <TableHead>User Email</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Item Type</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -5097,41 +5097,38 @@ export function DashboardPage() {
                     ) : (
                       enquiries.map((enquiry: any) => (
                         <TableRow key={enquiry._id}>
-                          <TableCell className="w-[180px]">
-                            <div className="text-sm truncate" title={enquiry.userEmail}>
-                              {enquiry.userEmail}
-                            </div>
+                          <TableCell>
+                            <div className="text-sm">{enquiry.userEmail}</div>
                           </TableCell>
-                          <TableCell className="w-[150px]">
-                            <div className="font-medium truncate" title={enquiry.itemName}>
-                              {enquiry.itemName}
-                            </div>
+                          <TableCell>
+                            <div className="font-medium">{enquiry.itemName}</div>
                           </TableCell>
-                          <TableCell className="w-[120px]">
+                          <TableCell>
                             <Badge variant="outline" className="capitalize">
                               {enquiry.itemType}
                             </Badge>
                           </TableCell>
-                          <TableCell className="w-[300px]">
-                            <div className="text-sm truncate" title={enquiry.message}>
-                              {enquiry.message}
+                          <TableCell>
+                            <div className="text-sm max-w-xs truncate" title={enquiry.message}>
+                              {enquiry.message.split(' ').slice(0, 3).join(' ')}
+                              {enquiry.message.split(' ').length > 3 && '...'}
                             </div>
                           </TableCell>
-                          <TableCell className="w-[120px]">
+                          <TableCell>
                             <div className="text-sm">
                               {new Date(enquiry.enquiryDate).toLocaleDateString()}
                             </div>
                           </TableCell>
-                          <TableCell className="w-[200px]">
+                          <TableCell>
                             <div className="flex items-center space-x-2">
-                              <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'} className="text-xs">
+                              <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'}>
                                 {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
                               </Badge>
                               <Select
                                 value={enquiry.status}
                                 onValueChange={(value) => console.log('Update enquiry status:', enquiry._id, value)}
                               >
-                                <SelectTrigger className="w-24 h-7 text-xs">
+                                <SelectTrigger className="w-32 h-8">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -5142,14 +5139,13 @@ export function DashboardPage() {
                               </Select>
                             </div>
                           </TableCell>
-                          <TableCell className="w-[150px]">
-                            <div className="flex items-center space-x-1">
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => console.log('View enquiry:', enquiry._id)}
                                 title="View enquiry details"
-                                className="h-8 w-8 p-0"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -5158,7 +5154,6 @@ export function DashboardPage() {
                                 size="sm"
                                 onClick={() => console.log('Edit enquiry:', enquiry._id)}
                                 title="Edit enquiry"
-                                className="h-8 w-8 p-0"
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -5167,7 +5162,7 @@ export function DashboardPage() {
                                 size="sm"
                                 onClick={() => console.log('Delete enquiry:', enquiry._id)}
                                 title="Delete enquiry"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
