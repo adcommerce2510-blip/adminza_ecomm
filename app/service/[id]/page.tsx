@@ -5,6 +5,11 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MessageCircle, Star, Truck, Shield, Clock, Package, ChevronLeft, ChevronRight, Check, Phone, Mail } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -30,6 +35,18 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
   const [service, setService] = useState<Service | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
+  const [isEnquiryDialogOpen, setIsEnquiryDialogOpen] = useState(false)
+  const [enquiryForm, setEnquiryForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    message: "",
+    preferredContactMethod: "email",
+    serviceName: "",
+    servicePrice: "",
+    serviceDescription: "",
+    serviceCategory: ""
+  })
 
   useEffect(() => {
     const fetchService = async () => {
@@ -60,14 +77,70 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
   const handlePlaceEnquiry = () => {
     if (!service) return
     
-    // Create enquiry message
-    const enquiryMessage = `Hi! I'm interested in your "${service.name}" service. Please provide more details and pricing information.`
+    // Load user data from localStorage if available
+    let userData = { name: "", email: "", phone: "" }
+    const user = localStorage.getItem("user")
+    if (user) {
+      try {
+        userData = JSON.parse(user)
+      } catch (error) {
+        console.error("Error parsing user data:", error)
+      }
+    }
     
-    // You can replace this with actual enquiry handling
-    alert(`Enquiry placed for: ${service.name}\n\nWe'll contact you soon with more details!`)
+    setEnquiryForm({
+      name: userData.name || "",
+      email: userData.email || "",
+      phone: userData.phone || "",
+      message: `Hi! I'm interested in your "${service.name}" service. Please provide more details and pricing information.`,
+      preferredContactMethod: "email",
+      serviceName: service.name,
+      servicePrice: `₹${service.price.toLocaleString()}`,
+      serviceDescription: service.description,
+      serviceCategory: service.category
+    })
+    setIsEnquiryDialogOpen(true)
+  }
+
+  const handleEnquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     
-    // Optional: Redirect to contact page or enquiry form
-    // router.push('/contact')
+    if (!service) return
+    
+    try {
+      const enquiryData = {
+        userId: "guest", // For now, we'll use "guest" as userId
+        userEmail: enquiryForm.email,
+        itemId: service._id,
+        itemType: "service",
+        itemName: service.name,
+        message: enquiryForm.message,
+        phone: enquiryForm.phone,
+        preferredContactMethod: enquiryForm.preferredContactMethod,
+        status: "pending"
+      }
+      
+      const response = await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(enquiryData),
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`Enquiry submitted successfully for ${service.name}!\n\nWe'll contact you soon with more details.`)
+        setIsEnquiryDialogOpen(false)
+        setEnquiryForm({ name: "", email: "", phone: "", message: "", preferredContactMethod: "email", serviceName: "", servicePrice: "", serviceDescription: "", serviceCategory: "" })
+      } else {
+        alert('Error submitting enquiry: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error submitting enquiry:', error)
+      alert('Error submitting enquiry. Please try again.')
+    }
   }
 
   if (loading) {
@@ -308,6 +381,133 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
           </div>
         </div>
       </div>
+      
+      {/* Enquiry Form Modal */}
+      <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Place Enquiry</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEnquirySubmit} className="space-y-6">
+            {/* Service Details Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-3">Service Details</h3>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="service-name">Service Name</Label>
+                  <Input
+                    id="service-name"
+                    value={enquiryForm.serviceName}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, serviceName: e.target.value})}
+                    className="bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="service-price">Price</Label>
+                  <Input
+                    id="service-price"
+                    value={enquiryForm.servicePrice}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, servicePrice: e.target.value})}
+                    className="bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="service-description">Description</Label>
+                  <Textarea
+                    id="service-description"
+                    value={enquiryForm.serviceDescription}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, serviceDescription: e.target.value})}
+                    rows={3}
+                    className="bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="service-category">Category</Label>
+                  <Input
+                    id="service-category"
+                    value={enquiryForm.serviceCategory}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, serviceCategory: e.target.value})}
+                    className="bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Your Details Section */}
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Your Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="enquiry-name">Your Name</Label>
+                  <Input
+                    id="enquiry-name"
+                    placeholder="Enter your name"
+                    value={enquiryForm.name}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="enquiry-email">Email Address</Label>
+                  <Input
+                    id="enquiry-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={enquiryForm.email}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, email: e.target.value})}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="enquiry-phone">Phone Number</Label>
+                  <Input
+                    id="enquiry-phone"
+                    placeholder="Enter your phone number"
+                    value={enquiryForm.phone}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, phone: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="enquiry-message">Message</Label>
+                  <Textarea
+                    id="enquiry-message"
+                    placeholder="Describe your requirements..."
+                    value={enquiryForm.message}
+                    onChange={(e) => setEnquiryForm({...enquiryForm, message: e.target.value})}
+                    rows={4}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="enquiry-contact">Preferred Contact Method</Label>
+                  <Select
+                    value={enquiryForm.preferredContactMethod}
+                    onValueChange={(value) => setEnquiryForm({...enquiryForm, preferredContactMethod: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="phone">Phone</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">
+                Submit Enquiry
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       <Footer />
     </div>
