@@ -9,6 +9,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { MessageCircle, Star, Search, Filter, Grid, List, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -40,6 +43,15 @@ export default function AllServicesPage() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("name")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [isEnquiryDialogOpen, setIsEnquiryDialogOpen] = useState(false)
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [enquiryForm, setEnquiryForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    message: "",
+    preferredContactMethod: "email"
+  })
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -83,8 +95,57 @@ export default function AllServicesPage() {
   }, [categoryParam, subcategoryParam, subSubcategoryParam])
 
   const handlePlaceEnquiry = (service: Service) => {
-    const enquiryMessage = `Hi! I'm interested in your "${service.name}" service. Please provide more details and pricing information.`
-    alert(`Enquiry placed for: ${service.name}\n\nWe'll contact you soon with more details!`)
+    setSelectedService(service)
+    setEnquiryForm({
+      name: "",
+      email: "",
+      phone: "",
+      message: `Hi! I'm interested in your "${service.name}" service. Please provide more details and pricing information.`,
+      preferredContactMethod: "email"
+    })
+    setIsEnquiryDialogOpen(true)
+  }
+
+  const handleEnquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedService) return
+    
+    try {
+      const enquiryData = {
+        userId: "guest", // For now, we'll use "guest" as userId
+        userEmail: enquiryForm.email,
+        itemId: selectedService._id,
+        itemType: "service",
+        itemName: selectedService.name,
+        message: enquiryForm.message,
+        phone: enquiryForm.phone,
+        preferredContactMethod: enquiryForm.preferredContactMethod,
+        status: "pending"
+      }
+      
+      const response = await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(enquiryData),
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`Enquiry submitted successfully for ${selectedService.name}!\n\nWe'll contact you soon with more details.`)
+        setIsEnquiryDialogOpen(false)
+        setEnquiryForm({ name: "", email: "", phone: "", message: "", preferredContactMethod: "email" })
+        setSelectedService(null)
+      } else {
+        alert('Error submitting enquiry: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error submitting enquiry:', error)
+      alert('Error submitting enquiry. Please try again.')
+    }
   }
 
   const filteredServices = services.filter(service => {
@@ -306,6 +367,82 @@ export default function AllServicesPage() {
           </div>
         )}
       </div>
+      
+      {/* Enquiry Form Modal */}
+      <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Place Enquiry</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEnquirySubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="enquiry-name">Your Name</Label>
+              <Input
+                id="enquiry-name"
+                placeholder="Enter your name"
+                value={enquiryForm.name}
+                onChange={(e) => setEnquiryForm({...enquiryForm, name: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="enquiry-email">Email Address</Label>
+              <Input
+                id="enquiry-email"
+                type="email"
+                placeholder="Enter your email"
+                value={enquiryForm.email}
+                onChange={(e) => setEnquiryForm({...enquiryForm, email: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="enquiry-phone">Phone Number</Label>
+              <Input
+                id="enquiry-phone"
+                placeholder="Enter your phone number"
+                value={enquiryForm.phone}
+                onChange={(e) => setEnquiryForm({...enquiryForm, phone: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="enquiry-message">Message</Label>
+              <Textarea
+                id="enquiry-message"
+                placeholder="Describe your requirements..."
+                value={enquiryForm.message}
+                onChange={(e) => setEnquiryForm({...enquiryForm, message: e.target.value})}
+                rows={4}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="enquiry-contact">Preferred Contact Method</Label>
+              <Select
+                value={enquiryForm.preferredContactMethod}
+                onValueChange={(value) => setEnquiryForm({...enquiryForm, preferredContactMethod: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">
+                Submit Enquiry
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       <Footer />
     </div>
