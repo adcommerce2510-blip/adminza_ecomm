@@ -39,6 +39,33 @@
   background-color: #9ca3af;
 }
 
+/* Force scrollbar visibility for enquiry form */
+.enquiry-form-scrollable {
+  overflow-y: scroll !important;
+  max-height: 60vh !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #d1d5db #f3f4f6 !important;
+}
+
+.enquiry-form-scrollable::-webkit-scrollbar {
+  width: 8px !important;
+  display: block !important;
+}
+
+.enquiry-form-scrollable::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 4px !important;
+}
+
+.enquiry-form-scrollable::-webkit-scrollbar-thumb {
+  background: #d1d5db !important;
+  border-radius: 4px !important;
+}
+
+.enquiry-form-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af !important;
+}
+
 :root {
   /* Professional business color scheme - Blue & Gray palette */
   --background: oklch(0.99 0.005 240);

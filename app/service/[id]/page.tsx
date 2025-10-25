@@ -388,7 +388,7 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <div className="enquiry-form-scrollable pr-2">
             <form onSubmit={handleEnquirySubmit} className="space-y-6 pb-4">
             {/* Service Details Section */}
             <div className="bg-gray-50 p-4 rounded-lg">
