@@ -4,7 +4,9 @@ import { DashboardAuth } from "@/components/dashboard-auth"
 export default function Dashboard() {
   return (
     <DashboardAuth>
-      <DashboardPage />
+      <div className="min-h-screen bg-background">
+        <DashboardPage />
+      </div>
     </DashboardAuth>
   )
 }
