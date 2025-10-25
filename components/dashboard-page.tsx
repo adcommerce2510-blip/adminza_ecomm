@@ -261,6 +261,10 @@ export function DashboardPage() {
   const [editingQuotation, setEditingQuotation] = useState<any>(null)
   const [enquiries, setEnquiries] = useState<any[]>([])
   const [enquirySearchTerm, setEnquirySearchTerm] = useState("")
+  const [isViewEnquiryDialogOpen, setIsViewEnquiryDialogOpen] = useState(false)
+  const [viewingEnquiry, setViewingEnquiry] = useState<any>(null)
+  const [isEditEnquiryDialogOpen, setIsEditEnquiryDialogOpen] = useState(false)
+  const [editingEnquiry, setEditingEnquiry] = useState<any>(null)
   const [isViewProductDetailsDialogOpen, setIsViewProductDetailsDialogOpen] = useState(false)
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -894,6 +898,68 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting quotation:', error)
       return { success: false, error: 'Error deleting quotation' }
+    }
+  }
+
+  // View enquiry details
+  const handleViewEnquiry = (enquiry: any) => {
+    setViewingEnquiry(enquiry)
+    setIsViewEnquiryDialogOpen(true)
+  }
+
+  // Edit enquiry
+  const handleEditEnquiry = (enquiry: any) => {
+    setEditingEnquiry(enquiry)
+    setIsEditEnquiryDialogOpen(true)
+  }
+
+  // Update enquiry status
+  const updateEnquiryStatus = async (id: string, status: string) => {
+    try {
+      const response = await fetch(`/api/enquiries/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setEnquiries(enquiries.map((enquiry: any) => 
+            enquiry._id === id ? data.data : enquiry
+          ))
+        }
+        return data
+      }
+      return { success: false, error: 'Failed to update enquiry status' }
+    } catch (error) {
+      console.error('Error updating enquiry status:', error)
+      return { success: false, error: 'Error updating enquiry status' }
+    }
+  }
+
+  // Delete enquiry
+  const deleteEnquiry = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this enquiry?')) return
+    
+    try {
+      const response = await fetch(`/api/enquiries/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setEnquiries(enquiries.filter((enquiry: any) => enquiry._id !== id))
+        }
+        return data
+      }
+      return { success: false, error: 'Failed to delete enquiry' }
+    } catch (error) {
+      console.error('Error deleting enquiry:', error)
+      return { success: false, error: 'Error deleting enquiry' }
     }
   }
 
@@ -5126,7 +5192,7 @@ export function DashboardPage() {
                               </Badge>
                               <Select
                                 value={enquiry.status}
-                                onValueChange={(value) => console.log('Update enquiry status:', enquiry._id, value)}
+                                onValueChange={(value) => updateEnquiryStatus(enquiry._id, value)}
                               >
                                 <SelectTrigger className="w-32 h-8">
                                   <SelectValue />
@@ -5144,7 +5210,7 @@ export function DashboardPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => console.log('View enquiry:', enquiry._id)}
+                                onClick={() => handleViewEnquiry(enquiry)}
                                 title="View enquiry details"
                               >
                                 <Eye className="h-4 w-4" />
@@ -5152,7 +5218,7 @@ export function DashboardPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => console.log('Edit enquiry:', enquiry._id)}
+                                onClick={() => handleEditEnquiry(enquiry)}
                                 title="Edit enquiry"
                               >
                                 <Edit className="h-4 w-4" />
@@ -5160,7 +5226,7 @@ export function DashboardPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => console.log('Delete enquiry:', enquiry._id)}
+                                onClick={() => deleteEnquiry(enquiry._id)}
                                 title="Delete enquiry"
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
@@ -5177,6 +5243,205 @@ export function DashboardPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* View Enquiry Dialog */}
+          <Dialog open={isViewEnquiryDialogOpen} onOpenChange={setIsViewEnquiryDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Enquiry Details</DialogTitle>
+              </DialogHeader>
+              {viewingEnquiry && (
+                <div className="space-y-6">
+                  {/* Customer Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">User Email</Label>
+                      <p className="text-sm font-medium mt-1">{viewingEnquiry.userEmail}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                      <p className="text-sm mt-1">{viewingEnquiry.phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Enquiry Date</Label>
+                      <p className="text-sm mt-1">{new Date(viewingEnquiry.enquiryDate).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <Badge variant={viewingEnquiry.status === 'responded' ? 'default' : 'secondary'} className="mt-1">
+                        {viewingEnquiry.status.charAt(0).toUpperCase() + viewingEnquiry.status.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Item Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Item Name</Label>
+                      <p className="text-sm font-medium mt-1">{viewingEnquiry.itemName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Item Type</Label>
+                      <Badge variant="outline" className="mt-1 capitalize">
+                        {viewingEnquiry.itemType}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Message */}
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Message</Label>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{viewingEnquiry.message}</p>
+                  </div>
+
+                  {/* Preferred Contact Method */}
+                  {viewingEnquiry.preferredContactMethod && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Preferred Contact Method</Label>
+                      <p className="text-sm mt-1 capitalize">{viewingEnquiry.preferredContactMethod}</p>
+                    </div>
+                  )}
+
+                  {/* Response Notes */}
+                  {viewingEnquiry.responseNotes && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Response Notes</Label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{viewingEnquiry.responseNotes}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <Button onClick={() => setIsViewEnquiryDialogOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Enquiry Dialog */}
+          <Dialog open={isEditEnquiryDialogOpen} onOpenChange={setIsEditEnquiryDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit Enquiry</DialogTitle>
+              </DialogHeader>
+              {editingEnquiry && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>User Email</Label>
+                      <Input
+                        value={editingEnquiry.userEmail}
+                        onChange={(e) => setEditingEnquiry({ ...editingEnquiry, userEmail: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Phone</Label>
+                      <Input
+                        value={editingEnquiry.phone || ''}
+                        onChange={(e) => setEditingEnquiry({ ...editingEnquiry, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Item Name</Label>
+                      <Input
+                        value={editingEnquiry.itemName}
+                        onChange={(e) => setEditingEnquiry({ ...editingEnquiry, itemName: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Item Type</Label>
+                      <Select
+                        value={editingEnquiry.itemType}
+                        onValueChange={(value) => setEditingEnquiry({ ...editingEnquiry, itemType: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="product">Product</SelectItem>
+                          <SelectItem value="service">Service</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Message</Label>
+                    <Textarea
+                      value={editingEnquiry.message}
+                      onChange={(e) => setEditingEnquiry({ ...editingEnquiry, message: e.target.value })}
+                      rows={4}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={editingEnquiry.status}
+                      onValueChange={(value) => setEditingEnquiry({ ...editingEnquiry, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="responded">Responded</SelectItem>
+                        <SelectItem value="closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Response Notes</Label>
+                    <Textarea
+                      value={editingEnquiry.responseNotes || ''}
+                      onChange={(e) => setEditingEnquiry({ ...editingEnquiry, responseNotes: e.target.value })}
+                      rows={3}
+                      placeholder="Add your response notes here..."
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditEnquiryDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        const result = await updateEnquiryStatus(editingEnquiry._id, editingEnquiry.status)
+                        if (result.success) {
+                          // Update the full enquiry data
+                          const response = await fetch(`/api/enquiries/${editingEnquiry._id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(editingEnquiry)
+                          })
+                          if (response.ok) {
+                            const data = await response.json()
+                            if (data.success) {
+                              setEnquiries(enquiries.map((e: any) => 
+                                e._id === editingEnquiry._id ? data.data : e
+                              ))
+                            }
+                          }
+                          setIsEditEnquiryDialogOpen(false)
+                        }
+                      }}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
