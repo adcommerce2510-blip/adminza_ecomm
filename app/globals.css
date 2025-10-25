@@ -64,6 +64,20 @@
   background: #e5e7eb;
 }
 
+/* Force modal width override */
+[data-radix-dialog-content] {
+  width: 90vw !important;
+  max-width: 1200px !important;
+  height: 600px !important;
+}
+
+/* Additional modal width enforcement */
+.dialog-content-wide {
+  width: 90vw !important;
+  max-width: 1200px !important;
+  height: 600px !important;
+}
+
 :root {
   /* Professional business color scheme - Blue & Gray palette */
   --background: oklch(0.99 0.005 240);
