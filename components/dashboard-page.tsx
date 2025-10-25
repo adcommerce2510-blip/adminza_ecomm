@@ -5419,6 +5419,7 @@ export function DashboardPage() {
                       Cancel
                     </Button>
                     <Button
+                      className="bg-blue-600 hover:bg-blue-700 text-white border-0"
                       onClick={async () => {
                         const result = await updateEnquiryStatus(editingEnquiry._id, editingEnquiry.status)
                         if (result.success) {
