@@ -390,11 +390,12 @@ export default function AllServicesPage() {
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto !top-16 !left-1/2 !transform !-translate-x-1/2 !translate-y-0">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[85vh] !top-16 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEnquirySubmit} className="space-y-6 max-h-[65vh] overflow-y-scroll pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            <form onSubmit={handleEnquirySubmit} className="space-y-6 pb-4">
             {/* Service Details Section */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-3">Service Details</h3>
@@ -511,7 +512,8 @@ export default function AllServicesPage() {
                 Submit Enquiry
               </Button>
             </div>
-          </form>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
       
