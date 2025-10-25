@@ -39,31 +39,23 @@
   background-color: #9ca3af;
 }
 
-/* Force scrollbar visibility for enquiry form */
-.enquiry-form-scrollable {
-  overflow-y: scroll !important;
-  max-height: 60vh !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: #d1d5db #f3f4f6 !important;
+/* Enquiry form scrollable styles */
+.enquiry-scrollable::-webkit-scrollbar {
+  width: 8px;
 }
 
-.enquiry-form-scrollable::-webkit-scrollbar {
-  width: 8px !important;
-  display: block !important;
+.enquiry-scrollable::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
 }
 
-.enquiry-form-scrollable::-webkit-scrollbar-track {
-  background: #f3f4f6 !important;
-  border-radius: 4px !important;
+.enquiry-scrollable::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
 }
 
-.enquiry-form-scrollable::-webkit-scrollbar-thumb {
-  background: #d1d5db !important;
-  border-radius: 4px !important;
-}
-
-.enquiry-form-scrollable::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af !important;
+.enquiry-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 :root {

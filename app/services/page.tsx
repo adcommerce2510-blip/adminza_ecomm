@@ -394,7 +394,10 @@ export default function AllServicesPage() {
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
-          <div className="enquiry-form-scrollable pr-2">
+           <div className="flex-1 overflow-y-auto pr-2 enquiry-scrollable" style={{
+             scrollbarWidth: 'thin',
+             scrollbarColor: '#d1d5db #f3f4f6'
+           }}>
             <form onSubmit={handleEnquirySubmit} className="space-y-6 pb-4">
             {/* Service Details Section */}
             <div className="bg-gray-50 p-4 rounded-lg">
