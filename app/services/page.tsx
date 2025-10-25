@@ -394,7 +394,7 @@ export default function AllServicesPage() {
           <DialogHeader>
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEnquirySubmit} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          <form onSubmit={handleEnquirySubmit} className="space-y-6 max-h-[65vh] overflow-y-scroll pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {/* Service Details Section */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-3">Service Details</h3>
