@@ -384,13 +384,14 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] !top-16 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[90vh] !top-12 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
-           <div className="flex-1 overflow-y-auto pr-2 enquiry-scrollable" style={{
+           <div className="flex-1 overflow-y-scroll pr-2 enquiry-scrollable" style={{
              scrollbarWidth: 'thin',
-             scrollbarColor: '#d1d5db #f3f4f6'
+             scrollbarColor: '#d1d5db #f3f4f6',
+             maxHeight: 'calc(90vh - 120px)'
            }}>
             <form onSubmit={handleEnquirySubmit} className="space-y-6 pb-4">
             {/* Service Details Section */}
