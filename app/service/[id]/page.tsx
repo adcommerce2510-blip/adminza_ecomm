@@ -384,7 +384,7 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto mt-8">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto mt-16 fixed top-20 left-1/2 transform -translate-x-1/2">
           <DialogHeader>
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
