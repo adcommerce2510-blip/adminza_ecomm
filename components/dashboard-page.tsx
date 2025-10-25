@@ -5322,12 +5322,12 @@ export function DashboardPage() {
 
           {/* Edit Enquiry Dialog */}
           <Dialog open={isEditEnquiryDialogOpen} onOpenChange={setIsEditEnquiryDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Enquiry</DialogTitle>
               </DialogHeader>
               {editingEnquiry && (
-                <div className="space-y-4 max-h-[calc(80vh-100px)] overflow-y-auto pr-2">
+                <div className="space-y-4 max-h-[calc(90vh-120px)] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>User Email</Label>
@@ -5375,7 +5375,7 @@ export function DashboardPage() {
                     <Textarea
                       value={editingEnquiry.message}
                       onChange={(e) => setEditingEnquiry({ ...editingEnquiry, message: e.target.value })}
-                      rows={2}
+                      rows={3}
                       className="resize-none"
                     />
                   </div>
@@ -5407,11 +5407,8 @@ export function DashboardPage() {
                       className="resize-none"
                     />
                   </div>
-                </div>
-              )}
-              
-              {/* Fixed Action Buttons */}
-              <div className="flex justify-end space-x-2 pt-4 border-t bg-white sticky bottom-0">
+
+                  <div className="flex justify-end space-x-2 pt-4 border-t">
                     <Button
                       variant="outline"
                       onClick={() => setIsEditEnquiryDialogOpen(false)}
@@ -5442,7 +5439,9 @@ export function DashboardPage() {
                     >
                       Save Changes
                     </Button>
-              </div>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </main>
