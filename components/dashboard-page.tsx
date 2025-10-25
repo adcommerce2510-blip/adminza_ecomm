@@ -5175,9 +5175,11 @@ export function DashboardPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm max-w-xs truncate" title={enquiry.message}>
-                              {enquiry.message.split(' ').slice(0, 3).join(' ')}
-                              {enquiry.message.split(' ').length > 3 && '...'}
+                            <div className="text-sm max-w-xs truncate overflow-hidden" title={enquiry.message}>
+                              {enquiry.message.length > 50 
+                                ? enquiry.message.substring(0, 50) + '...'
+                                : enquiry.message
+                              }
                             </div>
                           </TableCell>
                           <TableCell>
