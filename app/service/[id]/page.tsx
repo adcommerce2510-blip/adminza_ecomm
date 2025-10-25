@@ -384,10 +384,10 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="w-[90vw] max-w-[1200px] h-[700px] !top-8 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col bg-white overflow-hidden dialog-content-wide" style={{
+        <DialogContent className="w-[90vw] max-w-[1200px] h-[600px] !top-12 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col bg-white overflow-hidden dialog-content-wide" style={{
           width: '90vw',
           maxWidth: '1200px',
-          height: '700px'
+          height: '600px'
         }}>
           <DialogHeader className="flex-shrink-0 bg-white border-b pb-4 px-6 pt-6">
             <DialogTitle>Place Enquiry</DialogTitle>
@@ -507,10 +507,10 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
                     
                     {/* Action Buttons */}
                     <div className="flex space-x-2 pt-4 mt-auto">
-                      <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1">
+                      <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50">
                         Cancel
                       </Button>
-                      <Button type="submit" className="flex-1">
+                      <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-0">
                         Submit Enquiry
                       </Button>
                     </div>
