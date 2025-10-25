@@ -390,18 +390,18 @@ export default function AllServicesPage() {
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="max-w-6xl h-[600px] !top-12 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col bg-white overflow-hidden">
+        <DialogContent className="w-[90vw] max-w-[1200px] h-[600px] !top-12 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col bg-white overflow-hidden">
           <DialogHeader className="flex-shrink-0 bg-white border-b pb-4 px-6 pt-6">
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
            <div className="flex-1 px-6 py-4 bg-white">
             <form onSubmit={handleEnquirySubmit} className="h-full">
-              <div className="grid grid-cols-2 gap-8 h-full">
+              <div className="grid grid-cols-2 gap-6 h-full">
                 {/* Left Column - Service Details */}
-                <div className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-900 mb-3">Service Details</h3>
-                    <div className="space-y-3">
+                <div className="flex flex-col">
+                  <div className="bg-gray-50 p-4 rounded-lg h-full">
+                    <h3 className="font-semibold text-gray-900 mb-4">Service Details</h3>
+                    <div className="space-y-4">
                       <div>
                         <Label htmlFor="service-name">Service Name</Label>
                         <Input
@@ -444,10 +444,10 @@ export default function AllServicesPage() {
                 </div>
 
                 {/* Right Column - Your Details */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">Your Details</h3>
-                    <div className="space-y-4">
+                <div className="flex flex-col">
+                  <div className="h-full flex flex-col">
+                    <h3 className="font-semibold text-gray-900 mb-4">Your Details</h3>
+                    <div className="space-y-4 flex-1">
                       <div>
                         <Label htmlFor="enquiry-name">Your Name</Label>
                         <Input
@@ -485,7 +485,7 @@ export default function AllServicesPage() {
                           placeholder="Describe your requirements..."
                           value={enquiryForm.message}
                           onChange={(e) => setEnquiryForm({...enquiryForm, message: e.target.value})}
-                          rows={4}
+                          rows={3}
                           required
                         />
                       </div>
@@ -506,16 +506,16 @@ export default function AllServicesPage() {
                         </Select>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex space-x-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1">
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="flex-1">
-                      Submit Enquiry
-                    </Button>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex space-x-2 pt-4 mt-auto">
+                      <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1">
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="flex-1">
+                        Submit Enquiry
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
