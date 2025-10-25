@@ -68,14 +68,20 @@
 [data-radix-dialog-content] {
   width: 90vw !important;
   max-width: 1200px !important;
-  height: 700px !important;
+  height: 600px !important;
 }
 
 /* Additional modal width enforcement */
 .dialog-content-wide {
   width: 90vw !important;
   max-width: 1200px !important;
-  height: 700px !important;
+  height: 600px !important;
+}
+
+/* Force Edit Enquiry modal to be wider */
+[data-radix-dialog-content]:has(.edit-enquiry-modal) {
+  width: 90vw !important;
+  max-width: 1200px !important;
 }
 
 :root {

@@ -5322,7 +5322,10 @@ export function DashboardPage() {
 
           {/* Edit Enquiry Dialog */}
           <Dialog open={isEditEnquiryDialogOpen} onOpenChange={setIsEditEnquiryDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+              className="max-w-6xl max-h-[90vh] overflow-y-auto edit-enquiry-modal"
+              style={{ width: '90vw', maxWidth: '1200px' }}
+            >
               <DialogHeader>
                 <DialogTitle>Edit Enquiry</DialogTitle>
               </DialogHeader>
