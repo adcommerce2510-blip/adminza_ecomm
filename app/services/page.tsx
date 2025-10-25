@@ -390,7 +390,7 @@ export default function AllServicesPage() {
       
       {/* Enquiry Form Modal */}
       <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto !top-4 !left-1/2 !transform !-translate-x-1/2 !translate-y-0">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto !top-16 !left-1/2 !transform !-translate-x-1/2 !translate-y-0">
           <DialogHeader>
             <DialogTitle>Place Enquiry</DialogTitle>
           </DialogHeader>
