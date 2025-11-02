@@ -169,7 +169,7 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
     )
   }
 
-  const images = service.images && service.images.length > 0 ? service.images : []
+  const images = service.images && service.images.length > 0 ? service.images : ["/placeholder.jpg"]
 
   return (
     <div className="min-h-screen">
@@ -194,20 +194,14 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
           {/* Left - Image Gallery */}
           <div>
             {/* Main Image */}
-            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
-              <div className="aspect-square relative">
-                {images.length > 0 ? (
-                  <Image
-                    src={images[selectedImage]}
-                    alt={service.name}
-                    fill
-                    className="object-contain p-8"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <MessageCircle className="h-24 w-24 text-gray-300" />
-                  </div>
-                )}
+            <div className="relative bg-white rounded-lg overflow-hidden mb-4 group">
+              <div className="aspect-square relative mt-68">
+                <Image
+                  src={images[selectedImage]}
+                  alt={service.name}
+                  fill
+                  className="object-center"
+                />
 
                 {/* Navigation Arrows */}
                 {images.length > 1 && (
@@ -287,7 +281,9 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
             {/* Action Button - Moved Higher */}
             <div className="mb-8">
               <Button
-                onClick={handlePlaceEnquiry}
+                onClick={() => {
+                  if (service) router.push(`/enquiry?itemType=service&id=${service._id}`)
+                }}
                 className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold"
               >
                 <MessageCircle className="h-5 w-5 mr-2" />
@@ -382,145 +378,7 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
       
-      {/* Enquiry Form Modal */}
-      <Dialog open={isEnquiryDialogOpen} onOpenChange={setIsEnquiryDialogOpen}>
-        <DialogContent className="w-[90vw] max-w-[1200px] h-[600px] !top-12 !left-1/2 !transform !-translate-x-1/2 !translate-y-0 flex flex-col bg-white overflow-hidden dialog-content-wide" style={{
-          width: '90vw',
-          maxWidth: '1200px',
-          height: '600px'
-        }}>
-          <DialogHeader className="flex-shrink-0 bg-white border-b pb-4 px-6 pt-6">
-            <DialogTitle>Place Enquiry</DialogTitle>
-          </DialogHeader>
-           <div className="flex-1 px-6 py-4 bg-white">
-            <form onSubmit={handleEnquirySubmit} className="h-full">
-              <div className="grid grid-cols-2 gap-6 h-full">
-                {/* Left Column - Service Details */}
-                <div className="flex flex-col">
-                  <div className="bg-gray-50 p-4 rounded-lg h-full">
-                    <h3 className="font-semibold text-gray-900 mb-4">Service Details</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="service-name">Service Name</Label>
-                        <Input
-                          id="service-name"
-                          value={enquiryForm.serviceName}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, serviceName: e.target.value})}
-                          className="bg-white"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service-price">Price</Label>
-                        <Input
-                          id="service-price"
-                          value={enquiryForm.servicePrice}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, servicePrice: e.target.value})}
-                          className="bg-white"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service-description">Description</Label>
-                        <Textarea
-                          id="service-description"
-                          value={enquiryForm.serviceDescription}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, serviceDescription: e.target.value})}
-                          rows={3}
-                          className="bg-white"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service-category">Category</Label>
-                        <Input
-                          id="service-category"
-                          value={enquiryForm.serviceCategory}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, serviceCategory: e.target.value})}
-                          className="bg-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column - Your Details */}
-                <div className="flex flex-col">
-                  <div className="h-full flex flex-col">
-                    <h3 className="font-semibold text-gray-900 mb-4">Your Details</h3>
-                    <div className="space-y-4 flex-1">
-                      <div>
-                        <Label htmlFor="enquiry-name">Your Name</Label>
-                        <Input
-                          id="enquiry-name"
-                          placeholder="Enter your name"
-                          value={enquiryForm.name}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, name: e.target.value})}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="enquiry-email">Email Address</Label>
-                        <Input
-                          id="enquiry-email"
-                          type="email"
-                          placeholder="Enter your email"
-                          value={enquiryForm.email}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, email: e.target.value})}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="enquiry-phone">Phone Number</Label>
-                        <Input
-                          id="enquiry-phone"
-                          placeholder="Enter your phone number"
-                          value={enquiryForm.phone}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, phone: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="enquiry-message">Message</Label>
-                        <Textarea
-                          id="enquiry-message"
-                          placeholder="Describe your requirements..."
-                          value={enquiryForm.message}
-                          onChange={(e) => setEnquiryForm({...enquiryForm, message: e.target.value})}
-                          rows={3}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="enquiry-contact">Preferred Contact Method</Label>
-                        <Select
-                          value={enquiryForm.preferredContactMethod}
-                          onValueChange={(value) => setEnquiryForm({...enquiryForm, preferredContactMethod: value})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="phone">Phone</SelectItem>
-                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    <div className="flex space-x-2 pt-4 mt-auto">
-                      <Button type="button" variant="outline" onClick={() => setIsEnquiryDialogOpen(false)} className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50">
-                        Cancel
-                      </Button>
-                      <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-0">
-                        Submit Enquiry
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Modal removed; navigation to /enquiry is used instead */}
       
       <Footer />
     </div>

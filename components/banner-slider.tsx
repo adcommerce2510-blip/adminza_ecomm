@@ -31,22 +31,24 @@ export function BannerSlider() {
   }
 
   return (
-    <section className="relative w-full h-auto bg-background py-2 md:py-4 mt-0 md:mt-2">
-      <div className="max-w-[1400px] mx-auto px-0">
+    <section className="relative w-full h-auto bg-background py-8 md:py-12 mt-[-30px]">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6">
         <div className="relative w-full aspect-[16/10] md:aspect-[16/8] lg:aspect-[16/5] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-gray-100 dark:bg-gray-900">
           {/* Slider Images */}
           {sliderImages.map((image, index) => (
             <div
               key={index}
-              className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ${
+              className={`absolute w-full h-full transition-opacity duration-1000 ${
                 index === currentSlide ? 'opacity-100' : 'opacity-0'
               }`}
+              style={{ top: '380px', bottom: '0', left: '0', right: '0' }}
             >
               <Image
                 src={image}
                 alt={`Banner ${index + 1}`}
                 fill
                 className="object-contain"
+                style={{ objectPosition: 'center bottom' }}
                 priority={index === 0}
                 quality={95}
               />

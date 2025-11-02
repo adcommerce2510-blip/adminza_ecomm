@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useDashboardLogout } from "@/components/dashboard-auth"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,7 +43,8 @@ import {
   ChevronDown,
   MoreVertical,
   Lock,
-  LogOut
+  LogOut,
+  X
 } from "lucide-react"
 
 // API functions
@@ -83,10 +84,10 @@ const createService = async (serviceData: any) => {
   return data
 }
 
-const uploadFile = async (file: File) => {
+const uploadFile = async (file: File, folder: string = 'batches') => {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('folder', 'products')
+  formData.append('folder', folder)
   
   const response = await fetch('/api/upload', {
     method: 'POST',
@@ -242,10 +243,27 @@ export function DashboardPage() {
     price: 0,
     notes: ""
   })
+  const [multipleProducts, setMultipleProducts] = useState<any[]>([{
+    productId: "",
+    productName: "",
+    quantity: 1,
+    price: 0,
+    notes: ""
+  }])
   const [eshopSearchTerm, setEshopSearchTerm] = useState("")
   const [isRetopUpDialogOpen, setIsRetopUpDialogOpen] = useState(false)
   const [retopUpItem, setRetopUpItem] = useState<any>(null)
   const [retopUpQuantity, setRetopUpQuantity] = useState("")
+  const [customerProductsForRetopUp, setCustomerProductsForRetopUp] = useState<any[]>([])
+  const [retopUpCustomerId, setRetopUpCustomerId] = useState<string>("")
+  const [retopUpCustomerName, setRetopUpCustomerName] = useState<string>("")
+  const [isEditInventoryDialogOpen, setIsEditInventoryDialogOpen] = useState(false)
+  const [editingInventoryItem, setEditingInventoryItem] = useState<any>(null)
+  const [editInventoryForm, setEditInventoryForm] = useState({
+    productName: "",
+    quantity: "",
+    price: ""
+  })
   const [isRecordUsageDialogOpen, setIsRecordUsageDialogOpen] = useState(false)
   const [recordUsageItem, setRecordUsageItem] = useState<any>(null)
   const [usedQuantity, setUsedQuantity] = useState("")
@@ -294,9 +312,32 @@ export function DashboardPage() {
   const [customerProducts, setCustomerProducts] = useState<any[]>([])
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null)
   const [isRetopUpMode, setIsRetopUpMode] = useState(false)
+  // Edit inventory item dialog state (My Customers)
+  const [isEshopEditOpen, setIsEshopEditOpen] = useState(false)
+  const [eshopEditForm, setEshopEditForm] = useState<{ id: string; productName: string; quantity: number; price: number; notes?: string }>({ id: "", productName: "", quantity: 1, price: 0, notes: "" })
 
   // Use logout function from context
   const { handleLogout } = useDashboardLogout()
+
+  // Handle URL parameters for section navigation
+  const searchParams = useSearchParams()
+  
+  useEffect(() => {
+    const section = searchParams.get('section')
+    const subsection = searchParams.get('subsection')
+    
+    if (section) {
+      setActiveSection(section)
+      
+      // Handle specific subsections
+      if (section === 'customer-management') {
+        setIsCustomerManagementExpanded(true)
+        if (subsection === 'my-customers') {
+          setActiveSubSection('my-customers')
+        }
+      }
+    }
+  }, [searchParams])
 
   // Get categories for products (main categories with mainUse = "product")
   const productCategories = categories
@@ -345,7 +386,8 @@ export function DashboardPage() {
     price: "",
     duration: "",
     description: "",
-    location: ""
+    location: "",
+    images: [] as string[]
   })
 
   // Load data on component mount
@@ -690,31 +732,19 @@ export function DashboardPage() {
     }
   }
 
-  // Handle edit E-Shop item
-  const handleEditEshopItem = (item: any) => {
-    // Load all products for this customer
-    const customerInventory = eshopInventory.filter((inv: any) => inv.customerId === item.customerId)
-    setCustomerProducts(customerInventory)
-    setEditingCustomerId(item.customerId)
-    setIsRetopUpMode(false) // Not re-top up mode
-    setIsEshopDialogOpen(true)
-    setOpenDropdownId(null) // Close dropdown
-  }
-
   // This function is now defined later (line ~1072) to handle both create and update
 
   // Handle Re-top up - Opens Edit Manually dialog for adding stock
   const handleRetopUp = (item: any) => {
-    // Load all products for this customer and update quantities to current remaining stock
+    // Load all products for this customer
     const customerInventory = eshopInventory.filter((inv: any) => inv.customerId === item.customerId).map((inv: any) => ({
       ...inv,
-      // Use the current remaining quantity (Total Stock) for re-top up
-      quantity: inv.quantity - (inv.invoicedQuantity || 0)
+      quantityToAdd: 0
     }))
-    setCustomerProducts(customerInventory)
-    setEditingCustomerId(item.customerId)
-    setIsRetopUpMode(true) // Mark as re-top up mode
-    setIsEshopDialogOpen(true)
+    setCustomerProductsForRetopUp(customerInventory)
+    setRetopUpCustomerId(item.customerId)
+    setRetopUpCustomerName(item.customerName)
+    setIsRetopUpDialogOpen(true)
     setOpenDropdownId(null) // Close dropdown
   }
 
@@ -722,25 +752,77 @@ export function DashboardPage() {
   const handleRetopUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const newQuantity = retopUpItem.quantity + parseInt(retopUpQuantity)
-      const result = await updateEshopInventory(retopUpItem._id, {
-        quantity: newQuantity,
-        notes: `Re-topped up with ${retopUpQuantity} units. ${retopUpItem.notes || ""}`
+      // Update all products that have quantityToAdd
+      const updates: any[] = []
+      for (const product of customerProductsForRetopUp) {
+        if (product.quantityToAdd > 0) {
+          const newQuantity = product.quantity + product.quantityToAdd
+          const result = await updateEshopInventory(product._id, {
+            quantity: newQuantity,
+            notes: `Re-topped up with ${product.quantityToAdd} units. ${product.notes || ""}`
+          })
+          if (result.success) {
+            updates.push(result.data)
+          }
+        }
+      }
+      
+      if (updates.length > 0) {
+        // Update the inventory state
+        setEshopInventory(eshopInventory.map((item: any) => {
+          const updated = updates.find((u: any) => u._id === item._id)
+          return updated || item
+        }))
+        alert(`Successfully re-topped up ${updates.length} product(s)`)
+      }
+      
+      setIsRetopUpDialogOpen(false)
+      setCustomerProductsForRetopUp([])
+      setRetopUpCustomerId("")
+      setRetopUpCustomerName("")
+    } catch (error) {
+      console.error('Error re-topping up:', error)
+      alert('Error re-topping up')
+    }
+  }
+
+  // Handle Edit Inventory Item
+  const handleEditInventoryItem = (item: any) => {
+    setEditingInventoryItem(item)
+    setEditInventoryForm({
+      productName: item.productName,
+      quantity: item.quantity.toString(),
+      price: item.price?.toString() || "0"
+    })
+    setIsEditInventoryDialogOpen(true)
+    setOpenDropdownId(null) // Close dropdown
+  }
+
+  // Handle Edit Inventory submit
+  const handleEditInventorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const result = await updateEshopInventory(editingInventoryItem._id, {
+        productName: editInventoryForm.productName,
+        quantity: parseInt(editInventoryForm.quantity),
+        price: parseFloat(editInventoryForm.price),
+        notes: editingInventoryItem.notes || ""
       })
       
       if (result.success) {
         setEshopInventory(eshopInventory.map((item: any) => 
-          item._id === retopUpItem._id ? result.data : item
+          item._id === editingInventoryItem._id ? result.data : item
         ))
-        setIsRetopUpDialogOpen(false)
-        setRetopUpItem(null)
-        setRetopUpQuantity("")
+        setIsEditInventoryDialogOpen(false)
+        setEditingInventoryItem(null)
+        setEditInventoryForm({ productName: "", quantity: "", price: "" })
+        alert('Inventory item updated successfully!')
       } else {
-        alert('Error re-topping up: ' + result.error)
+        alert('Error updating inventory: ' + result.error)
       }
     } catch (error) {
-      console.error('Error re-topping up:', error)
-      alert('Error re-topping up')
+      console.error('Error updating inventory:', error)
+      alert('Error updating inventory')
     }
   }
 
@@ -960,6 +1042,39 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting enquiry:', error)
       return { success: false, error: 'Error deleting enquiry' }
+    }
+  }
+
+  const openEshopEditDialog = (item: any) => {
+    setEshopEditForm({
+      id: item._id,
+      productName: item.productName || "",
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+      notes: item.notes || ""
+    })
+    setIsEshopEditOpen(true)
+  }
+
+  const deleteEshopItem = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this inventory item?')) return
+    
+    try {
+      const response = await fetch(`/api/eshop-inventory/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setEshopInventory(eshopInventory.filter((item: any) => item._id !== id))
+        }
+        return data
+      }
+      return { success: false, error: 'Failed to delete inventory item' }
+    } catch (error) {
+      console.error('Error deleting inventory item:', error)
+      return { success: false, error: 'Error deleting inventory item' }
     }
   }
 
@@ -1530,12 +1645,13 @@ export function DashboardPage() {
         ...serviceForm,
         category: categoryString,
         price: parseFloat(serviceForm.price),
-        vendor: "Admin"
+        vendor: "Admin",
+        images: serviceForm.images || []
       })
       
       if (result.success) {
         setServices([...services, result.data])
-        setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "" })
+        setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
         setMainCategory("")
         setIsServiceDialogOpen(false)
       } else {
@@ -1608,6 +1724,85 @@ export function DashboardPage() {
     }
   }
 
+  const handleMultipleProductsSubmit = async () => {
+    try {
+      if (!eshopForm.customerId) {
+        alert('Please select a customer');
+        return;
+      }
+
+      const validProducts = multipleProducts.filter(p => p.productId && p.quantity > 0);
+      if (validProducts.length === 0) {
+        alert('Please add at least one valid product');
+        return;
+      }
+
+      // Submit each product individually
+      const submissions = validProducts.map(async (product) => {
+        const inventoryData = {
+          productId: product.productId,
+          productName: product.productName,
+          customerId: eshopForm.customerId,
+          customerName: eshopForm.customerName,
+          quantity: product.quantity,
+          price: product.price,
+          notes: product.notes,
+          lastUpdated: new Date().toISOString()
+        };
+
+        const response = await fetch('/api/eshop-inventory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(inventoryData),
+        });
+
+        return response.json();
+      });
+
+      const results = await Promise.all(submissions);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.length - successCount;
+
+      if (successCount > 0) {
+        // Refresh the e-shop inventory list
+        const updatedInventory = await fetchEshopInventory();
+        setEshopInventory(updatedInventory);
+        
+        // Reset form and close dialog
+        setEshopForm({
+          productId: "",
+          productName: "",
+          customerId: "",
+          customerName: "",
+          quantity: "1",
+          price: 0,
+          notes: ""
+        });
+        setMultipleProducts([{
+          productId: "",
+          productName: "",
+          quantity: 1,
+          price: 0,
+          notes: ""
+        }]);
+        setIsEshopDialogOpen(false);
+        
+        if (failCount === 0) {
+          alert(`Successfully added ${successCount} products to inventory!`);
+        } else {
+          alert(`Added ${successCount} products successfully. ${failCount} failed to add.`);
+        }
+      } else {
+        alert('Failed to add any products to inventory');
+      }
+    } catch (error) {
+      console.error('Error submitting multiple products:', error);
+      alert('Error submitting products to inventory');
+    }
+  }
+
   const handleDeleteProduct = async (id: string) => {
     try {
       const result = await deleteProduct(id)
@@ -1636,12 +1831,13 @@ export function DashboardPage() {
     }
   }
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (file: File, folder: string = 'batches') => {
     try {
       setUploading(true)
-      const result = await uploadFile(file)
+      const result = await uploadFile(file, folder)
+      console.log('Upload result:', result)
       if (result.success) {
-        return result.data.url
+        return result.url
       } else {
         throw new Error(result.error)
       }
@@ -1687,6 +1883,38 @@ export function DashboardPage() {
       color: "text-orange-600"
     }
   ]
+
+  // Open edit dialog with selected item
+  const handleEditEshopItem = (item: any) => {
+    setEshopEditForm({
+      id: item._id,
+      productName: item.productName || "",
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+      notes: item.notes || ""
+    })
+    setIsEshopEditOpen(true)
+  }
+
+  // Submit edit update
+  const handleEshopEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const payload = {
+        productName: eshopEditForm.productName,
+        quantity: eshopEditForm.quantity,
+        price: eshopEditForm.price,
+        notes: eshopEditForm.notes || ""
+      }
+      const res = await updateEshopInventory(eshopEditForm.id, payload)
+      if (!res?.success) throw new Error(res?.error || "Update failed")
+      // Reflect in local state
+      setEshopInventory((prev: any[]) => prev.map((it: any) => (it._id === eshopEditForm.id ? { ...it, ...payload, lastUpdated: new Date().toISOString() } : it)))
+      setIsEshopEditOpen(false)
+    } catch (err: any) {
+      alert(err?.message || "Error updating inventory item")
+    }
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -1931,31 +2159,33 @@ export function DashboardPage() {
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {/* Header */}
-        <header className="bg-card border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Dashboard</h1>
-              <p className="text-muted-foreground">Manage your products and services</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export Data
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={handleLogout}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-medium text-sm">A</span>
+        {activeSection !== "customer-management" && (
+          <header className="bg-card border-b px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Dashboard</h1>
+                <p className="text-muted-foreground">Manage your products and services</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Data
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <span className="text-primary-foreground font-medium text-sm">A</span>
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Dashboard Content */}
         <main className="p-6 space-y-6">
@@ -2047,6 +2277,7 @@ export function DashboardPage() {
             </div>
           )}
 
+         
           {/* Products Management Section */}
           {activeSection === "products-management" && (
             <div className="space-y-6">
@@ -2172,6 +2403,64 @@ export function DashboardPage() {
                                     required
                                   />
                                 </div>
+                                
+                                {/* Image Upload Section */}
+                                <div>
+                                  <Label htmlFor="service-images">Images</Label>
+                                  <div className="mb-2">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      className="w-full"
+                                      onClick={() => document.getElementById('service-file-upload')?.click()}
+                                    >
+                                      <Upload className="h-4 w-4 mr-2" />
+                                      {uploading ? "Uploading..." : "Upload Image"}
+                                    </Button>
+                                    <Input
+                                      id="service-file-upload"
+                                      type="file"
+                                      multiple
+                                      accept="image/*"
+                                      className="sr-only"
+                                      onChange={async (e) => {
+                                        const files = e.target.files
+                                        if (files) {
+                                          const urls = []
+                                          for (let i = 0; i < files.length; i++) {
+                                            const url = await handleImageUpload(files[i], 'services')
+                                            if (url) urls.push(url)
+                                          }
+                                          setServiceForm({...serviceForm, images: [...serviceForm.images, ...urls]})
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  {serviceForm.images.length > 0 && (
+                                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
+                                      <div className="space-y-2">
+                                        {serviceForm.images.map((image, index) => {
+                                          const fileName = image.split('/').pop() || `Image ${index + 1}`
+                                          return (
+                                            <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                              <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
+                                              <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                className="ml-2 h-6 w-6 rounded-full p-0"
+                                                onClick={() => setServiceForm({...serviceForm, images: serviceForm.images.filter((_, i) => i !== index)})}
+                                              >
+                                                <X className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
                                 <div>
                                   <Label htmlFor="service-description">Description</Label>
                                   <Textarea
@@ -2180,12 +2469,18 @@ export function DashboardPage() {
                                     value={serviceForm.description}
                                     onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
                                     required
+                                    rows={3}
+                                    className="resize-none"
+                                    style={{ maxHeight: '120px', overflowY: 'auto' }}
                                   />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {serviceForm.description.length}/5000 characters
+                                  </p>
                                 </div>
                                 <div className="flex justify-end space-x-2">
                                   <Button type="button" variant="outline" onClick={() => {
                                     setIsServiceDialogOpen(false)
-                                    setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "" })
+                                    setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
                                   }}>
                                     Cancel
                                   </Button>
@@ -2408,7 +2703,13 @@ export function DashboardPage() {
                                     value={productForm.description}
                                     onChange={(e) => setProductForm({...productForm, description: e.target.value})}
                                     required
+                                    rows={3}
+                                    className="resize-none"
+                                    style={{ maxHeight: '120px', overflowY: 'auto' }}
                                   />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {productForm.description.length}/5000 characters
+                                  </p>
                                 </div>
                                 <div>
                                   <Label htmlFor="product-images">Images</Label>
@@ -2433,7 +2734,7 @@ export function DashboardPage() {
                                         if (files) {
                                           const urls = []
                                           for (let i = 0; i < files.length; i++) {
-                                            const url = await handleImageUpload(files[i])
+                                            const url = await handleImageUpload(files[i], 'products')
                                             if (url) urls.push(url)
                                           }
                                           setProductForm({...productForm, images: [...productForm.images, ...urls]})
@@ -2441,37 +2742,29 @@ export function DashboardPage() {
                                       }}
                                     />
                                   </div>
-                                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 min-h-[120px] max-h-[200px] overflow-hidden">
-                                    {productForm.images.length > 0 ? (
-                                      <div className="grid grid-cols-2 gap-2 h-full">
-                                        {productForm.images.map((image, index) => (
-                                          <div key={index} className="relative h-20">
-                                            <img 
-                                              src={image} 
-                                              alt={`Product ${index + 1}`} 
-                                              className="w-full h-full object-cover rounded border"
-                                            />
-                                            <Button
-                                              type="button"
-                                              variant="destructive"
-                                              size="sm"
-                                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
-                                              onClick={() => setProductForm({...productForm, images: productForm.images.filter((_, i) => i !== index)})}
-                                            >
-                                              ×
-                                            </Button>
-                                          </div>
-                                        ))}
+                                  {productForm.images.length > 0 && (
+                                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
+                                      <div className="space-y-2">
+                                        {productForm.images.map((image, index) => {
+                                          const fileName = image.split('/').pop() || `Image ${index + 1}`
+                                          return (
+                                            <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                              <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
+                                              <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                className="ml-2 h-6 w-6 rounded-full p-0"
+                                                onClick={() => setProductForm({...productForm, images: productForm.images.filter((_, i) => i !== index)})}
+                                              >
+                                                <X className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          )
+                                        })}
                                       </div>
-                                    ) : (
-                                      <div className="text-center h-full flex flex-col justify-center">
-                                        <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                                        <span className="mt-2 block text-sm font-medium text-muted-foreground">
-                                          No images uploaded yet
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex justify-end space-x-2">
                                   <Button type="button" variant="outline" onClick={() => {
@@ -3168,7 +3461,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* Customer Management Section */}
+          {/*my customer Section */}
           {activeSection === "customer-management" && (
             <div className="space-y-6">
               <div>
@@ -3189,189 +3482,334 @@ export function DashboardPage() {
                         className="pl-10"
                       />
                     </div>
+                    {/* Edit Inventory Dialog */}
+                    <Dialog open={isEshopEditOpen} onOpenChange={setIsEshopEditOpen}>
+                      <DialogContent className="max-w-lg w-[90vw]">
+                        <DialogHeader>
+                          <DialogTitle>Edit Inventory Item</DialogTitle>
+                          <DialogDescription>Update product/service name, quantity and price for this customer</DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleEshopEditSubmit} className="space-y-4">
+                          <div>
+                            <Label className="text-sm font-medium">Product/Service Name</Label>
+                            <Input
+                              value={eshopEditForm.productName}
+                              onChange={(e) => setEshopEditForm({ ...eshopEditForm, productName: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium">Qty</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={eshopEditForm.quantity}
+                                onChange={(e) => setEshopEditForm({ ...eshopEditForm, quantity: parseInt(e.target.value) || 1 })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium">Price (₹)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={eshopEditForm.price}
+                                onChange={(e) => setEshopEditForm({ ...eshopEditForm, price: parseFloat(e.target.value) || 0 })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium">Notes</Label>
+                            <Textarea value={eshopEditForm.notes} onChange={(e) => setEshopEditForm({ ...eshopEditForm, notes: e.target.value })} />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsEshopEditOpen(false)}>Cancel</Button>
+                            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">Save Changes</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                     <Dialog open={isEshopDialogOpen} onOpenChange={setIsEshopDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button 
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => {
+                            setEshopForm({
+                              productId: "",
+                              productName: "",
+                              customerId: "",
+                              customerName: "",
+                              quantity: "1",
+                              price: 0,
+                              notes: ""
+                            });
+                            setMultipleProducts([{
+                              productId: "",
+                              productName: "",
+                              quantity: 1,
+                              price: 0,
+                              notes: ""
+                            }]);
+                            setIsEshopDialogOpen(true);
+                          }}
+                        >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Product Inventory
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-none w-[98vw] max-h-[90vh] overflow-y-auto" style={{ width: '98vw', maxWidth: '98vw' }}>
-                        <DialogHeader>
-                          <DialogTitle>
-                            {isRetopUpMode ? 'Re-top up Stock for' : 'Edit Products for'} {customerProducts[0]?.customerName || 'Customer'}
-                          </DialogTitle>
+                      <DialogContent 
+                        className="max-w-6xl w-[95vw] add-inventory-modal p-6"
+                        style={{ 
+                          width: '95vw', 
+                          maxWidth: '1400px', 
+                          height: '600px',
+                          minWidth: '1200px',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <DialogHeader className="mb-4">
+                          <DialogTitle>Add Product Inventory</DialogTitle>
+                          <DialogDescription>
+                            Assign products to existing customers with quantities
+                          </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-6">
-                          {/* Description */}
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm text-muted-foreground">
-                              {isRetopUpMode ? 'Enter additional quantities to add to current stock (shown in quantity fields)' : 'Manage all products for this customer'}
+                        
+                        <div className="bg-white border-2 border-gray-300 rounded-lg shadow-inner" style={{ height: '350px', overflow: 'hidden' }}>
+                          <div className="h-full overflow-y-auto inventory-dialog-scroll p-4" style={{ maxHeight: '350px' }}>
+                            <div className="grid grid-cols-12 gap-6">
+                            {/* Left Side - Customer Selection */}
+                            <div className="col-span-4 space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="customer-select" className="text-base font-medium">Select Customer</Label>
+                                <Select
+                                  value={eshopForm.customerId}
+                                  onValueChange={(value) => {
+                                    const selectedCustomer = customers.find((c: any) => c._id === value);
+                                    setEshopForm({
+                                      ...eshopForm,
+                                      customerId: value,
+                                      customerName: selectedCustomer?.name || ""
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="h-12">
+                                    <SelectValue placeholder="Choose a customer" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {customers.map((customer: any) => (
+                                      <SelectItem key={customer._id} value={customer._id}>
+                                        {customer.name} ({customer.email})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {/* Customer Info Display */}
+                              {eshopForm.customerId && (
+                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                  <h4 className="font-medium text-blue-900 mb-2">Selected Customer</h4>
+                                  <p className="text-sm text-blue-700">{eshopForm.customerName}</p>
+                                  <p className="text-xs text-blue-600 mt-1">
+                                    Products will be assigned to this customer
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Summary */}
+                              {multipleProducts.length > 0 && (
+                                <div className="p-4 bg-gray-50 rounded-lg border">
+                                  <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
+                                  <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="flex justify-between">
+                                      <span>Total Products:</span>
+                                      <span className="font-medium">{multipleProducts.length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Total Quantity:</span>
+                                      <span className="font-medium">
+                                        {multipleProducts.reduce((sum, p) => sum + (p.quantity || 0), 0)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Total Value:</span>
+                                      <span className="font-medium">
+                                        ₹{multipleProducts.reduce((sum, p) => sum + ((p.price || 0) * (p.quantity || 0)), 0).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                          {/* Products Table */}
-                          <div className="border rounded-lg overflow-x-auto">
-                            <Table className="min-w-[1200px]">
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Product Name</TableHead>
-                                  <TableHead>Price (₹)</TableHead>
-                                  <TableHead>Discount (₹)</TableHead>
-                                  <TableHead>{isRetopUpMode ? 'Add Qty' : 'Quantity'}</TableHead>
-                                  <TableHead>Notes</TableHead>
-                                  <TableHead>Actions</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {customerProducts.map((product: any, index: number) => (
-                                  <TableRow key={product._id}>
-                                    <TableCell>
-                                      {product.isNew ? (
-                                        <Select
-                                          value={product.productId}
-                                          onValueChange={(value) => {
-                                            const selectedProduct = products.find((p: any) => p._id === value)
-                                            const updatedProducts = [...customerProducts]
-                                            updatedProducts[index] = {
-                                              ...updatedProducts[index],
-                                              productId: value,
-                                              productName: selectedProduct?.name || '',
-                                              price: selectedProduct?.price || 0
-                                            }
-                                            setCustomerProducts(updatedProducts)
-                                          }}
-                                        >
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select product" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {products.map((p: any) => (
-                                              <SelectItem key={p._id} value={p._id}>
-                                                {p.name} - ₹{p.price}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div className="font-medium">{product.productName}</div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="number"
-                                        value={product.price}
-                                        onChange={(e) => {
-                                          const updatedProducts = [...customerProducts]
-                                          updatedProducts[index].price = parseFloat(e.target.value) || 0
-                                          setCustomerProducts(updatedProducts)
+
+                            {/* Right Side - Products Section */}
+                            <div className="col-span-8 space-y-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <Label className="text-base font-medium">Products</Label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setMultipleProducts([...multipleProducts, {
+                                      productId: "",
+                                      productName: "",
+                                      quantity: 1,
+                                      price: 0,
+                                      notes: ""
+                                    }]);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Product
+                                </Button>
+                              </div>
+
+                              {/* Column Headers */}
+                              <div className="grid grid-cols-12 gap-3 items-center px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
+                                <div className="col-span-5">Product</div>
+                                <div className="col-span-2">Qty</div>
+                                <div className="col-span-2">Price (₹)</div>
+                                <div className="col-span-2">Total</div>
+                                <div className="col-span-1">Action</div>
+                              </div>
+
+                              {/* Scrollable Products List Container */}
+                              <div className="overflow-y-scroll inventory-dialog-scroll border border-red-500" style={{ maxHeight: '180px', minHeight: '180px', backgroundColor: '#fef2f2' }}>
+                                <div className="space-y-3 p-2">
+                                {multipleProducts.map((product, index) => (
+                                  <div key={index} className="grid grid-cols-12 gap-3 items-center p-3 border rounded-lg bg-gray-50">
+                                    {/* Product Selection */}
+                                    <div className="col-span-5">
+                                      <Select
+                                        value={product.productId}
+                                        onValueChange={(value) => {
+                                          const selectedProduct = products.find((p: any) => p._id === value);
+                                          const updatedProducts = [...multipleProducts];
+                                          updatedProducts[index] = {
+                                            ...updatedProducts[index],
+                                            productId: value,
+                                            productName: selectedProduct?.name || "",
+                                            price: selectedProduct?.price || 0
+                                          };
+                                          setMultipleProducts(updatedProducts);
                                         }}
-                                        min="0"
-                                        step="0.01"
-                                        className="w-32"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="font-medium text-green-600">
-                                        ₹{((product.price || 0) * 0.33).toFixed(1)}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
+                                      >
+                                        <SelectTrigger className="h-9">
+                                          <SelectValue placeholder="Choose product" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {products.map((prod: any) => (
+                                            <SelectItem key={prod._id} value={prod._id}>
+                                              {prod.name} - ₹{prod.price}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    {/* Quantity */}
+                                    <div className="col-span-2">
                                       <Input
                                         type="number"
                                         value={product.quantity}
                                         onChange={(e) => {
-                                          const updatedProducts = [...customerProducts]
-                                          updatedProducts[index].quantity = parseInt(e.target.value) || 1
-                                          setCustomerProducts(updatedProducts)
+                                          const updatedProducts = [...multipleProducts];
+                                          updatedProducts[index].quantity = parseInt(e.target.value) || 1;
+                                          setMultipleProducts(updatedProducts);
                                         }}
                                         min="1"
-                                        className="w-24"
+                                        placeholder="Qty"
+                                        className="h-9"
                                       />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        value={product.notes || ''}
-                                        onChange={(e) => {
-                                          const updatedProducts = [...customerProducts]
-                                          updatedProducts[index].notes = e.target.value
-                                          setCustomerProducts(updatedProducts)
-                                        }}
-                                        placeholder="Add notes..."
-                                        className="w-48"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => handleRemoveProductFromCustomer(product._id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
+                                    </div>
 
-                          {/* Summary Section */}
-                          <div className="border-t pt-4">
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium">Sub Total:</span>
-                                <div className="flex space-x-8">
-                                  <span className="text-sm font-medium">
-                                    ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toLocaleString()}
-                                  </span>
-                                  <span className="text-sm font-medium text-green-600">
-                                    ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity * 0.33), 0).toFixed(1)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium">Tax:</span>
-                                <span className="text-sm font-medium">
-                                  ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity * 0.25), 0).toFixed(1)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium">Discount:</span>
-                                <span className="text-sm font-medium">
-                                  ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity * 0.33), 0).toFixed(1)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center border-t pt-2">
-                                <span className="text-lg font-bold">Grand Total:</span>
-                                <div className="flex space-x-8">
-                                  <span className="text-lg font-bold">
-                                    ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity * 0.92), 0).toFixed(1)}
-                                  </span>
-                                  <span className="text-sm font-medium text-green-600">
-                                    ₹{customerProducts.reduce((sum, p) => sum + (p.price * p.quantity * 0.33), 0).toFixed(1)}
-                                  </span>
-                                  <span className="text-sm font-medium">
-                                    {customerProducts.reduce((sum, p) => sum + p.quantity, 0)}
-                                  </span>
+                                    {/* Price */}
+                                    <div className="col-span-2">
+                                      <Input
+                                        type="number"
+                                        value={product.price}
+                                        onChange={(e) => {
+                                          const updatedProducts = [...multipleProducts];
+                                          updatedProducts[index].price = parseFloat(e.target.value) || 0;
+                                          setMultipleProducts(updatedProducts);
+                                        }}
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Price"
+                                        className="h-9"
+                                      />
+                                    </div>
+
+                                    {/* Total */}
+                                    <div className="col-span-2">
+                                      <div className="h-9 px-3 py-2 bg-white border rounded-md flex items-center">
+                                        <span className="text-sm font-medium">
+                                          ₹{((product.price || 0) * (product.quantity || 0)).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Delete Button */}
+                                    <div className="col-span-1">
+                                      {multipleProducts.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            setMultipleProducts(multipleProducts.filter((_, i) => i !== index));
+                                          }}
+                                          className="h-9 w-9 p-0"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
                                 </div>
                               </div>
                             </div>
+                            </div>
                           </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="outline" onClick={() => {
-                              setIsEshopDialogOpen(false)
-                              setCustomerProducts([])
-                              setEditingCustomerId(null)
-                              setIsRetopUpMode(false)
-                            }}>
-                              Cancel
-                            </Button>
-                            <Button onClick={handleUpdateCustomerProducts}>
-                              {isRetopUpMode ? 'Update Stock' : 'Save Changes'}
-                            </Button>
-                          </div>
+                        </div>
+                        
+                        {/* Action Buttons - Outside scrollable area */}
+                        <div className="flex justify-end space-x-2 mt-4 pt-4 border-t">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              setIsEshopDialogOpen(false);
+                              setEshopForm({
+                                productId: "",
+                                productName: "",
+                                customerId: "",
+                                customerName: "",
+                                quantity: "1",
+                                price: 0,
+                                notes: ""
+                              });
+                              setMultipleProducts([{
+                                productId: "",
+                                productName: "",
+                                quantity: 1,
+                                price: 0,
+                                notes: ""
+                              }]);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleMultipleProductsSubmit}
+                            disabled={!eshopForm.customerId || multipleProducts.some(p => !p.productId || !p.quantity)}
+                          >
+                            Add Products to Inventory
+                          </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -3426,16 +3864,19 @@ export function DashboardPage() {
                               </div>
                               <div className="flex space-x-2">
                                 <Button
+                                  variant="outline"
                                   onClick={() => {
-                                    // Use the first product to get customer info, then load all products
+                                    // Call the existing handleRetopUp function
                                     const firstProduct = customerData.products[0];
                                     handleRetopUp(firstProduct);
                                   }}
+                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   Re-top up
                                 </Button>
                                 <Button
+                                  variant="outline"
                                   onClick={() => {
                                     const items = customerData.products.map((item: any) => ({
                                       name: item.productName,
@@ -3448,6 +3889,7 @@ export function DashboardPage() {
                                     });
                                     window.open(`/dashboard/invoice?${queryParams.toString()}`, '_blank');
                                   }}
+                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
                                 >
                                   <FileText className="h-4 w-4 mr-2" />
                                   Generate Invoice
@@ -3461,8 +3903,8 @@ export function DashboardPage() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Product Name</TableHead>
-                                  <TableHead>Total Stock</TableHead>
-                                  <TableHead>Last Invoice</TableHead>
+                                  <TableHead>Available Stock</TableHead>
+                                  <TableHead>Invoiced Qty</TableHead>
                                   <TableHead>Last Updated</TableHead>
                                   <TableHead>Notes</TableHead>
                                   <TableHead>Actions</TableHead>
@@ -3498,15 +3940,7 @@ export function DashboardPage() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="relative">
-                                      <div className="relative flex space-x-2">
-                                        <Button 
-                                          size="sm"
-                                          onClick={() => handleRetopUp(item)}
-                                          className="bg-green-600 hover:bg-green-700 text-white"
-                                        >
-                                          <Plus className="h-4 w-4 mr-1" />
-                                          Re-top up
-                                        </Button>
+                                      <div className="relative">
                                         <Button 
                                           variant="outline" 
                                           size="sm"
@@ -3522,25 +3956,18 @@ export function DashboardPage() {
                                           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999]">
                                             <div className="py-1">
                                               <button
-                                                onClick={() => handleRecordUsage(item)}
-                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                              >
-                                                <DollarSign className="h-4 w-4 mr-2" />
-                                                Record Usage
-                                              </button>
-                                              <button
-                                                onClick={() => handleEditEshopItem(item)}
-                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                              >
-                                                <Edit className="h-4 w-4 mr-2" />
-                                                Edit Manually
-                                              </button>
-                                              <button
                                                 onClick={() => handleViewProductDetails(item)}
                                                 className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                                               >
                                                 <Eye className="h-4 w-4 mr-2" />
-                                                View Details
+                                                View
+                                              </button>
+                                              <button
+                                                onClick={() => openEshopEditDialog(item)}
+                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                              >
+                                                <Edit className="h-4 w-4 mr-2" />
+                                                Edit
                                               </button>
                                               <button
                                                 onClick={() => handleDeleteInventoryItem(item)}
@@ -3657,14 +4084,23 @@ export function DashboardPage() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditCustomer(customer)}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomer(customer._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleDeleteCustomer(customer._id)} className="text-red-600">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -5445,6 +5881,120 @@ export function DashboardPage() {
                     </Button>
                   </div>
                 </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Re-top Up Dialog */}
+          <Dialog open={isRetopUpDialogOpen} onOpenChange={setIsRetopUpDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Re-top Up Stock - {retopUpCustomerName}</DialogTitle>
+                <DialogDescription>
+                  Add additional stock to existing products
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleRetopUpSubmit} className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>Current Stock</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Quantity to Add</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customerProductsForRetopUp.map((product, index) => (
+                      <TableRow key={product._id}>
+                        <TableCell className="font-medium">{product.productName}</TableCell>
+                        <TableCell>{product.quantity - (product.invoicedQuantity || 0)} units</TableCell>
+                        <TableCell>₹{product.price?.toLocaleString() || 0}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={product.quantityToAdd || ""}
+                            onChange={(e) => {
+                              const updated = [...customerProductsForRetopUp]
+                              updated[index].quantityToAdd = parseInt(e.target.value) || 0
+                              setCustomerProductsForRetopUp(updated)
+                            }}
+                            min="0"
+                            className="w-24"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsRetopUpDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    Update Stock
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Inventory Dialog */}
+          <Dialog open={isEditInventoryDialogOpen} onOpenChange={setIsEditInventoryDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Inventory Item</DialogTitle>
+                <DialogDescription>
+                  Update product details, quantity, and price
+                </DialogDescription>
+              </DialogHeader>
+              {editingInventoryItem && (
+                <form onSubmit={handleEditInventorySubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit-product-name">Product Name</Label>
+                    <Input
+                      id="edit-product-name"
+                      placeholder="Enter product name"
+                      value={editInventoryForm.productName}
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, productName: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-quantity">Quantity</Label>
+                    <Input
+                      id="edit-quantity"
+                      type="number"
+                      placeholder="Enter quantity"
+                      value={editInventoryForm.quantity}
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, quantity: e.target.value})}
+                      required
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-price">Price (₹)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      placeholder="Enter price"
+                      value={editInventoryForm.price}
+                      onChange={(e) => setEditInventoryForm({...editInventoryForm, price: e.target.value})}
+                      required
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditInventoryDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                      Save Changes
+                    </Button>
+                  </div>
+                </form>
               )}
             </DialogContent>
           </Dialog>

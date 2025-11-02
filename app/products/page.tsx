@@ -282,19 +282,29 @@ export default function AllProductsPage() {
             : "space-y-4"
           }>
             {sortedProducts.map((product) => (
-              <Card key={product._id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <Link href={`/product/${product._id}`}>
-                  <CardContent className="p-0">
+              <Card key={product._id} className="overflow-hidden hover:shadow-lg transition-shadow" style={{ overflow: 'hidden' }}>
+                <Link href={`/product/${product._id}`} style={{ display: 'block', overflow: 'hidden' }}>
+                  <CardContent className="p-0 overflow-hidden" style={{ overflow: 'hidden' }}>
                     {/* Image */}
-                    <div className="aspect-square bg-gray-100 overflow-hidden relative">
+                    <div className="aspect-square bg-gray-100 overflow-hidden relative" style={{ overflow: 'hidden !important', isolation: 'isolate', position: 'relative', contain: 'layout style paint' }}>
                       {product.images && product.images.length > 0 ? (
-                        <Image
-                          src={product.images[0]}
-                          alt={product.name}
-                          fill
-                          className="object-contain p-4 hover:scale-105 transition-transform duration-300"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
+                        <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden" style={{ 
+                          transform: 'translateY(40%)', 
+                          height: '100%',
+                          width: '100%',
+                          maxHeight: '100%',
+                          maxWidth: '100%',
+                          clipPath: 'inset(0 0 0 0)'
+                        }}>
+                          <Image
+                            src={product.images[0]}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                            style={{ objectPosition: 'center' }}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <ShoppingCart className="h-16 w-16 text-gray-400" />
@@ -308,8 +318,12 @@ export default function AllProductsPage() {
                         {product.name}
                       </h3>
                       
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                        {product.description}
+                      <p className="text-sm text-gray-600 mb-3">
+                        {product.description ? (() => {
+                          const words = product.description.split(' ');
+                          const truncated = words.slice(0, 5).join(' ');
+                          return words.length > 5 ? truncated + '...' : truncated;
+                        })() : ''}
                       </p>
 
                       <div className="flex items-center justify-between mb-3">

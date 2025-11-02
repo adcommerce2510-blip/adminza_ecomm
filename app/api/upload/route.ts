@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.formData()
     const file: File | null = data.get('file') as unknown as File
-    const folder: string = data.get('folder') as string || 'uploads'
+    const folderParam: string = data.get('folder') as string || ''
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
@@ -26,27 +24,17 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Create uploads directory if it doesn't exist
-    const uploadDir = join(process.cwd(), 'public', 'uploads', folder)
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
+    // Upload to Cloudinary in 'adminza' folder
+    // Organize by type: adminza/products or adminza/services
+    const cloudinaryFolder = folderParam ? `adminza/${folderParam}` : 'adminza'
+    const cloudinaryUrl = await uploadToCloudinary(buffer, cloudinaryFolder, file.type)
 
-    // Generate unique filename
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 15)
-    const fileExtension = file.name.split('.').pop()
-    const filename = `${timestamp}-${randomString}.${fileExtension}`
-    
-    const filepath = join(uploadDir, filename)
-    await writeFile(filepath, buffer)
-
-    // Return public URL
-    const publicUrl = `/uploads/${folder}/${filename}`
+    // Extract filename from URL for backward compatibility
+    const filename = cloudinaryUrl.split('/').pop() || file.name
     
     return NextResponse.json({ 
       success: true, 
-      url: publicUrl,
+      url: cloudinaryUrl,
       filename: filename 
     })
 

@@ -5,12 +5,45 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRightIcon } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { AnimatedWrapper, StaggeredContainer } from "@/components/animated-wrapper"
 
 interface Category {
   _id: string
   name: string
   description?: string
+}
+
+// Mapping category names to their images
+const getCategoryImage = (categoryName: string): string => {
+  const categoryImageMap: { [key: string]: string } = {
+    "Office Stationery": "/office-stationery-bundle.jpg",
+    "IT Support": "/it-network-setup-office.jpg",
+    "IT Support & Network": "/it-network-setup-office.jpg",
+    "Cleaning Solutions": "/office-cleaning.png",
+    "Business Promotion": "/corporate-branding-materials.jpg",
+    "Office Support Solutions": "/modern-office-desk-setup.jpg",
+    "Office Furniture & Interior": "/modern-office-desk-front-view.jpg",
+    "Printing Solutions": "/large-format-printing-banners.jpg",
+    "AMC Services": "/ergonomic-office-chair.png",
+    "Corporate Gifting": "/desk-organizer-set.jpg"
+  }
+  
+  return categoryImageMap[categoryName] || "/placeholder.jpg"
+}
+
+// Check if category needs upward shift
+const shouldShiftImageUp = (categoryName: string): boolean => {
+  const categoriesToShiftUp = [
+    "Office Stationery",
+    "Printing Solutions",
+    "Business Promotion",
+    "IT Support",
+    "Office Support Solutions",
+    "Office Furniture & Interior"
+  ]
+  
+  return categoriesToShiftUp.includes(categoryName)
 }
 
 export function DynamicCategoriesSection() {
@@ -85,18 +118,42 @@ export function DynamicCategoriesSection() {
               
               return (
                 <AnimatedWrapper key={category._id} animation="fade-in-up" delay={index * 100}>
-                  <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden bg-gradient-to-br from-white to-gray-50">
-                    <CardContent className="p-0">
-                      <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-6xl opacity-20">
-                            📁
-                          </div>
+                  <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden bg-white rounded-lg" style={{ overflow: 'hidden' }}>
+                    <CardContent className="p-0 overflow-hidden relative rounded-lg" style={{ overflow: 'hidden' }}>
+                      <div className="h-1.5 bg-white overflow-hidden"></div>
+                      <div className="relative w-full bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden z-0 rounded-t-lg" style={{ height: '192px', width: '100%', maxHeight: '192px', minHeight: '192px', overflow: 'hidden', clipPath: 'inset(0 0 0 0)' }}>
+                        <div className="absolute left-0 right-0 overflow-hidden rounded-t-lg" style={{ 
+                          width: '100%',
+                          ...(shouldShiftImageUp(category.name) ? {
+                            top: '-80px',
+                            height: 'calc(100% + 80px)'
+                          } : {
+                            top: '0',
+                            bottom: '0',
+                            height: '192px',
+                            maxHeight: '192px'
+                          }),
+                          clipPath: 'inset(0 0 0 0)'
+                        }}>
+                          <Image
+                            src={getCategoryImage(category.name)}
+                            alt={category.name}
+                            fill
+                            className="object-cover z-0"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            style={{ 
+                              objectFit: 'cover', 
+                              objectPosition: 'top'
+                            }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.jpg"
+                            }}
+                          />
                         </div>
                       </div>
                       
-                      <div className="p-6">
+                      <div className="p-6 relative z-20 bg-white rounded-b-lg overflow-hidden">
                         <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
                           {category.name}
                         </h3>

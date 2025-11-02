@@ -1,16 +1,52 @@
 import mongoose from 'mongoose'
 
-const EShopInventorySchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  productName: { type: String, required: true },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
-  customerName: { type: String, required: true },
-  quantity: { type: Number, required: true, default: 0 }, // Total stock given to customer
-  invoicedQuantity: { type: Number, default: 0 }, // Total quantity that has been invoiced
-  price: { type: Number, default: 0 },
-  lastUpdated: { type: Date, default: Date.now },
-  notes: { type: String },
-}, { timestamps: true })
+const EshopInventorySchema = new mongoose.Schema({
+  productId: {
+    type: String,
+    required: true
+  },
+  productName: {
+    type: String,
+    required: true
+  },
+  customerId: {
+    type: String,
+    required: true
+  },
+  customerName: {
+    type: String,
+    required: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  notes: {
+    type: String,
+    default: ''
+  },
+  invoicedQuantity: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  lastUpdated: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+})
 
-export default mongoose.models.EShopInventory || mongoose.model('EShopInventory', EShopInventorySchema)
+// Clear the model cache to prevent recompilation issues
+delete mongoose.models.EshopInventory
 
+const EshopInventory = mongoose.models.EshopInventory || mongoose.model('EshopInventory', EshopInventorySchema)
+
+export default EshopInventory

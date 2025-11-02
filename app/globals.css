@@ -64,8 +64,8 @@
   background: #e5e7eb;
 }
 
-/* Force modal width override */
-[data-radix-dialog-content] {
+/* Force modal width override - but not for inventory modal */
+[data-radix-dialog-content]:not(:has(.add-inventory-modal)) {
   width: 90vw !important;
   max-width: 1200px !important;
   height: 600px !important;
@@ -82,6 +82,83 @@
 [data-radix-dialog-content]:has(.edit-enquiry-modal) {
   width: 90vw !important;
   max-width: 1200px !important;
+}
+
+/* Force Add Product Inventory modal to be wider and taller */
+[data-radix-dialog-content]:has(.add-inventory-modal) {
+  width: 95vw !important;
+  max-width: 1400px !important;
+  height: 85vh !important;
+  min-width: 1200px !important;
+}
+
+/* Additional override for inventory modal */
+.add-inventory-modal {
+  width: 95vw !important;
+  max-width: 1400px !important;
+  height: 85vh !important;
+  min-width: 1200px !important;
+}
+
+/* Most aggressive override for inventory modal */
+[data-radix-dialog-content].add-inventory-modal,
+[data-radix-dialog-overlay]+[data-radix-dialog-content]:has(.add-inventory-modal),
+div[data-radix-dialog-content]:has(.add-inventory-modal) {
+  width: 95vw !important;
+  max-width: 1400px !important;
+  height: 85vh !important;
+  min-width: 1200px !important;
+}
+
+/* Custom scrollbar for inventory dialog - ALWAYS VISIBLE */
+.inventory-dialog-scroll {
+  scrollbar-width: thick;
+  scrollbar-color: #dc2626 #fef2f2;
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable both-edges;
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar {
+  width: 22px !important;
+  background: #fef2f2 !important;
+  border: 2px solid #dc2626;
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-track {
+  background: #fef2f2 !important;
+  border-radius: 0px;
+  border: 1px solid #dc2626;
+  box-shadow: inset 0 0 5px rgba(220, 38, 38, 0.3);
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-thumb {
+  background: #dc2626 !important;
+  border-radius: 8px;
+  border: 2px solid #fef2f2;
+  min-height: 40px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-thumb:hover {
+  background: #dc2626 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-thumb:active {
+  background: #b91c1c !important;
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-corner {
+  background: #f1f5f9 !important;
+}
+
+/* Force scrollbar to always show */
+.inventory-dialog-scroll::-webkit-scrollbar-thumb {
+  background: #ef4444 !important;
+}
+
+.inventory-dialog-scroll::-webkit-scrollbar-track:vertical {
+  background: #f1f5f9 !important;
 }
 
 :root {
@@ -1339,4 +1416,109 @@ header .cart-dropdown-container {
 header .cart-dropdown-container .cart-dropdown {
   z-index: 999999 !important;
   position: absolute !important;
+}
+
+/* Force service form images to be constrained */
+[data-radix-dialog-content] .border-2.border-dashed img {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+}
+
+/* Force image containers to respect their dimensions */
+[data-radix-dialog-content] .border-2.border-dashed>div>div {
+  overflow: hidden !important;
+  max-height: 64px !important;
+  height: 64px !important;
+  width: 100% !important;
+}
+
+/* Additional force for service images */
+[data-radix-dialog-content] .border-2.border-dashed .relative {
+  overflow: hidden !important;
+  max-height: 48px !important;
+  height: 48px !important;
+}
+
+/* Force max height on image containers */
+[data-radix-dialog-content] .border-2.border-dashed>div>div {
+  max-height: 48px !important;
+  height: 48px !important;
+  overflow: hidden !important;
+}
+
+/* FORCE all images to stay within bounds - ULTRA STRICT */
+[data-radix-dialog-content] .border-2.border-dashed {
+  max-height: 80px !important;
+  height: 80px !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+
+[data-radix-dialog-content] .border-2.border-dashed>* {
+  max-height: 72px !important;
+  height: 72px !important;
+  overflow: hidden !important;
+}
+
+[data-radix-dialog-content] .border-2.border-dashed img,
+[data-radix-dialog-content] .border-2.border-dashed .relative img,
+[data-radix-dialog-content] .border-2.border-dashed>div img,
+[data-radix-dialog-content] .border-2.border-dashed>div>div img {
+  max-height: 48px !important;
+  height: 48px !important;
+  overflow: hidden !important;
+  display: block !important;
+  object-fit: cover !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* CRITICAL: Force ALL images in all dialog content to be small */
+[data-radix-dialog-content] img {
+  max-height: 48px !important;
+  overflow: hidden !important;
+  object-fit: cover !important;
+}
+
+/* ABSOLUTE OVERRIDE: Force ALL img tags to not overflow */
+img {
+  overflow: hidden !important;
+  max-height: 48px !important;
+  object-fit: cover !important;
+}
+
+/* Target specific service form images */
+form img,
+.dialog-content img,
+[role="dialog"] img {
+  max-height: 48px !important;
+  overflow: hidden !important;
+  object-fit: cover !important;
+  height: auto !important;
+}
+
+/* SPECIFIC SERVICE IMAGE PREVIEW FIX */
+.service-images-preview {
+  max-height: 80px !important;
+  height: 80px !important;
+  overflow: hidden !important;
+}
+
+.service-image-wrapper {
+  max-height: 48px !important;
+  height: 48px !important;
+  overflow: hidden !important;
+}
+
+.service-preview-image {
+  max-height: 48px !important;
+  height: 48px !important;
+  overflow: hidden !important;
+  object-fit: cover !important;
+  display: block !important;
 }

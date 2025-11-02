@@ -92,22 +92,30 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
 
   // Extract customer and invoice data
   const customerName = data?.customerName || "Customer Name";
-  const customerAddress = data?.customerAddress || "";
-  const customerCity = data?.customerCity || "";
-  const customerState = data?.customerState || "";
-  const customerZipCode = data?.customerZipCode || "";
-  const customerEmail = data?.customerEmail || "";
-  const customerPhone = data?.customerPhone || "";
-  const customerGstNumber = data?.customerGstNumber || "";
-  
+  const customerAddress = data?.customerAddress || "Customer Address";
+  const customerCity = data?.customerCity || "Customer City";
+  const customerState = data?.customerState || "Maharashtra";
+  const customerZipCode = data?.customerZipCode || "400001";
+  const customerEmail = data?.customerEmail || "customer@email.com";
+  const customerPhone = data?.customerPhone || "1234567890";
+  const customerGstNumber = data?.customerGstNumber || "N/A";
+
+  // Debug log to see what data we're receiving (can be removed in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Invoice Preview Data:', data);
+    console.log('Customer Name:', customerName);
+    console.log('Customer Address:', customerAddress);
+    console.log('Customer Email:', customerEmail);
+  }
+
   const invoiceNo = data?.invoiceNo || `INV-${Date.now()}`;
   const invoiceDate = data?.invoiceDate || new Date().toLocaleDateString('en-IN');
-  
+
   const items = data?.items || [];
   const subtotal = safeNumber(data?.subtotal) || 0;
   const gstType = data?.gstType || 'CGST/SGST';
   const gstRate = safeNumber(data?.gstRate) || 18;
-  
+
   // Calculate tax
   let cgst = 0, sgst = 0, igst = 0;
   if (gstType === 'IGST') {
@@ -116,7 +124,7 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
     cgst = +(subtotal * (gstRate / 200)).toFixed(2);
     sgst = +(subtotal * (gstRate / 200)).toFixed(2);
   }
-  
+
   const totalTax = cgst + sgst + igst;
   const grandTotal = +(subtotal + totalTax).toFixed(2);
   const amountInWords = amountToWordsWithPaise(grandTotal);
@@ -125,12 +133,12 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
   const handleDownloadPDF = async () => {
     try {
       const filename = `Invoice_${invoiceNo}.pdf`;
-      
+
       const { data: pdfData } = await generateStandardizedPDF(
         <InvoicePreview data={{ ...data, invoiceNo }} showDownloadButton={false} isPdfExport={true} />,
         filename
       );
-      
+
       // Create blob and download
       const blob = new Blob([pdfData as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
@@ -141,7 +149,7 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
     } catch (error) {
       console.error('PDF generation error:', error);
       alert('Error generating PDF. Please try again.');
@@ -161,14 +169,14 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
       )}
       <div
         ref={previewRef}
-        className="w-[800px] mx-auto bg-white shadow-lg p-4 text-black"
+        className="w-[800px] mx-auto bg-white shadow-lg text-black"
         style={{ 
-          fontFamily: 'Arial, Helvetica, sans-serif', 
+          fontFamily: 'Arial, sans-serif', 
           color: isPdfExport ? '#000000' : '#000', 
           background: isPdfExport ? '#ffffff' : '#fff', 
           minHeight: '1100px',
-          paddingTop: '40px',
-          paddingBottom: '60px',
+          padding: '20px',
+          fontSize: '12px',
           // Override any modern CSS color functions for PDF export
           ...(isPdfExport && {
             color: '#000000 !important',
@@ -204,74 +212,83 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
           </style>
         )}
         {/* Header with Logo and Invoice Title */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '0.5rem', marginTop: '-10px' }}>
-          <div style={{ width: '120px' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: '100%', height: 'auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ width: '80px' }}>
+            <div style={{ width: '70px', height: '70px' }}>
+              <img 
+                src="/logo.png" 
+                alt="Adminza Logo" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
+            </div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontWeight: 'bold', fontSize: '28px', marginBottom: '0.25rem' }}>TAX INVOICE</div>
-            <div style={{ fontSize: '10px', marginBottom: '4px' }}>
-              <div style={{ marginBottom: '4px' }}>IRN: {invoiceNo.replace('INV-', 'IRN')}</div>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '24px', marginBottom: '5px' }}>TAX INVOICE</div>
+            <div style={{ fontSize: '10px', lineHeight: '1.3' }}>
+              <div>IRN: {invoiceNo.replace('INV-', 'IRN')}</div>
               <div>Invoice Number: {invoiceNo}</div>
             </div>
           </div>
-          <div style={{ width: '120px' }}>
-            {/* Empty space for balance */}
+          <div style={{ width: '80px' }}>
+            {/* Empty div for balance */}
           </div>
         </div>
 
         {/* Order Details Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.25rem', fontSize: '12px', border: '1px solid #000', marginTop: '-8px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '10px', fontSize: '11px' }}>
           <tbody>
-            <tr style={{ borderBottom: '1px solid #000' }}>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f5f5f5', width: '15%' }}>Order Id</td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', width: '18%' }}>{invoiceNo.replace('INV-', 'ORD')}</td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f5f5f5', width: '15%' }}>Invoice No</td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', width: '18%' }}>{invoiceNo}</td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f5f5f5', width: '15%' }}>Invoice Date</td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', width: '19%' }}>{invoiceDate}</td>
+            <tr>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '15%' }}>Order Id</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', width: '18%' }}>{invoiceNo.replace('INV-', 'ORD')}</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '15%' }}>Invoice No</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', width: '18%' }}>{invoiceNo}</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '15%' }}>Invoice Date</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', width: '19%' }}>{invoiceDate}</td>
             </tr>
             <tr>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Place of Supply</td>
-              <td style={{ padding: '6px' }} colSpan={5}>{customerState || 'Maharashtra'}</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Place of Supply</td>
+              <td style={{ padding: '4px 6px', border: '1px solid #000' }} colSpan={5}>{customerState || 'Maharashtra'}</td>
             </tr>
           </tbody>
         </table>
 
         {/* Seller and Buyer Details Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.25rem', fontSize: '12px', border: '1px solid #000', marginTop: '-6px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '10px', fontSize: '11px' }}>
           <tbody>
-            {/* Seller Row */}
-            <tr style={{ borderBottom: '1px solid #000' }}>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f5f5f5', width: '15%', verticalAlign: 'top' }}>
+            <tr>
+              <td style={{ padding: '6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '15%', verticalAlign: 'top' }}>
                 Sold By / Seller
               </td>
-              <td style={{ padding: '6px', borderRight: '1px solid #000', width: '35%', verticalAlign: 'top' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>ADMINZA BUSINESS SOLUTIONS</div>
-                <div>Shop 1 & 2, Ground Floor, Business Plaza</div>
-                <div>Plot Number 123, Sector 15, CBD Belapur</div>
-                <div>Navi Mumbai, Maharashtra - 400614</div>
-                <div style={{ marginTop: '8px' }}>
-                  <div>GSTIN: 27ADMIN1234A1Z5</div>
-                  <div>PAN: ADMIN1234A</div>
-                  <div>CIN: U74140MH2023PTC123456</div>
+              <td style={{ padding: '6px', border: '1px solid #000', width: '35%', verticalAlign: 'top' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>ADMINZA BUSINESS SOLUTIONS</div>
+                <div style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                  <div>Shop 1 & 2, Ground Floor, Business Plaza</div>
+                  <div>Plot Number 123, Sector 15, CBD Belapur</div>
+                  <div>Navi Mumbai, Maharashtra - 400614</div>
+                  <div style={{ marginTop: '4px' }}>
+                    <div>GSTIN: 27ADMIN1234A1Z5</div>
+                    <div>PAN: ADMIN1234A</div>
+                    <div>CIN: U74140MH2023PTC123456</div>
+                  </div>
                 </div>
               </td>
-              <td style={{ padding: '6px', fontWeight: 'bold', backgroundColor: '#f5f5f5', width: '15%', verticalAlign: 'top' }}>
+              <td style={{ padding: '6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '15%', verticalAlign: 'top' }}>
                 Invoice To
               </td>
-              <td style={{ padding: '6px', width: '35%', verticalAlign: 'top' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>{customerName}</div>
-                {customerAddress && <div>{customerAddress}</div>}
-                {(customerCity || customerState || customerZipCode) && (
-                  <div>{[customerCity, customerState, customerZipCode].filter(Boolean).join(', ')}</div>
-                )}
-                <div style={{ marginTop: '8px' }}>
-                  <div>GSTIN: {customerGstNumber || 'N/A'}</div>
-                  <div>Pin code: {customerZipCode || 'N/A'}</div>
-                  <div>State: {customerState || 'Maharashtra'}</div>
-                  {customerPhone && <div>Phone: {customerPhone}</div>}
-                  {customerEmail && <div>Email: {customerEmail}</div>}
+              <td style={{ padding: '6px', border: '1px solid #000', width: '35%', verticalAlign: 'top' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{customerName}</div>
+                <div style={{ fontSize: '10px', lineHeight: '1.2' }}>
+                  {customerAddress && <div>{customerAddress}</div>}
+                  {(customerCity || customerState || customerZipCode) && (
+                    <div>{[customerCity, customerState, customerZipCode].filter(Boolean).join(', ')}</div>
+                  )}
+                  <div style={{ marginTop: '4px' }}>
+                    <div>GSTIN: {customerGstNumber || 'N/A'}</div>
+                    <div>Pin code: {customerZipCode || 'N/A'}</div>
+                    <div>State: {customerState || 'Maharashtra'}</div>
+                    {customerPhone && <div>Phone: {customerPhone}</div>}
+                    {customerEmail && <div>Email: {customerEmail}</div>}
+                  </div>
                 </div>
               </td>
             </tr>
@@ -279,21 +296,21 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
         </table>
 
         {/* Items Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.25rem', fontSize: '11px', border: '1px solid #000' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '10px', fontSize: '10px' }}>
           <thead>
-            <tr style={{ backgroundColor: '#f0f0f0', borderTop: '2px solid #000', borderBottom: '2px solid #000' }}>
-              <th style={{ padding: '6px', textAlign: 'center', borderRight: '1px solid #ddd', width: '5%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Sr. no</div></th>
-              <th style={{ padding: '6px', textAlign: 'left', borderRight: '1px solid #ddd', width: '15%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>UPC</div></th>
-              <th style={{ padding: '6px', textAlign: 'left', borderRight: '1px solid #ddd', width: '25%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Item Description</div></th>
-              <th style={{ padding: '6px', textAlign: 'right', borderRight: '1px solid #ddd', width: '8%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>MRP</div></th>
-              <th style={{ padding: '6px', textAlign: 'right', borderRight: '1px solid #ddd', width: '8%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Discount</div></th>
-              <th style={{ padding: '6px', textAlign: 'center', borderRight: '1px solid #ddd', width: '6%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Qty.</div></th>
-              <th style={{ padding: '6px', textAlign: 'right', borderRight: '1px solid #ddd', width: '8%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Taxable Value</div></th>
-              <th style={{ padding: '6px', textAlign: 'center', borderRight: '1px solid #ddd', width: '6%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>CGST (%)</div></th>
-              <th style={{ padding: '6px', textAlign: 'right', borderRight: '1px solid #ddd', width: '7%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>CGST (INR)</div></th>
-              <th style={{ padding: '6px', textAlign: 'center', borderRight: '1px solid #ddd', width: '6%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>SGST (%)</div></th>
-              <th style={{ padding: '6px', textAlign: 'right', borderRight: '1px solid #ddd', width: '7%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>SGST (INR)</div></th>
-              <th style={{ padding: '6px', textAlign: 'center', borderRight: '1px solid #ddd', width: '6%', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Total</div></th>
+            <tr style={{ backgroundColor: '#f0f0f0' }}>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '4%', fontWeight: 'bold' }}>Sr. no</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '12%', fontWeight: 'bold' }}>UPC</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '25%', fontWeight: 'bold' }}>Item Description</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '8%', fontWeight: 'bold' }}>MRP</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '8%', fontWeight: 'bold' }}>Discount</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>Qty.</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '8%', fontWeight: 'bold' }}>Taxable Value</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '6%', fontWeight: 'bold' }}>CGST (%)</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '7%', fontWeight: 'bold' }}>CGST (INR)</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '6%', fontWeight: 'bold' }}>SGST (%)</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '7%', fontWeight: 'bold' }}>SGST (INR)</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '6%', fontWeight: 'bold' }}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -301,68 +318,70 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
               const itemCgst = gstType === 'IGST' ? 0 : +(item.total * (gstRate / 200)).toFixed(2);
               const itemSgst = gstType === 'IGST' ? 0 : +(item.total * (gstRate / 200)).toFixed(2);
               const itemTotal = +(item.total + itemCgst + itemSgst).toFixed(2);
-              
+
               return (
-                <tr key={index} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{index + 1}</div></td>
-                  <td style={{ padding: '4px', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{Math.floor(Math.random() * 10000000000000)}</div></td>
-                  <td style={{ padding: '4px', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{item.name} (HSN-{Math.floor(Math.random() * 100000000)}) | {Math.floor(Math.random() * 500) + 100} ml</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{((item.price * 0.4)).toFixed(2)}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{item.quantity}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{gstType === 'IGST' ? '0.00' : (gstRate / 2).toFixed(2)}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{itemCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{gstType === 'IGST' ? '0.00' : (gstRate / 2).toFixed(2)}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{itemSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></td>
-                  <td style={{ padding: '4px', textAlign: 'right', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></td>
+                <tr key={index}>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{index + 1}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '8px' }}>{Math.floor(Math.random() * 10000000000000)}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', fontSize: '9px' }}>
+                    {item.name} (HSN-{Math.floor(Math.random() * 100000000)}) | {Math.floor(Math.random() * 500) + 100} ml
+                  </td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{((item.price * 0.4)).toFixed(2)}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{item.quantity}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{gstType === 'IGST' ? '0.00' : (gstRate / 2).toFixed(2)}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{itemCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{gstType === 'IGST' ? '0.00' : (gstRate / 2).toFixed(2)}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{itemSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                 </tr>
               );
             })}
             {/* Total Row */}
-            <tr style={{ backgroundColor: '#f0f0f0', borderTop: '2px solid #000', borderBottom: '2px solid #000' }}>
-              <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', fontWeight: 'bold', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}>Total</div></td>
-              <td style={{ padding: '4px', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', fontWeight: 'bold', position: 'relative' }}>
-                <div style={{ position: 'relative', top: '-8px' }}>{items.reduce((sum, item) => sum + item.quantity, 0)}</div>
+            <tr style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+              <td style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>Total</td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>
+                {items.reduce((sum, item) => sum + item.quantity, 0)}
               </td>
-              <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', fontWeight: 'bold', position: 'relative' }}>
-                <div style={{ position: 'relative', top: '-8px' }}>{cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>
+                {cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </td>
-              <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #ddd', position: 'relative' }}><div style={{ position: 'relative', top: '-8px' }}></div></td>
-              <td style={{ padding: '4px', textAlign: 'right', borderRight: '1px solid #ddd', fontWeight: 'bold', position: 'relative' }}>
-                <div style={{ position: 'relative', top: '-8px' }}>{sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+              <td style={{ padding: '4px 2px', border: '1px solid #000' }}></td>
+              <td style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>
+                {sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </td>
-              <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold', position: 'relative' }}>
-                <div style={{ position: 'relative', top: '-8px' }}>{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+              <td style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>
+                {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </td>
             </tr>
           </tbody>
         </table>
 
         {/* Amount in Words Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.25rem', fontSize: '12px', border: '1px solid #000', marginTop: '-2px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '10px', fontSize: '11px' }}>
           <tbody>
             <tr>
-              <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', borderRight: '1px solid #000', width: '20%' }}>
+              <td style={{ padding: '6px', border: '1px solid #000', fontWeight: 'bold', backgroundColor: '#f0f0f0', width: '20%' }}>
                 Amount in Words:
               </td>
-              <td style={{ padding: '8px' }}>
+              <td style={{ padding: '6px', border: '1px solid #000' }}>
                 {amountInWords}
               </td>
             </tr>
           </tbody>
         </table>
 
-        {/* Additional Seller Information */}
-        <div style={{ marginBottom: '1rem', fontSize: '11px', lineHeight: '1.6', marginTop: '-1px' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Company Details</div>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>ADMINZA BUSINESS SOLUTIONS (formerly known as Adminza Private Limited)</div>
+        {/* Company Details */}
+        <div style={{ marginBottom: '15px', fontSize: '11px', lineHeight: '1.4' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Company Details</div>
+          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>ADMINZA BUSINESS SOLUTIONS (formerly known as Adminza Private Limited)</div>
           <div>GSTIN: 27ADMIN1234A1Z5</div>
           <div>FSSAI License Number: 10018064001545</div>
           <div>CIN: U74140MH2023PTC123456</div>
@@ -373,20 +392,25 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
         </div>
 
         {/* Terms & Conditions */}
-        <div style={{ marginBottom: '1rem', fontSize: '11px', lineHeight: '1.6', marginTop: '-1px' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Terms & Conditions</div>
-          <ol style={{ paddingLeft: '20px', margin: 0 }}>
-            <li>If you have any issues or queries in respect of your order, please contact customer chat support through Adminza platform or drop in email at info@adminza.com</li>
-            <li>In case you need to get more information about seller's or Adminza's FSSAI status, please visit https://foscos.fssai.gov.in/ and use the FBO search option with FSSAI License / Registration number.</li>
-            <li>Please note that we never ask for bank account details such as CVV, account number, UPI Pin, etc. across our support channels. For your safety please do not share these details with anyone over any medium.</li>
-          </ol>
+        <div style={{ marginBottom: '20px', fontSize: '10px', lineHeight: '1.3' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Terms & Conditions</div>
+          <div style={{ textAlign: 'justify' }}>
+            If you have any issues or queries in respect of your order, please contact customer chat support through Adminza platform or drop in email at info@adminza.com
+          </div>
+          <div style={{ textAlign: 'justify', marginTop: '3px' }}>
+            In case you need to get more information about seller's or Adminza's FSSAI status, please visit https://foscos.fssai.gov.in/ and use the FBO search option with FSSAI License / Registration number.
+          </div>
+          <div style={{ textAlign: 'justify', marginTop: '3px' }}>
+            Please note that we never ask for bank account details such as CVV, account number, UPI Pin, etc. across our support channels. For your safety please do not share these details with anyone over any medium.
+          </div>
         </div>
 
         {/* Authorised Signatory */}
-        <div style={{ marginTop: '60px', marginBottom: '20px', textAlign: 'right' }}>
-          <div style={{ textAlign: 'center', display: 'inline-block' }}>
-            <div style={{ borderTop: '1px solid #000', width: '200px', marginBottom: '10px', paddingTop: '30px' }}></div>
-            <div style={{ fontWeight: 'bold', fontSize: '12px' }}>Authorised Signatory</div>
+        <div style={{ marginTop: '30px', textAlign: 'right' }}>
+          <div style={{ display: 'inline-block' }}>
+            <div style={{ height: '40px' }}></div>
+            <div style={{ borderTop: '1px solid #000', width: '150px', marginBottom: '5px' }}></div>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textAlign: 'center' }}>Authorised Signatory</div>
           </div>
         </div>
       </div>
@@ -405,22 +429,67 @@ export default function InvoicePage() {
     // Get customer ID and items from URL params
     const customerId = searchParams.get('customerId');
     const itemsParam = searchParams.get('items');
-    
+
     if (customerId && itemsParam) {
       try {
         const items = JSON.parse(decodeURIComponent(itemsParam));
-        
-        // Fetch customer details
+
+        // First try to fetch customer details from Customer collection
         console.log('Fetching customer with ID:', customerId);
         fetch(`/api/customers/${customerId}`)
-          .then(res => res.json())
+          .then(res => {
+            console.log('Customer API response status:', res.status);
+            return res.json();
+          })
           .then(response => {
             console.log('Customer API response:', response);
-            // Handle both direct customer object and wrapped response
-            const customer = response.data || response;
-            console.log('Customer data extracted:', customer);
-            const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
             
+            let customer: any = null;
+            
+            // If customer exists in Customer collection, use that data
+            if (response.success && response.data) {
+              customer = response.data;
+              console.log('Using customer data from Customer collection:', customer);
+            } else {
+              // If customer doesn't exist in Customer collection, try to get data from e-shop inventory
+              console.log('Customer not found in Customer collection, fetching from e-shop inventory');
+              return fetch('/api/eshop-inventory')
+                .then(res => res.json())
+                .then(inventoryResponse => {
+                  console.log('E-shop inventory response:', inventoryResponse);
+                  const inventoryArray = inventoryResponse.data || inventoryResponse;
+                  const customerInventory = inventoryArray.find((item: any) => item.customerId === customerId);
+                  
+                  if (customerInventory) {
+                    // Create customer object from e-shop inventory data
+                    customer = {
+                      _id: customerId,
+                      name: customerInventory.customerName,
+                      email: `${customerInventory.customerName.toLowerCase().replace(/\s+/g, '')}@email.com`,
+                      phone: '1234567890',
+                      address: 'Customer Address',
+                      city: 'Customer City',
+                      state: 'Maharashtra',
+                      zipCode: '400001',
+                      gstNumber: 'N/A'
+                    };
+                    console.log('Created customer object from e-shop inventory:', customer);
+                  }
+                  return customer;
+                });
+            }
+            
+            return customer;
+          })
+          .then(customer => {
+            if (!customer) {
+              console.error('No customer data found');
+              alert('No customer data found');
+              return;
+            }
+            
+            const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+
             const invoice = {
               customerId: customer._id,
               customerName: customer.name,
@@ -443,21 +512,60 @@ export default function InvoicePage() {
               gstType: 'CGST/SGST' as const,
               gstRate: 18
             };
-            
-            setInvoiceData(invoice);
-            
-            // Fetch current inventory for this customer
-            return fetch('/api/eshop-inventory');
+
+            console.log('Final invoice data:', invoice);
+
+            // Fetch current inventory for this customer first
+            return fetch(`/api/eshop-inventory?t=${Date.now()}`, {
+              cache: 'no-cache',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
+            })
+            .then(res => res?.json())
+            .then(inventoryData => {
+              console.log('Raw inventory data:', inventoryData);
+              // Handle both direct array and wrapped response formats
+              const inventoryArray = inventoryData.data || inventoryData;
+              const customerInventory = inventoryArray.filter((item: any) => item.customerId === searchParams.get('customerId'));
+              console.log('Filtered customer inventory:', customerInventory);
+              setCurrentInventory(customerInventory);
+              
+              // Update invoice items to use available stock quantities
+              const updatedItems = invoice.items.map((invoiceItem: any) => {
+                const inventoryItem = customerInventory.find((inv: any) => 
+                  inv.productName === invoiceItem.name || 
+                  inv.productName?.toLowerCase().trim() === invoiceItem.name?.toLowerCase().trim()
+                );
+                
+                if (inventoryItem) {
+                  const invoicedQty = inventoryItem.invoicedQuantity || 0;
+                  const availableStock = inventoryItem.quantity - invoicedQty;
+                  
+                  return {
+                    ...invoiceItem,
+                    quantity: availableStock, // Use available stock as initial quantity
+                    total: invoiceItem.price * availableStock
+                  };
+                }
+                return invoiceItem;
+              });
+              
+              const updatedSubtotal = updatedItems.reduce((sum: number, item: any) => sum + item.total, 0);
+              
+              const finalInvoiceData = {
+                ...invoice,
+                items: updatedItems,
+                subtotal: updatedSubtotal
+              };
+              
+              setInvoiceData(finalInvoiceData);
+              setLoading(false);
+            });
           })
-          .then(res => res.json())
-          .then(inventoryData => {
-            console.log('Raw inventory data:', inventoryData);
-            // Handle both direct array and wrapped response formats
-            const inventoryArray = inventoryData.data || inventoryData;
-            const customerInventory = inventoryArray.filter((item: any) => item.customerId === searchParams.get('customerId'));
-            console.log('Filtered customer inventory:', customerInventory);
-            setCurrentInventory(customerInventory);
-            setLoading(false);
+          .then(() => {
+            // This .then() is now handled above
           })
           .catch(error => {
             console.error('Error fetching customer:', error);
@@ -477,9 +585,9 @@ export default function InvoicePage() {
       const updatedItems = [...invoiceData.items];
       updatedItems[itemIndex].quantity = newQuantity;
       updatedItems[itemIndex].total = updatedItems[itemIndex].price * newQuantity;
-      
+
       const subtotal = updatedItems.reduce((sum, item) => sum + item.total, 0);
-      
+
       setInvoiceData({
         ...invoiceData,
         items: updatedItems,
@@ -493,9 +601,9 @@ export default function InvoicePage() {
       const updatedItems = [...invoiceData.items];
       updatedItems[itemIndex].price = newPrice;
       updatedItems[itemIndex].total = newPrice * updatedItems[itemIndex].quantity;
-      
+
       const subtotal = updatedItems.reduce((sum, item) => sum + item.total, 0);
-      
+
       setInvoiceData({
         ...invoiceData,
         items: updatedItems,
@@ -506,18 +614,18 @@ export default function InvoicePage() {
 
   const handleGenerateInvoice = async () => {
     if (!invoiceData) return;
-    
+
     setSaving(true);
-    
+
     try {
       // Generate and download invoice
       const filename = `Invoice_${invoiceData.invoiceNo}.pdf`;
-      
+
       const { data: pdfData } = await generateStandardizedPDF(
         <InvoicePreview data={invoiceData} showDownloadButton={false} isPdfExport={true} />,
         filename
       );
-      
+
       // Create blob and download
       const blob = new Blob([pdfData as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
@@ -528,7 +636,7 @@ export default function InvoicePage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       // Update inventory quantities (deduct billed amounts)
       const updatePromises = (invoiceData.items || []).map(async (invoiceItem) => {
         // Find the corresponding inventory item with better matching
@@ -536,11 +644,11 @@ export default function InvoicePage() {
           inv.productName === invoiceItem.name || 
           inv.productName?.toLowerCase().trim() === invoiceItem.name?.toLowerCase().trim()
         );
-        
+
         console.log('Looking for inventory item:', invoiceItem.name);
         console.log('Available inventory items:', currentInventory.map(inv => inv.productName));
         console.log('Found inventory item:', inventoryItem);
-        
+
         if (inventoryItem) {
           const newInvoicedQuantity = (inventoryItem.invoicedQuantity || 0) + invoiceItem.quantity;
           const remainingQuantity = inventoryItem.quantity - newInvoicedQuantity;
@@ -550,7 +658,7 @@ export default function InvoicePage() {
           console.log(`  New Invoice: ${invoiceItem.quantity}`);
           console.log(`  Total Invoiced: ${newInvoicedQuantity}`);
           console.log(`  Remaining: ${remainingQuantity}`);
-          
+
           // Update the inventory item - increment invoicedQuantity
           const response = await fetch(`/api/eshop-inventory/${inventoryItem._id}`, {
             method: 'PUT',
@@ -565,10 +673,10 @@ export default function InvoicePage() {
               lastUpdated: new Date().toISOString()
             }),
           });
-          
+
           const result = await response.json();
           console.log('Update result:', result);
-          
+
           if (!result.success) {
             console.error('Failed to update inventory item:', result.error);
           }
@@ -578,7 +686,7 @@ export default function InvoicePage() {
       });
 
       await Promise.all(updatePromises);
-      
+
       // Count successful updates
       const successfulUpdates = (invoiceData.items || []).filter((invoiceItem) => {
         return currentInventory.find(inv => 
@@ -586,12 +694,37 @@ export default function InvoicePage() {
           inv.productName?.toLowerCase().trim() === invoiceItem.name?.toLowerCase().trim()
         );
       }).length;
+
+      // Wait a moment for database updates to complete, then refresh the current inventory
+      await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
       
+      try {
+        const refreshedInventoryResponse = await fetch(`/api/eshop-inventory?t=${Date.now()}`, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        const refreshedInventoryData = await refreshedInventoryResponse.json();
+        console.log('Refreshed inventory data:', refreshedInventoryData);
+        
+        const refreshedInventoryArray = refreshedInventoryData.data || refreshedInventoryData;
+        const refreshedCustomerInventory = refreshedInventoryArray.filter((item: any) => item.customerId === searchParams.get('customerId'));
+        console.log('Filtered customer inventory:', refreshedCustomerInventory);
+        
+        setCurrentInventory(refreshedCustomerInventory);
+      } catch (error) {
+        console.error('Error refreshing inventory:', error);
+      }
+
       alert(`Invoice generated successfully! Updated ${successfulUpdates} inventory items.`);
-      
-      // Redirect to My Customers tab
-      window.location.href = '/dashboard?tab=customer-management&subtab=my-customers';
-      
+
+      // Redirect to dashboard My Customers tab after successful invoice generation
+      setTimeout(() => {
+        window.location.href = '/dashboard?section=customer-management&subsection=my-customers';
+      }, 2000); // 2 second delay to allow user to see the success message
+
     } catch (error) {
       console.error('Error generating invoice:', error);
       alert('Error generating invoice. Please try again.');
@@ -604,7 +737,7 @@ export default function InvoicePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading invoice...</p>
         </div>
       </div>
@@ -615,10 +748,10 @@ export default function InvoicePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">No Invoice Data</h2>
-          <p className="text-gray-600 mb-8">Unable to load invoice. Please try again.</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">No Invoice Data</h1>
+          <p className="text-gray-600 mb-6">Unable to load invoice. Please try again.</p>
           <Link href="/dashboard">
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
@@ -629,59 +762,78 @@ export default function InvoicePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <Link href="/dashboard">
-            <Button variant="ghost" className="flex items-center space-x-2">
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Dashboard</span>
+            <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
             </Button>
           </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Invoice Generator</h1>
+          <div></div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar - Edit Items */}
+          {/* Sidebar - Invoice Controls */}
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle>Edit Invoice Items</CardTitle>
+                <CardTitle className="text-lg">Invoice Items</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {(invoiceData.items || []).map((item, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <h4 className="font-medium text-sm mb-2">{item.name}</h4>
-                      
-                      <div className="space-y-2">
-                        <div>
-                          <Label className="text-xs">Quantity</Label>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuantityChange(index, Math.max(0, item.quantity - 1))}
-                              disabled={item.quantity <= 0}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 0)}
-                              min="0"
-                              className="w-16 text-center text-sm"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuantityChange(index, item.quantity + 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
+                  {(invoiceData.items || []).map((item, index) => {
+                    // Find corresponding inventory item to get available stock
+                    const inventoryItem = currentInventory.find(inv => 
+                      inv.productName === item.name || 
+                      inv.productName?.toLowerCase().trim() === item.name?.toLowerCase().trim()
+                    );
+                    const invoicedQty = inventoryItem?.invoicedQuantity || 0;
+                    const availableStock = inventoryItem ? (inventoryItem.quantity - invoicedQty) : 0;
+                    
+                    return (
+                      <div key={index} className="border rounded-lg p-4">
+                        <h4 className="font-medium text-sm mb-2">{item.name}</h4>
+                        <div className="text-xs text-gray-500 mb-2">Available: {availableStock} units</div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <Label className="text-xs">Quantity</Label>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleQuantityChange(index, Math.max(0, item.quantity - 1))}
+                                disabled={item.quantity <= 0}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newQty = parseInt(e.target.value) || 0;
+                                  const limitedQty = Math.min(newQty, availableStock);
+                                  handleQuantityChange(index, limitedQty);
+                                }}
+                                min="0"
+                                max={availableStock}
+                                className="w-16 text-center text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleQuantityChange(index, Math.min(item.quantity + 1, availableStock))}
+                                disabled={item.quantity >= availableStock}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        
+
                         <div>
                           <Label className="text-xs">Price (₹)</Label>
                           <Input
@@ -693,27 +845,58 @@ export default function InvoicePage() {
                             className="text-sm"
                           />
                         </div>
-                        
-                        <div className="text-xs text-gray-600">
-                          Total: ₹{item.total.toFixed(2)}
+
+                          <div className="text-xs text-gray-600">
+                            Total: ₹{item.total.toFixed(2)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-                
+
                 {/* Current Inventory Info */}
                 {currentInventory.length > 0 && (
                   <div className="mt-6 pt-4 border-t">
-                    <h5 className="font-medium text-sm mb-3">Current Inventory</h5>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="font-medium text-sm">Current Inventory</h5>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`/api/eshop-inventory?t=${Date.now()}`, {
+                              cache: 'no-cache',
+                              headers: { 
+                                'Cache-Control': 'no-cache',
+                                'Pragma': 'no-cache'
+                              }
+                            });
+                            const data = await response.json();
+                            const inventoryArray = data.data || data;
+                            const customerInventory = inventoryArray.filter((item: any) => item.customerId === searchParams.get('customerId'));
+                            setCurrentInventory(customerInventory);
+                          } catch (error) {
+                            console.error('Error refreshing inventory:', error);
+                          }
+                        }}
+                        className="text-xs px-2 py-1 h-6"
+                      >
+                        Refresh
+                      </Button>
+                    </div>
                     <div className="space-y-2">
-                      {currentInventory.map((item) => (
-                        <div key={item._id} className="text-xs text-gray-600 p-2 bg-gray-50 rounded">
-                          <div className="font-medium">{item.productName}</div>
-                          <div>Available: {item.quantity}</div>
-                          <div>Price: ₹{item.price}</div>
-                        </div>
-                      ))}
+                      {currentInventory.map((item) => {
+                        const invoicedQty = item.invoicedQuantity || 0;
+                        const availableQty = item.quantity - invoicedQty;
+                        return (
+                          <div key={item._id} className="text-xs text-gray-600 p-2 bg-gray-50 rounded">
+                            <div className="font-medium">{item.productName}</div>
+                            <div>Current Stock: {availableQty}</div>
+                            <div>Price: ₹{item.price}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -742,7 +925,7 @@ export default function InvoicePage() {
                 )}
               </Button>
             </div>
-            
+
             <InvoicePreview data={invoiceData} showDownloadButton={false} isPdfExport={false} />
           </div>
         </div>

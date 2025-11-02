@@ -54,7 +54,7 @@ const ServiceSchema: Schema = new Schema({
     type: String,
     required: [true, 'Description is required'],
     trim: true,
-    maxlength: [1000, 'Description cannot exceed 1000 characters']
+    maxlength: [5000, 'Description cannot exceed 5000 characters']
   },
   location: {
     type: String,

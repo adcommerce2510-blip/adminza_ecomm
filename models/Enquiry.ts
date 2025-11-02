@@ -15,3 +15,4 @@ const EnquirySchema = new mongoose.Schema({
 }, { timestamps: true })
 
 export default mongoose.models.Enquiry || mongoose.model('Enquiry', EnquirySchema)
+

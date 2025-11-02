@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
     await dbConnect()
 
     const body = await request.json()
+    console.log('Creating service with data:', body)
+    
     const service = new Service(body)
     await service.save()
 
@@ -93,7 +95,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating service:', error)
     return NextResponse.json(
-      { error: 'Failed to create service' },
+      { 
+        error: 'Failed to create service',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

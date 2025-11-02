@@ -491,7 +491,7 @@ export function Header() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
                     {loading ? "Logging in..." : "Login"}
                   </Button>
                   <p className="text-sm text-center text-gray-600">
@@ -675,7 +675,7 @@ export function Header() {
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
                     {loading ? "Creating Account..." : "Create Account"}
                   </Button>
                   <p className="text-sm text-center text-gray-600">

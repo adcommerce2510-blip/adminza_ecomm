@@ -245,25 +245,35 @@ export default function CategoryPage() {
               const detailUrl = isProduct ? `/product/${item._id}` : `/service/${item._id}`
               
               return (
-                <Card key={item._id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <Link href={detailUrl}>
-                    <CardContent className="p-0">
+                <Card key={item._id} className="overflow-hidden hover:shadow-lg transition-shadow" style={{ overflow: 'hidden' }}>
+                  <Link href={detailUrl} style={{ display: 'block', overflow: 'hidden' }}>
+                      <CardContent className="p-0 overflow-hidden" style={{ overflow: 'hidden' }}>
                       {/* Image */}
-                      <div className="aspect-square bg-gray-100 overflow-hidden relative">
-                        {item.images && item.images.length > 0 ? (
-                          <Image
-                            src={item.images[0]}
-                            alt={item.name}
-                            fill
-                            className="object-contain p-4 hover:scale-105 transition-transform duration-300"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ShoppingCart className="h-16 w-16 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
+                        <div className="aspect-square bg-gray-900 overflow-hidden relative" style={{ overflow: 'hidden !important', isolation: 'isolate', position: 'relative', contain: 'layout style paint' }}>
+                          {item.images && item.images.length > 0 ? (
+                            <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden" style={{ 
+                              transform: 'translateY(45%)', 
+                              height: '100%',
+                              width: '100%',
+                              maxHeight: '100%',
+                              maxWidth: '100%',
+                              clipPath: 'inset(0 0 0 0)'
+                            }}>
+                              <Image
+                                src={item.images[0]}
+                                alt={item.name}
+                                fill
+                                className="object-cover"
+                                style={{ objectPosition: 'center' }}
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ShoppingCart className="h-16 w-16 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
 
                       {/* Content */}
                       <div className="p-4">
@@ -271,8 +281,12 @@ export default function CategoryPage() {
                           {item.name}
                         </h3>
                         
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                          {item.description}
+                        <p className="text-sm text-gray-600 mb-3">
+                          {item.description ? (() => {
+                            const words = item.description.split(' ');
+                            const truncated = words.slice(0, 5).join(' ');
+                            return words.length > 5 ? truncated + '...' : truncated;
+                          })() : ''}
                         </p>
 
                         <div className="flex items-center justify-between mb-3">
@@ -280,9 +294,12 @@ export default function CategoryPage() {
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm text-gray-600 ml-1">4.8</span>
                           </div>
-                          <span className="text-lg font-bold text-blue-600">
-                            ₹{item.price.toLocaleString()}
-                          </span>
+                          {/* Show price only for products, hide for services */}
+                          {isProduct && (
+                            <span className="text-lg font-bold text-blue-600">
+                              ₹{item.price.toLocaleString()}
+                            </span>
+                          )}
                         </div>
 
                         <Button

@@ -155,14 +155,17 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           <div>
             {/* Main Image */}
             <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
-              <div className="aspect-square relative">
+              <div className="aspect-square relative overflow-hidden">
                 {images.length > 0 ? (
-                  <Image
-                    src={images[selectedImage]}
-                    alt={product.name}
-                    fill
-                    className="object-contain p-8"
-                  />
+                  <div className="absolute inset-0" style={{ transform: 'translateY(42%)' }}>
+                    <Image
+                      src={images[selectedImage]}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      style={{ objectPosition: 'center' }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ShoppingCart className="h-24 w-24 text-gray-300" />
