@@ -17,6 +17,14 @@ interface Item {
   category?: string
 }
 
+const truncateDescription = (description: string, wordLimit = 12) => {
+  const words = description.trim().split(/\s+/)
+  if (words.length <= wordLimit) {
+    return description
+  }
+  return `${words.slice(0, wordLimit).join(" ")}…`
+}
+
 export default function EnquiryPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -145,7 +153,7 @@ export default function EnquiryPage() {
             {item?.description && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">Description</label>
-                <Textarea value={item.description} readOnly className="bg-white" rows={4} />
+                <Textarea value={truncateDescription(item.description)} readOnly className="bg-white" rows={4} />
               </div>
             )}
           </div>
