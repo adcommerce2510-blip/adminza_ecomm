@@ -3,7 +3,7 @@ import { MapPin, Phone, Mail } from "lucide-react"
 
 export function Footer() {
   return (
-    <footer className="border-t border-blue-700" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
+    <footer className="border-t border-blue-700 relative z-30" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
        <div className="container mx-auto px-4 py-8">
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Company Info */}
@@ -55,11 +55,6 @@ export function Footer() {
               <li>
                 <Link href="/contact" className="text-gray-300 hover:text-white transition-colors text-base">
                   Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="text-gray-300 hover:text-white transition-colors text-base">
-                  Dashboard
                 </Link>
               </li>
               <li>

@@ -57,6 +57,14 @@ export async function POST(request: NextRequest) {
       quotationDate = new Date(quotationDate)
     }
     
+    // Generate unique quotation number if not provided
+    let quotationNo = body.quotationNo
+    if (!quotationNo) {
+      const timestamp = Date.now()
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      quotationNo = `QUO-${timestamp}-${random}`
+    }
+    
     const quotationData = {
       userEmail: body.userEmail,
       userName: body.userName || 'Guest',
@@ -68,7 +76,8 @@ export async function POST(request: NextRequest) {
       company: body.company || '',
       gstNumber: body.gstNumber || '',
       status: body.status || 'pending',
-      quotationDate: quotationDate || new Date()
+      quotationDate: quotationDate || new Date(),
+      quotationNo: quotationNo
     }
     
     console.log('Creating quotation document with:', quotationData)

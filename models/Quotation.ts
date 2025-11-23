@@ -35,7 +35,18 @@ const QuotationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  notes: String
+  quotationNo: {
+    type: String,
+    unique: true,
+    sparse: true // Allow multiple null values, but enforce uniqueness for non-null values
+  },
+  notes: String,
+  userResponse: {
+    type: String,
+    enum: ['accepted', 'rejected', 're-quote'],
+    default: null
+  },
+  requoteMessage: String
 }, {
   timestamps: true,
   collection: 'quotations'

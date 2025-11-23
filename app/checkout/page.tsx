@@ -127,7 +127,7 @@ export default function CheckoutPage() {
         description: formData.notes,
         company: formData.company,
         gstNumber: formData.gstNumber,
-        status: "pending",
+        status: "request",
         quotationDate: new Date().toISOString()
       }
 

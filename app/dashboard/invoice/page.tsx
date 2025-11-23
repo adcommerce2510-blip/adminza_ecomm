@@ -5,11 +5,12 @@ import { generateStandardizedPDF } from "../../../utils/pdfGenerator";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Save, Download, Minus, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Helper to convert number to words (simple, for INR)
 function numberToWords(num: number) {
@@ -79,12 +80,17 @@ interface InvoiceData {
     quantity: number;
     price: number;
     total: number;
+    hslCode?: string;
   }>;
   subtotal?: number;
   tax?: number;
   total?: number;
   gstType?: 'CGST/SGST' | 'IGST';
   gstRate?: number;
+  additionalCharges?: Array<{
+    name: string;
+    amount: number;
+  }>;
 }
 
 const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, isPdfExport = false }) => {
@@ -126,7 +132,9 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
   }
 
   const totalTax = cgst + sgst + igst;
-  const grandTotal = +(subtotal + totalTax).toFixed(2);
+  const additionalCharges = data?.additionalCharges || [];
+  const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + (charge.amount || 0), 0);
+  const grandTotal = +(subtotal + totalTax + additionalChargesTotal).toFixed(2);
   const amountInWords = amountToWordsWithPaise(grandTotal);
 
   // PDF Export
@@ -213,8 +221,8 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
         )}
         {/* Header with Logo and Invoice Title */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ width: '80px' }}>
-            <div style={{ width: '70px', height: '70px' }}>
+          <div style={{ width: '120px' }}>
+            <div style={{ width: '130px', height: '130px' }}>
               <img 
                 src="/logo.png" 
                 alt="Adminza Logo" 
@@ -225,11 +233,10 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontWeight: 'bold', fontSize: '24px', marginBottom: '5px' }}>TAX INVOICE</div>
             <div style={{ fontSize: '10px', lineHeight: '1.3' }}>
-              <div>IRN: {invoiceNo.replace('INV-', 'IRN')}</div>
               <div>Invoice Number: {invoiceNo}</div>
             </div>
           </div>
-          <div style={{ width: '80px' }}>
+          <div style={{ width: '120px' }}>
             {/* Empty div for balance */}
           </div>
         </div>
@@ -260,15 +267,14 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
                 Sold By / Seller
               </td>
               <td style={{ padding: '6px', border: '1px solid #000', width: '35%', verticalAlign: 'top' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>ADMINZA BUSINESS SOLUTIONS</div>
+                <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Dhanasvi Office & Print - Packaging Private Limited.</div>
                 <div style={{ fontSize: '10px', lineHeight: '1.2' }}>
-                  <div>Shop 1 & 2, Ground Floor, Business Plaza</div>
-                  <div>Plot Number 123, Sector 15, CBD Belapur</div>
-                  <div>Navi Mumbai, Maharashtra - 400614</div>
+                  <div>Office No. B-427, A Wing, Balaji Bhavan, Plot No 42A</div>
+                  <div>Sector 11, C.B.D. Belapur, Navi Mumbai</div>
+                  <div>Maharashtra - 400614</div>
                   <div style={{ marginTop: '4px' }}>
-                    <div>GSTIN: 27ADMIN1234A1Z5</div>
-                    <div>PAN: ADMIN1234A</div>
-                    <div>CIN: U74140MH2023PTC123456</div>
+                    <div>GSTIN: 27AALCD5002FIZY</div>
+                    <div>Phone: 8433661506</div>
                   </div>
                 </div>
               </td>
@@ -300,8 +306,8 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
           <thead>
             <tr style={{ backgroundColor: '#f0f0f0' }}>
               <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '4%', fontWeight: 'bold' }}>Sr. no</th>
-              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '12%', fontWeight: 'bold' }}>UPC</th>
               <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '25%', fontWeight: 'bold' }}>Item Description</th>
+              <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '12%', fontWeight: 'bold' }}>HSL Code</th>
               <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '8%', fontWeight: 'bold' }}>MRP</th>
               <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '8%', fontWeight: 'bold' }}>Discount</th>
               <th style={{ padding: '4px 2px', border: '1px solid #000', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>Qty.</th>
@@ -322,10 +328,10 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
               return (
                 <tr key={index}>
                   <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{index + 1}</td>
-                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '8px' }}>{Math.floor(Math.random() * 10000000000000)}</td>
                   <td style={{ padding: '3px 2px', border: '1px solid #000', fontSize: '9px' }}>
                     {item.name} (HSN-{Math.floor(Math.random() * 100000000)}) | {Math.floor(Math.random() * 500) + 100} ml
                   </td>
+                  <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{item.hslCode || '-'}</td>
                   <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'right', fontSize: '9px' }}>{((item.price * 0.4)).toFixed(2)}</td>
                   <td style={{ padding: '3px 2px', border: '1px solid #000', textAlign: 'center', fontSize: '9px' }}>{item.quantity}</td>
@@ -378,30 +384,70 @@ const InvoicePreview = ({ data = {} as InvoiceData, showDownloadButton = true, i
           </tbody>
         </table>
 
-        {/* Company Details */}
-        <div style={{ marginBottom: '15px', fontSize: '11px', lineHeight: '1.4' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Company Details</div>
-          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>ADMINZA BUSINESS SOLUTIONS (formerly known as Adminza Private Limited)</div>
-          <div>GSTIN: 27ADMIN1234A1Z5</div>
-          <div>FSSAI License Number: 10018064001545</div>
-          <div>CIN: U74140MH2023PTC123456</div>
-          <div>PAN: ADMIN1234A</div>
-          <div style={{ marginTop: '8px' }}>
-            <strong>Reverse Charge Status:</strong> Whether the tax is payable on reverse charge - No
+        {/* Additional Charges Table */}
+        {additionalCharges.length > 0 && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '10px', fontSize: '11px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f0f0f0' }}>
+                <th style={{ padding: '6px', border: '1px solid #000', textAlign: 'left', fontWeight: 'bold', width: '70%' }}>Additional Charges</th>
+                <th style={{ padding: '6px', border: '1px solid #000', textAlign: 'right', fontWeight: 'bold', width: '30%' }}>Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {additionalCharges.map((charge, index) => (
+                <tr key={index}>
+                  <td style={{ padding: '6px', border: '1px solid #000' }}>{charge.name}</td>
+                  <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'right' }}>
+                    {charge.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'right' }}>Total Additional Charges:</td>
+                <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'right' }}>
+                  {additionalChargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+
+        {/* Bank Details with QR Code */}
+        <div style={{ marginBottom: '15px', fontSize: '11px', lineHeight: '1.4', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: '1' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Bank Details</div>
+            <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>DHANASVI OFFICE AND PRINT PACKAGING PRIVATE LIMITED</div>
+            <div style={{ marginBottom: '3px' }}>STATE BANK OF INDIA, SECTOR-11, CBD BELAPUR, NAVI MUMBAI 400614</div>
+            <div style={{ marginBottom: '3px' }}><strong>A/C No:</strong> 43918417934</div>
+            <div style={{ marginBottom: '3px' }}><strong>IFSC Code:</strong> SBIN0013551</div>
+            <div style={{ marginBottom: '3px' }}><strong>UPI ID:</strong> dhanasviofficeprintpackaging@sbi</div>
+            <div style={{ marginBottom: '3px' }}><strong>PAN:</strong> AALCD5002F</div>
+            <div><strong>GSTIN:</strong> 27AALCD5002FIZY</div>
+          </div>
+          <div style={{ marginLeft: '20px', textAlign: 'center', marginTop: '40px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '11px' }}>SCAN & PAY</div>
+            <img 
+              src="/qr_code-adminzaa-removebg-preview.png" 
+              alt="QR Code for Payment"
+              style={{ width: '120px', height: '120px', objectFit: 'contain' }}
+            />
           </div>
         </div>
 
         {/* Terms & Conditions */}
         <div style={{ marginBottom: '20px', fontSize: '10px', lineHeight: '1.3' }}>
           <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Terms & Conditions</div>
+          <div style={{ textAlign: 'justify', marginBottom: '3px' }}>
+            • Goods once sold will be returned/replaced only if reported damaged or incorrect within 24 hours of delivery; no returns on customized items.
+          </div>
+          <div style={{ textAlign: 'justify', marginBottom: '3px' }}>
+            • Prices are exclusive/inclusive of GST as applicable; delivery beyond 5 KM is chargeable and timelines may vary due to external factors.
+          </div>
+          <div style={{ textAlign: 'justify', marginBottom: '3px' }}>
+            • All payments must be cleared through approved modes; ADMINZA is not liable for delays/failures of banks or payment gateways.
+          </div>
           <div style={{ textAlign: 'justify' }}>
-            If you have any issues or queries in respect of your order, please contact customer chat support through Adminza platform or drop in email at info@adminza.com
-          </div>
-          <div style={{ textAlign: 'justify', marginTop: '3px' }}>
-            In case you need to get more information about seller's or Adminza's FSSAI status, please visit https://foscos.fssai.gov.in/ and use the FBO search option with FSSAI License / Registration number.
-          </div>
-          <div style={{ textAlign: 'justify', marginTop: '3px' }}>
-            Please note that we never ask for bank account details such as CVV, account number, UPI Pin, etc. across our support channels. For your safety please do not share these details with anyone over any medium.
+            • All disputes are subject to the jurisdiction of Courts of India, and ADMINZA's liability is limited to the invoice value only.
           </div>
         </div>
 
@@ -424,6 +470,9 @@ export default function InvoicePage() {
   const [currentInventory, setCurrentInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [chargeType, setChargeType] = useState<string>('');
+  const [chargeName, setChargeName] = useState<string>('');
+  const [chargeAmount, setChargeAmount] = useState<string>('');
 
   useEffect(() => {
     // Get customer ID and items from URL params
@@ -506,7 +555,8 @@ export default function InvoicePage() {
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                total: item.price * item.quantity
+                total: item.price * item.quantity,
+                hslCode: item.hslCode || ''
               })),
               subtotal,
               gstType: 'CGST/SGST' as const,
@@ -557,7 +607,8 @@ export default function InvoicePage() {
               const finalInvoiceData = {
                 ...invoice,
                 items: updatedItems,
-                subtotal: updatedSubtotal
+                subtotal: updatedSubtotal,
+                additionalCharges: []
               };
               
               setInvoiceData(finalInvoiceData);
@@ -609,6 +660,21 @@ export default function InvoicePage() {
         items: updatedItems,
         subtotal
       });
+    }
+  };
+
+  const handleRemoveItem = (itemIndex: number) => {
+    if (invoiceData && invoiceData.items && invoiceData.items.length > 1) {
+      const updatedItems = invoiceData.items.filter((_, index) => index !== itemIndex);
+      const subtotal = updatedItems.reduce((sum, item) => sum + item.total, 0);
+
+      setInvoiceData({
+        ...invoiceData,
+        items: updatedItems,
+        subtotal
+      });
+    } else if (invoiceData && invoiceData.items && invoiceData.items.length === 1) {
+      alert('Cannot remove the last item. An invoice must have at least one item.');
     }
   };
 
@@ -796,7 +862,18 @@ export default function InvoicePage() {
                     
                     return (
                       <div key={index} className="border rounded-lg p-4">
-                        <h4 className="font-medium text-sm mb-2">{item.name}</h4>
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-medium text-sm">{item.name}</h4>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleRemoveItem(index)}
+                            className="h-6 w-6 p-0"
+                            title="Remove item"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                         <div className="text-xs text-gray-500 mb-2">Available: {availableStock} units</div>
 
                         <div className="space-y-2">
@@ -900,6 +977,174 @@ export default function InvoicePage() {
                     </div>
                   </div>
                 )}
+
+                {/* Additional Charges Section */}
+                <div className="mt-6 pt-4 border-t">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="font-medium text-sm">Additional Charges</h5>
+                  </div>
+                  
+                  {/* Add New Charge Form */}
+                  <div className="space-y-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <Label className="text-xs mb-2 block">Tax/Charge Type</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={chargeType === 'packaging' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setChargeType('packaging');
+                            setChargeName('Packaging');
+                          }}
+                          className="min-h-[2.5rem] h-auto py-2 px-3 text-xs whitespace-normal break-words leading-tight"
+                        >
+                          Packaging
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={chargeType === 'delivery' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setChargeType('delivery');
+                            setChargeName('Delivery Charges');
+                          }}
+                          className="min-h-[2.5rem] h-auto py-2 px-3 text-xs whitespace-normal break-words leading-tight"
+                        >
+                          Delivery Charges
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={chargeType === 'labour' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setChargeType('labour');
+                            setChargeName('Labour Handling Charges');
+                          }}
+                          className="min-h-[2.5rem] h-auto py-2 px-3 text-xs whitespace-normal break-words leading-tight"
+                        >
+                          Labour Handling Charges
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={chargeType === 'custom' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setChargeType('custom');
+                            setChargeName('');
+                          }}
+                          className="min-h-[2.5rem] h-auto py-2 px-3 text-xs whitespace-normal break-words leading-tight"
+                        >
+                          Custom
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {chargeType === 'custom' && (
+                      <div>
+                        <Label className="text-xs">Custom Charge Name</Label>
+                        <Input
+                          type="text"
+                          placeholder="Enter custom charge name"
+                          value={chargeName}
+                          onChange={(e) => setChargeName(e.target.value)}
+                          className="h-8 text-xs mt-1"
+                        />
+                      </div>
+                    )}
+                    
+                    <div>
+                      <Label className="text-xs">Amount (₹)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={chargeAmount}
+                        onChange={(e) => setChargeAmount(e.target.value)}
+                        className="h-8 text-xs mt-1"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const finalChargeName = chargeType === 'custom' 
+                          ? chargeName.trim()
+                          : chargeType === 'packaging'
+                            ? 'Packaging'
+                            : chargeType === 'delivery'
+                              ? 'Delivery Charges'
+                              : 'Labour Handling Charges';
+                        
+                        if (!chargeType || !finalChargeName || !chargeAmount || parseFloat(chargeAmount) <= 0) {
+                          alert('Please select a charge type and enter a valid amount');
+                          return;
+                        }
+                        
+                        if (chargeType === 'custom' && !chargeName.trim()) {
+                          alert('Please enter a custom charge name');
+                          return;
+                        }
+                        
+                        if (invoiceData) {
+                          const updatedCharges = [
+                            ...(invoiceData.additionalCharges || []),
+                            {
+                              name: finalChargeName,
+                              amount: parseFloat(chargeAmount)
+                            }
+                          ];
+                          
+                          setInvoiceData({
+                            ...invoiceData,
+                            additionalCharges: updatedCharges
+                          });
+                          
+                          // Reset form
+                          setChargeType('');
+                          setChargeName('');
+                          setChargeAmount('');
+                        }
+                      }}
+                      className="w-full h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Charge
+                    </Button>
+                  </div>
+                  
+                  {/* List of Added Charges */}
+                  {invoiceData?.additionalCharges && invoiceData.additionalCharges.length > 0 && (
+                    <div className="space-y-2">
+                      {invoiceData.additionalCharges.map((charge, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                          <span className="font-medium">{charge.name}</span>
+                          <div className="flex items-center space-x-2">
+                            <span>₹{charge.amount.toFixed(2)}</span>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (invoiceData) {
+                                  const updatedCharges = invoiceData.additionalCharges?.filter((_, i) => i !== index) || [];
+                                  setInvoiceData({
+                                    ...invoiceData,
+                                    additionalCharges: updatedCharges
+                                  });
+                                }
+                              }}
+                              className="h-5 w-5 p-0"
+                              title="Remove charge"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

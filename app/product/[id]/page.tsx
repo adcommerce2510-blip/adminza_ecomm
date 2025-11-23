@@ -247,18 +247,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <span className="text-sm text-gray-600">4.8 (124 reviews)</span>
             </div>
 
-            {/* Price */}
+            {/* Price - Show only Final Price */}
             <div className="mb-6">
               <div className="flex items-baseline gap-3 mb-2">
                 <span className="text-4xl font-semibold text-gray-900">
-                  ₹{product.price.toLocaleString()}
+                  ₹{(product.finalPrice || product.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-xl text-gray-400 line-through">
-                  ₹{Math.round(product.price * 1.2).toLocaleString()}
-                </span>
-                <span className="text-sm font-medium text-green-600">20% off</span>
               </div>
-              <p className="text-sm text-gray-600">Inclusive of all taxes</p>
+              <p className="text-sm text-gray-600">Inclusive of all taxes (GST included)</p>
             </div>
 
             {/* Quantity Selector */}

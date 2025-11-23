@@ -289,16 +289,36 @@ export default function CategoryPage() {
                           })() : ''}
                         </p>
 
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm text-gray-600 ml-1">4.8</span>
+                            </div>
                           </div>
-                          {/* Show price only for products, hide for services */}
+                          {/* Show pricing for products: MRP, Offer Price, Discount */}
                           {isProduct && (
+                            (item as any).mrp && (item as any).offerPrice ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-bold text-blue-600">
+                                    ₹{((item as any).offerPrice || 0).toLocaleString()}
+                                  </span>
+                                  <span className="text-sm text-gray-400 line-through">
+                                    ₹{((item as any).mrp || 0).toLocaleString()}
+                                  </span>
+                                  {(item as any).discount && (item as any).discount > 0 && (
+                                    <span className="text-xs font-medium text-green-600">
+                                      Save ₹{((item as any).discount || 0).toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
                             <span className="text-lg font-bold text-blue-600">
-                              ₹{item.price.toLocaleString()}
+                                ₹{((item as any).finalPrice || item.price || 0).toLocaleString()}
                             </span>
+                            )
                           )}
                         </div>
 

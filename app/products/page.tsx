@@ -16,7 +16,12 @@ import Link from "next/link"
 interface Product {
   _id: string
   name: string
-  price: number
+  price: number // Keep for backward compatibility
+  mrp?: number
+  offerPrice?: number
+  gstPercentage?: number
+  discount?: number
+  finalPrice?: number
   description: string
   images?: string[]
   category: string
@@ -107,7 +112,7 @@ export default function AllProductsPage() {
       const newItems = [...cartItems, { 
         id: product._id,
         name: product.name,
-        price: product.price,
+        price: product.finalPrice || product.price, // Use finalPrice if available
         image: product.images?.[0],
         category: product.category,
         quantity: 1
@@ -132,9 +137,9 @@ export default function AllProductsPage() {
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
       case "price-low":
-        return a.price - b.price
+        return (a.finalPrice || a.price) - (b.finalPrice || b.price)
       case "price-high":
-        return b.price - a.price
+        return (b.finalPrice || b.price) - (a.finalPrice || a.price)
       case "name":
         return a.name.localeCompare(b.name)
       default:
@@ -326,14 +331,35 @@ export default function AllProductsPage() {
                         })() : ''}
                       </p>
 
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center">
                           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                           <span className="text-sm text-gray-600 ml-1">4.8</span>
+                          </div>
                         </div>
+                        {/* Pricing Display: MRP, Offer Price, Discount */}
+                        {product.mrp && product.offerPrice ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-blue-600">
+                                ₹{(product.offerPrice || 0).toLocaleString()}
+                              </span>
+                              <span className="text-sm text-gray-400 line-through">
+                                ₹{(product.mrp || 0).toLocaleString()}
+                              </span>
+                              {product.discount && product.discount > 0 && (
+                                <span className="text-xs font-medium text-green-600">
+                                  Save ₹{product.discount.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
                         <span className="text-lg font-bold text-blue-600">
-                          ₹{product.price.toLocaleString()}
+                            ₹{(product.finalPrice || product.price || 0).toLocaleString()}
                         </span>
+                        )}
                       </div>
 
                       <Button

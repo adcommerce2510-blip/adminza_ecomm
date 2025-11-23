@@ -1,8 +1,9 @@
-"use client"
+     "use client"
 
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useDashboardLogout } from "@/components/dashboard-auth"
+import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -44,7 +45,8 @@ import {
   MoreVertical,
   Lock,
   LogOut,
-  X
+  X,
+  Copy
 } from "lucide-react"
 
 // API functions
@@ -187,6 +189,8 @@ export function DashboardPage() {
   const [editingItem, setEditingItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadingExcel, setUploadingExcel] = useState(false)
+  const excelFileInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState("dashboard")
   const [activeSubSection, setActiveSubSection] = useState("all-items")
   const [isProductsManagementExpanded, setIsProductsManagementExpanded] = useState(false)
@@ -257,6 +261,7 @@ export function DashboardPage() {
   const [customerProductsForRetopUp, setCustomerProductsForRetopUp] = useState<any[]>([])
   const [retopUpCustomerId, setRetopUpCustomerId] = useState<string>("")
   const [retopUpCustomerName, setRetopUpCustomerName] = useState<string>("")
+  const [retopUpNotes, setRetopUpNotes] = useState<string>("")
   const [isEditInventoryDialogOpen, setIsEditInventoryDialogOpen] = useState(false)
   const [editingInventoryItem, setEditingInventoryItem] = useState<any>(null)
   const [editInventoryForm, setEditInventoryForm] = useState({
@@ -277,6 +282,7 @@ export function DashboardPage() {
   const [viewingQuotation, setViewingQuotation] = useState<any>(null)
   const [isEditQuotationDialogOpen, setIsEditQuotationDialogOpen] = useState(false)
   const [editingQuotation, setEditingQuotation] = useState<any>(null)
+  const [isRequoteMessageDialogOpen, setIsRequoteMessageDialogOpen] = useState(false)
   const [enquiries, setEnquiries] = useState<any[]>([])
   const [enquirySearchTerm, setEnquirySearchTerm] = useState("")
   const [isViewEnquiryDialogOpen, setIsViewEnquiryDialogOpen] = useState(false)
@@ -318,6 +324,7 @@ export function DashboardPage() {
 
   // Use logout function from context
   const { handleLogout } = useDashboardLogout()
+  const router = useRouter()
 
   // Handle URL parameters for section navigation
   const searchParams = useSearchParams()
@@ -372,9 +379,13 @@ export function DashboardPage() {
     mainCategory: "",
     subCategory: "",
     level2Category: "",
-    price: "",
+    price: "", // Keep for backward compatibility
+    mrp: "",
+    offerPrice: "",
+    gstPercentage: "",
     stock: "",
     description: "",
+    hslCode: "",
     images: [] as string[]
   })
 
@@ -744,6 +755,7 @@ export function DashboardPage() {
     setCustomerProductsForRetopUp(customerInventory)
     setRetopUpCustomerId(item.customerId)
     setRetopUpCustomerName(item.customerName)
+    setRetopUpNotes("") // Reset notes when opening dialog
     setIsRetopUpDialogOpen(true)
     setOpenDropdownId(null) // Close dropdown
   }
@@ -754,15 +766,30 @@ export function DashboardPage() {
     try {
       // Update all products that have quantityToAdd
       const updates: any[] = []
+      const historyProducts: any[] = []
+      
       for (const product of customerProductsForRetopUp) {
         if (product.quantityToAdd > 0) {
+          const previousQuantity = product.quantity
           const newQuantity = product.quantity + product.quantityToAdd
+          
           const result = await updateEshopInventory(product._id, {
             quantity: newQuantity,
             notes: `Re-topped up with ${product.quantityToAdd} units. ${product.notes || ""}`
           })
+          
           if (result.success) {
             updates.push(result.data)
+            
+            // Collect data for history
+            historyProducts.push({
+              productId: product.productId || product._id,
+              productName: product.productName,
+              previousQuantity: previousQuantity,
+              quantityAdded: product.quantityToAdd,
+              newQuantity: newQuantity,
+              price: product.price || 0
+            })
           }
         }
       }
@@ -773,6 +800,32 @@ export function DashboardPage() {
           const updated = updates.find((u: any) => u._id === item._id)
           return updated || item
         }))
+        
+        // Save retop up history
+        try {
+          const historyResponse = await fetch('/api/retopup-history', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              customerId: retopUpCustomerId,
+              customerName: retopUpCustomerName,
+              products: historyProducts,
+              notes: retopUpNotes,
+              date: new Date()
+            }),
+          })
+          
+          const historyResult = await historyResponse.json()
+          if (!historyResult.success) {
+            console.error('Error saving retop up history:', historyResult.error)
+          }
+        } catch (historyError) {
+          console.error('Error saving retop up history:', historyError)
+          // Don't block the main flow if history saving fails
+        }
+        
         alert(`Successfully re-topped up ${updates.length} product(s)`)
       }
       
@@ -780,6 +833,7 @@ export function DashboardPage() {
       setCustomerProductsForRetopUp([])
       setRetopUpCustomerId("")
       setRetopUpCustomerName("")
+      setRetopUpNotes("")
     } catch (error) {
       console.error('Error re-topping up:', error)
       alert('Error re-topping up')
@@ -936,24 +990,121 @@ export function DashboardPage() {
   // Update quotation status
   const updateQuotationStatus = async (id: string, status: string) => {
     try {
-      const response = await fetch(`/api/quotations/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setQuotations(quotations.map((quotation: any) => 
-            quotation._id === id ? data.data : quotation
-          ))
+      // If status is "accepted", confirm and create order
+      if (status === 'accepted') {
+        const quotation = quotations.find((q: any) => q._id === id)
+        if (!quotation) {
+          alert('Quotation not found')
+          return { success: false, error: 'Quotation not found' }
         }
-        return data
+
+        // Confirm with user
+        const confirmMessage = `Are you sure you want to accept this quotation and create an order?\n\nQuotation: ${quotation.quotationNo || 'N/A'}\nCustomer: ${quotation.userName || quotation.userEmail}\nTotal Amount: ₹${(quotation.totalAmount || 0).toLocaleString()}`
+        
+        if (!confirm(confirmMessage)) {
+          // User cancelled, don't update status
+          return { success: false, error: 'Cancelled by user' }
+        }
+
+        // Create order from quotation data
+        // Note: orderNo will be generated sequentially by the API
+        const orderData = {
+          userId: quotation.userId || 'guest',
+          userEmail: quotation.userEmail,
+          items: (quotation.items || []).map((item: any) => ({
+            productId: item.itemId || '',
+            productName: item.itemName || '',
+            quantity: item.quantity || 1,
+            price: item.price || 0
+          })),
+          totalAmount: quotation.totalAmount || 0,
+          status: 'Order Placed',
+          shippingAddress: {
+            receiverName: quotation.userName || '',
+            street: quotation.userAddress?.street || '',
+            city: quotation.userAddress?.city || '',
+            state: quotation.userAddress?.state || '',
+            zipCode: quotation.userAddress?.zipCode || '',
+            country: quotation.userAddress?.country || 'India'
+          },
+          phone: quotation.userPhone || '',
+          customerName: quotation.userName || '',
+          customerPhone: quotation.userPhone || '',
+          customerEmail: quotation.userEmail || '',
+          company: quotation.company || '',
+          gstNumber: quotation.gstNumber || '',
+          notes: `Order created from quotation ${quotation.quotationNo || 'N/A'}. ${quotation.notes || ''}`,
+          orderDate: new Date()
+          // orderNo will be generated by the API sequentially
+        }
+
+        // Create order
+        const orderResponse = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(orderData),
+        })
+
+        const orderResult = await orderResponse.json()
+
+        if (!orderResult.success) {
+          alert('Error creating order: ' + (orderResult.error || 'Unknown error'))
+          return { success: false, error: 'Failed to create order' }
+        }
+
+        // Order created successfully, now update quotation status
+        const response = await fetch(`/api/quotations/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            // Update quotations list
+            setQuotations(quotations.map((quotation: any) => 
+              quotation._id === id ? data.data : quotation
+            ))
+            
+            // Add order to orders list and switch to orders tab
+            const updatedOrders = await fetchOrders()
+            setOrders(updatedOrders)
+            setActiveSection('orders')
+            setActiveSubSection('all-orders')
+            
+            // Get the order number from the response
+            const createdOrderNo = orderResult.data?.orderNo || 'N/A'
+            alert(`Quotation accepted! Order ${createdOrderNo} has been created successfully.`)
+          }
+          return data
+        }
+        return { success: false, error: 'Failed to update quotation status' }
+      } else {
+        // For other statuses, just update normally
+        const response = await fetch(`/api/quotations/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setQuotations(quotations.map((quotation: any) => 
+              quotation._id === id ? data.data : quotation
+            ))
+          }
+          return data
+        }
+        return { success: false, error: 'Failed to update quotation status' }
       }
-      return { success: false, error: 'Failed to update quotation status' }
     } catch (error) {
       console.error('Error updating quotation status:', error)
       return { success: false, error: 'Error updating quotation status' }
@@ -1042,6 +1193,78 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting enquiry:', error)
       return { success: false, error: 'Error deleting enquiry' }
+    }
+  }
+
+  // Convert enquiry to quotation
+  const handleSendQuotation = async (enquiry: any) => {
+    if (!confirm('Are you sure you want to convert this enquiry to a quotation?')) return
+
+    try {
+      // Extract name from email if userName is not available
+      const userName = enquiry.userName || enquiry.userEmail.split('@')[0] || 'Guest'
+      
+      // Generate unique quotation number
+      const timestamp = Date.now()
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      const quotationNo = `QUO-${timestamp}-${random}`
+      
+      // Create quotation from enquiry
+      const quotationData = {
+        userId: enquiry.userId || 'guest',
+        userEmail: enquiry.userEmail,
+        userName: userName,
+        userPhone: enquiry.phone || '',
+        userAddress: enquiry.userAddress || {},
+        items: [{
+          itemId: enquiry.itemId || '',
+          itemName: enquiry.itemName,
+          quantity: 1, // Default to 1, can be edited later
+          price: 0 // Default to 0, can be set later
+        }],
+        totalAmount: 0, // Default to 0, will be calculated when items are priced
+        description: enquiry.message,
+        company: enquiry.company || '',
+        gstNumber: enquiry.gstNumber || '',
+        status: enquiry.status || 'pending', // Use enquiry status
+        quotationDate: new Date(),
+        quotationNo: quotationNo, // Generate unique quotation number
+        notes: enquiry.responseNotes || ''
+      }
+
+      // Create quotation
+      const quotationResponse = await fetch('/api/quotations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(quotationData),
+      })
+
+      const quotationResult = await quotationResponse.json()
+
+      if (quotationResult.success) {
+        // Update enquiry status to 'closed'
+        await updateEnquiryStatus(enquiry._id, 'closed')
+        
+        // Remove enquiry from enquiries list (since it's now a quotation)
+        setEnquiries(enquiries.filter((e: any) => e._id !== enquiry._id))
+        
+        // Add quotation to quotations list
+        const updatedQuotations = await fetchQuotations()
+        setQuotations(updatedQuotations)
+        
+        // Switch to quotations tab
+        setActiveSubSection('received-quotations')
+        setIsViewEnquiryDialogOpen(false)
+        
+        alert('Quotation created successfully!')
+      } else {
+        alert('Error creating quotation: ' + (quotationResult.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error converting enquiry to quotation:', error)
+      alert('Error converting enquiry to quotation')
     }
   }
 
@@ -1316,6 +1539,69 @@ export function DashboardPage() {
     }
   }
 
+  // Handle generate invoice for order
+  const handleGenerateInvoice = async (order: any) => {
+    try {
+      let customerId = null
+      
+      // Try to find customer from eshop-inventory by email or name
+      if (order.customerEmail || order.customerName) {
+        try {
+          const inventoryResponse = await fetch('/api/eshop-inventory')
+          const inventoryData = await inventoryResponse.json()
+          const inventoryArray = inventoryData.data || inventoryData
+          const customerInventory = inventoryArray.find((item: any) => 
+            (order.customerEmail && item.customerEmail === order.customerEmail) || 
+            (order.customerName && item.customerName === order.customerName)
+          )
+          if (customerInventory) {
+            customerId = customerInventory.customerId
+          }
+        } catch (error) {
+          console.error('Error fetching inventory:', error)
+        }
+      }
+
+      // If still no customerId, try to find from customers collection
+      if (!customerId && order.customerEmail) {
+        try {
+          const customersResponse = await fetch('/api/customers')
+          const customersData = await customersResponse.json()
+          if (customersData.success && customersData.data) {
+            const customer = customersData.data.find((c: any) => 
+              c.email === order.customerEmail || 
+              c.name === order.customerName
+            )
+            if (customer) {
+              customerId = customer._id
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching customers:', error)
+        }
+      }
+
+      // If still no customerId, use order.userId or order._id as fallback
+      if (!customerId) {
+        customerId = order.userId || order._id
+      }
+
+      // Convert order items to invoice format
+      const invoiceItems = (order.items || []).map((item: any) => ({
+        name: item.productName || item.name || 'Product',
+        quantity: item.quantity || 1,
+        price: item.price || 0
+      }))
+
+      // Navigate to invoice page with order data
+      const itemsParam = encodeURIComponent(JSON.stringify(invoiceItems))
+      router.push(`/dashboard/invoice?customerId=${customerId}&items=${itemsParam}`)
+    } catch (error) {
+      console.error('Error generating invoice:', error)
+      alert('Error generating invoice. Please try again.')
+    }
+  }
+
   // Fetch quotations
   const fetchQuotations = async () => {
     try {
@@ -1335,6 +1621,11 @@ export function DashboardPage() {
   const handleViewQuotation = (quotation: any) => {
     setViewingQuotation(quotation)
     setIsViewQuotationDialogOpen(true)
+  }
+
+  // Handle requote - navigate to quotation page in edit mode
+  const handleRequote = (quotation: any) => {
+    router.push(`/dashboard/quotation?id=${quotation._id}&requote=true`)
   }
 
   // View product details
@@ -1595,6 +1886,206 @@ export function DashboardPage() {
     }
   }
 
+  // Handle Excel file upload and parse
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    if (!['xlsx', 'xls'].includes(fileExtension || '')) {
+      alert('Please upload a valid Excel file (.xlsx or .xls)')
+      return
+    }
+
+    try {
+      setUploadingExcel(true)
+      
+      // Read Excel file
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      
+      // Convert to JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      
+      if (jsonData.length < 2) {
+        alert('Excel file must contain at least a header row and one data row')
+        setUploadingExcel(false)
+        return
+      }
+
+      // Get header row (first row)
+      const headers = (jsonData[0] as any[]).map((h: any) => String(h).toLowerCase().trim())
+      
+      // Find column indices
+      const getColumnIndex = (possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.includes(name))
+          if (index !== -1) return index
+        }
+        return -1
+      }
+
+      const nameIndex = getColumnIndex(['product name', 'name', 'product'])
+      const mainCategoryIndex = getColumnIndex(['main category', 'maincategory', 'category'])
+      const subCategoryIndex = getColumnIndex(['sub category', 'subcategory', 'sub'])
+      const level2CategoryIndex = getColumnIndex(['level2', 'level 2', 'level2category', 'level 2 category'])
+      const mrpIndex = getColumnIndex(['mrp', 'maximum retail price'])
+      const offerPriceIndex = getColumnIndex(['offer price', 'offerprice', 'selling price'])
+      const gstIndex = getColumnIndex(['gst', 'gst%', 'gst percentage', 'gst in %'])
+      const stockIndex = getColumnIndex(['stock', 'quantity', 'stocks quantity', 'qty'])
+      const descriptionIndex = getColumnIndex(['description', 'desc'])
+      const hslCodeIndex = getColumnIndex(['hsl code', 'hslcode', 'hsl'])
+      const imagesIndex = getColumnIndex(['images', 'image', 'image url', 'imageurl'])
+
+      // Validate required columns
+      if (nameIndex === -1 || mrpIndex === -1 || offerPriceIndex === -1 || gstIndex === -1 || stockIndex === -1) {
+        alert('Excel file must contain the following columns: Product Name, MRP, Offer Price, GST in %, and Stocks Quantity')
+        setUploadingExcel(false)
+        return
+      }
+
+      // Process data rows (skip header row)
+      const productsToCreate: any[] = []
+      const errors: string[] = []
+
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i] as any[]
+        
+        // Skip empty rows
+        if (!row[nameIndex] || String(row[nameIndex]).trim() === '') continue
+
+        try {
+          const productName = String(row[nameIndex] || '').trim()
+          const mainCategory = mainCategoryIndex !== -1 ? String(row[mainCategoryIndex] || '').trim() : ''
+          const subCategory = subCategoryIndex !== -1 ? String(row[subCategoryIndex] || '').trim() : ''
+          const level2Category = level2CategoryIndex !== -1 ? String(row[level2CategoryIndex] || '').trim() : ''
+          const mrp = parseFloat(String(row[mrpIndex] || '0').replace(/[^0-9.]/g, '')) || 0
+          const offerPrice = parseFloat(String(row[offerPriceIndex] || '0').replace(/[^0-9.]/g, '')) || 0
+          const gstPercentage = parseFloat(String(row[gstIndex] || '0').replace(/[^0-9.]/g, '')) || 0
+          const stock = parseInt(String(row[stockIndex] || '0').replace(/[^0-9]/g, '')) || 0
+          const description = descriptionIndex !== -1 ? String(row[descriptionIndex] || '').trim() : ''
+          const hslCode = hslCodeIndex !== -1 ? String(row[hslCodeIndex] || '').trim() : ''
+          const images = imagesIndex !== -1 ? String(row[imagesIndex] || '').trim() : ''
+
+          // Validate required fields
+          if (!productName) {
+            errors.push(`Row ${i + 1}: Product name is required`)
+            continue
+          }
+          if (mrp <= 0) {
+            errors.push(`Row ${i + 1}: MRP must be greater than 0`)
+            continue
+          }
+          if (offerPrice <= 0) {
+            errors.push(`Row ${i + 1}: Offer Price must be greater than 0`)
+            continue
+          }
+          if (gstPercentage < 0 || gstPercentage > 100) {
+            errors.push(`Row ${i + 1}: GST percentage must be between 0 and 100`)
+            continue
+          }
+
+          // Build category string
+          let categoryString = mainCategory || ''
+          if (subCategory) {
+            categoryString += categoryString ? `/${subCategory}` : subCategory
+          }
+          if (level2Category) {
+            categoryString += categoryString ? `/${level2Category}` : level2Category
+          }
+
+          // Calculate discount and final price
+          const discount = mrp - offerPrice
+          const gstAmount = (offerPrice * gstPercentage) / 100
+          const finalPrice = offerPrice + gstAmount
+
+          // Parse images (if provided, can be comma-separated URLs or paths)
+          const imageArray = images ? images.split(',').map((img: string) => img.trim()).filter((img: string) => img) : []
+
+          productsToCreate.push({
+            name: productName,
+            category: categoryString || 'Uncategorized',
+            mainCategory: mainCategory,
+            subCategory: subCategory,
+            level2Category: level2Category,
+            mrp: mrp,
+            offerPrice: offerPrice,
+            gstPercentage: gstPercentage,
+            discount: discount,
+            finalPrice: finalPrice,
+            price: finalPrice, // Keep for backward compatibility
+            stock: stock,
+            description: description || `${productName} - Quality product`,
+            hslCode: hslCode || '',
+            images: imageArray,
+            vendor: "Admin"
+          })
+        } catch (rowError) {
+          errors.push(`Row ${i + 1}: Error processing row - ${rowError}`)
+        }
+      }
+
+      if (productsToCreate.length === 0) {
+        alert('No valid products found in Excel file. Please check your data.')
+        setUploadingExcel(false)
+        return
+      }
+
+      // Create products
+      let successCount = 0
+      let failCount = 0
+      const createdProducts: any[] = []
+
+      for (const productData of productsToCreate) {
+        try {
+          const result = await createProduct(productData)
+          if (result.success) {
+            successCount++
+            createdProducts.push(result.data)
+          } else {
+            failCount++
+            errors.push(`${productData.name}: ${result.error || 'Failed to create'}`)
+          }
+        } catch (error) {
+          failCount++
+          errors.push(`${productData.name}: Error creating product`)
+        }
+      }
+
+      // Refresh products list
+      if (successCount > 0) {
+        const updatedProducts = await fetchProducts()
+        setProducts(updatedProducts)
+      }
+
+      // Show results
+      let message = `Successfully created ${successCount} product(s).`
+      if (failCount > 0) {
+        message += ` ${failCount} product(s) failed.`
+      }
+      if (errors.length > 0 && errors.length <= 10) {
+        message += `\n\nErrors:\n${errors.join('\n')}`
+      } else if (errors.length > 10) {
+        message += `\n\nFirst 10 errors:\n${errors.slice(0, 10).join('\n')}\n...and ${errors.length - 10} more errors.`
+      }
+      
+      alert(message)
+
+      // Reset file input
+      if (excelFileInputRef.current) {
+        excelFileInputRef.current.value = ''
+      }
+    } catch (error) {
+      console.error('Error processing Excel file:', error)
+      alert('Error processing Excel file: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setUploadingExcel(false)
+    }
+  }
+
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -1607,17 +2098,30 @@ export function DashboardPage() {
         categoryString += `/${productForm.level2Category}`
       }
 
+      // Calculate discount and final price
+      const mrp = parseFloat(productForm.mrp) || 0
+      const offerPrice = parseFloat(productForm.offerPrice) || 0
+      const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+      const discount = mrp - offerPrice
+      const gstAmount = (offerPrice * gstPercentage) / 100
+      const finalPrice = offerPrice + gstAmount
+
       const result = await createProduct({
         ...productForm,
         category: categoryString,
-        price: parseFloat(productForm.price),
+        price: finalPrice, // Keep price field for backward compatibility, set to finalPrice
+        mrp: mrp,
+        offerPrice: offerPrice,
+        gstPercentage: gstPercentage,
+        discount: discount,
+        finalPrice: finalPrice,
         stock: parseInt(productForm.stock),
         vendor: "Admin"
       })
       
       if (result.success) {
         setProducts([...products, result.data])
-        setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", stock: "", description: "", images: [] })
+        setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
         setMainCategory("")
         setIsProductDialogOpen(false)
       } else {
@@ -2588,6 +3092,23 @@ export function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <CardTitle>Products</CardTitle>
                         <div className="flex items-center space-x-2">
+                          <input
+                            ref={excelFileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            className="hidden"
+                            onChange={handleExcelUpload}
+                            disabled={uploadingExcel}
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() => excelFileInputRef.current?.click()}
+                            disabled={uploadingExcel}
+                            className="border-green-600 text-green-600 hover:bg-green-50"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingExcel ? 'Uploading...' : 'Upload Excel'}
+                          </Button>
                           <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
                             <DialogTrigger asChild>
                               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -2671,29 +3192,92 @@ export function DashboardPage() {
                                     </Select>
                                   </div>
                                 )}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
                                   <div>
-                                    <Label htmlFor="product-price">Price (₹)</Label>
+                                    <Label htmlFor="product-mrp">MRP (₹)</Label>
                                     <Input
-                                      id="product-price"
+                                      id="product-mrp"
                                       type="number"
                                       placeholder="0"
-                                      value={productForm.price}
-                                      onChange={(e) => setProductForm({...productForm, price: e.target.value})}
+                                      min="0"
+                                      step="0.01"
+                                      value={productForm.mrp}
+                                      onChange={(e) => {
+                                        const mrp = parseFloat(e.target.value) || 0
+                                        const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                        const discount = mrp - offerPrice
+                                        setProductForm({...productForm, mrp: e.target.value})
+                                      }}
                                       required
                                     />
                                   </div>
                                   <div>
-                                    <Label htmlFor="product-stock">Stock Quantity</Label>
+                                    <Label htmlFor="product-offer-price">Offer Price (₹)</Label>
                                     <Input
-                                      id="product-stock"
+                                      id="product-offer-price"
                                       type="number"
                                       placeholder="0"
-                                      value={productForm.stock}
-                                      onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                                      min="0"
+                                      step="0.01"
+                                      value={productForm.offerPrice}
+                                      onChange={(e) => {
+                                        const offerPrice = parseFloat(e.target.value) || 0
+                                        const mrp = parseFloat(productForm.mrp) || 0
+                                        const discount = mrp - offerPrice
+                                        setProductForm({...productForm, offerPrice: e.target.value})
+                                      }}
                                       required
                                     />
                                   </div>
+                                  <div>
+                                    <Label htmlFor="product-gst">GST (%)</Label>
+                                    <Input
+                                      id="product-gst"
+                                      type="number"
+                                      placeholder="0"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={productForm.gstPercentage}
+                                      onChange={(e) => setProductForm({...productForm, gstPercentage: e.target.value})}
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                {/* Calculated Values Display */}
+                                {(productForm.mrp || productForm.offerPrice || productForm.gstPercentage) && (
+                                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                      <div>
+                                        <span className="text-muted-foreground">Discount: </span>
+                                        <span className="font-semibold text-green-600">
+                                          ₹{((parseFloat(productForm.mrp) || 0) - (parseFloat(productForm.offerPrice) || 0)).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Final Price (Offer + GST): </span>
+                                        <span className="font-semibold text-blue-600">
+                                          ₹{(() => {
+                                            const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                            const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+                                            const gstAmount = (offerPrice * gstPercentage) / 100
+                                            return (offerPrice + gstAmount).toFixed(2)
+                                          })()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                <div>
+                                  <Label htmlFor="product-stock">Stock Quantity</Label>
+                                  <Input
+                                    id="product-stock"
+                                    type="number"
+                                    placeholder="0"
+                                    value={productForm.stock}
+                                    onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                                    required
+                                  />
                                 </div>
                                 <div>
                                   <Label htmlFor="product-description">Description</Label>
@@ -2710,6 +3294,15 @@ export function DashboardPage() {
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {productForm.description.length}/5000 characters
                                   </p>
+                                </div>
+                                <div>
+                                  <Label htmlFor="product-hsl-code">HSL Code</Label>
+                                  <Input
+                                    id="product-hsl-code"
+                                    placeholder="Enter HSL Code"
+                                    value={productForm.hslCode}
+                                    onChange={(e) => setProductForm({...productForm, hslCode: e.target.value})}
+                                  />
                                 </div>
                                 <div>
                                   <Label htmlFor="product-images">Images</Label>
@@ -2769,7 +3362,7 @@ export function DashboardPage() {
                                 <div className="flex justify-end space-x-2">
                                   <Button type="button" variant="outline" onClick={() => {
                                     setIsProductDialogOpen(false)
-                                    setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", stock: "", description: "", images: [] })
+                                    setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
                                   }}>
                                     Cancel
                                   </Button>
@@ -2811,7 +3404,9 @@ export function DashboardPage() {
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead>Category</TableHead>
-                          <TableHead>Price</TableHead>
+                          <TableHead>MRP</TableHead>
+                          <TableHead>Offer Price</TableHead>
+                          <TableHead>Discount</TableHead>
                           <TableHead>Stock</TableHead>
                           <TableHead>Orders</TableHead>
                           <TableHead>Status</TableHead>
@@ -2821,7 +3416,7 @@ export function DashboardPage() {
                       <TableBody>
                         {loading ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8">
+                            <TableCell colSpan={9} className="text-center py-8">
                               Loading products...
                             </TableCell>
                           </TableRow>
@@ -2839,7 +3434,17 @@ export function DashboardPage() {
                               </div>
                             </TableCell>
                             <TableCell>{product.category}</TableCell>
-                            <TableCell>₹{product.price.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">₹{(product.mrp || product.price || 0).toLocaleString()}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium">₹{(product.offerPrice || product.price || 0).toLocaleString()}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-semibold text-green-600">
+                                ₹{((product.mrp || product.price || 0) - (product.offerPrice || product.price || 0)).toLocaleString()}
+                              </div>
+                            </TableCell>
                             <TableCell>{product.stock}</TableCell>
                             <TableCell>{product.orders}</TableCell>
                             <TableCell>
@@ -3807,6 +4412,7 @@ export function DashboardPage() {
                           <Button 
                             onClick={handleMultipleProductsSubmit}
                             disabled={!eshopForm.customerId || multipleProducts.some(p => !p.productId || !p.quantity)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             Add Products to Inventory
                           </Button>
@@ -4393,8 +4999,8 @@ export function DashboardPage() {
                       ) : (
                         orders
                           .filter((order: any) => 
-                            order.orderNo.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
-                            order.customerName.toLowerCase().includes(orderSearchTerm.toLowerCase())
+                            (order.orderNo || '').toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+                            (order.customerName || '').toLowerCase().includes(orderSearchTerm.toLowerCase())
                           )
                           .map((order: any) => (
                             <TableRow key={order._id}>
@@ -4471,6 +5077,16 @@ export function DashboardPage() {
                                           >
                                             <Eye className="h-4 w-4 mr-2" />
                                             View
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              handleGenerateInvoice(order)
+                                              setOpenOrderDropdownId(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center"
+                                          >
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            Generate Invoice
                                           </button>
                                           <button
                                             onClick={() => {
@@ -4561,16 +5177,19 @@ export function DashboardPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {viewingOrder.items?.map((item: any, index: number) => (
-                              <TableRow key={index}>
-                                <TableCell>
-                                  <div className="font-medium">{item.productName}</div>
-                                </TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                                <TableCell>₹{item.total.toLocaleString()}</TableCell>
-                              </TableRow>
-                            ))}
+                            {viewingOrder.items?.map((item: any, index: number) => {
+                              const itemTotal = item.total || (item.price || 0) * (item.quantity || 0)
+                              return (
+                                <TableRow key={index}>
+                                  <TableCell>
+                                    <div className="font-medium">{item.productName}</div>
+                                  </TableCell>
+                                  <TableCell>{item.quantity}</TableCell>
+                                  <TableCell>₹{(item.price || 0).toLocaleString()}</TableCell>
+                                  <TableCell>₹{itemTotal.toLocaleString()}</TableCell>
+                                </TableRow>
+                              )
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -4737,16 +5356,19 @@ export function DashboardPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {orderEditForm.items?.map((item: any, index: number) => (
-                              <TableRow key={index}>
-                                <TableCell>
-                                  <div className="font-medium">{item.productName}</div>
-                                </TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                                <TableCell>₹{item.total.toLocaleString()}</TableCell>
-                              </TableRow>
-                            ))}
+                            {orderEditForm.items?.map((item: any, index: number) => {
+                              const itemTotal = item.total || (item.price || 0) * (item.quantity || 0)
+                              return (
+                                <TableRow key={index}>
+                                  <TableCell>
+                                    <div className="font-medium">{item.productName}</div>
+                                  </TableCell>
+                                  <TableCell>{item.quantity}</TableCell>
+                                  <TableCell>₹{(item.price || 0).toLocaleString()}</TableCell>
+                                  <TableCell>₹{itemTotal.toLocaleString()}</TableCell>
+                                </TableRow>
+                              )
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -4814,7 +5436,7 @@ export function DashboardPage() {
                           </TableRow>
                         ) : quotations.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8">
+                            <TableCell colSpan={9} className="text-center py-8">
                               <div className="text-muted-foreground">
                                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No quotations found</p>
@@ -4869,9 +5491,38 @@ export function DashboardPage() {
                                         <SelectItem value="quoted">Quoted</SelectItem>
                                         <SelectItem value="accepted">Accepted</SelectItem>
                                         <SelectItem value="rejected">Rejected</SelectItem>
+                                        <SelectItem value="sent re-quote">Sent Re-Quote</SelectItem>
+                                        <SelectItem value="received re-quote">Received Re-Quote</SelectItem>
+                                        <SelectItem value="requested re-quote">Requested Re-Quote</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
+                                </TableCell>
+                                <TableCell>
+                                  {quotation.userResponse ? (
+                                    <div className="flex items-center space-x-2">
+                                      {quotation.userResponse === 're-quote' ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="cursor-pointer hover:bg-blue-50 text-blue-600 border-blue-600"
+                                          onClick={() => {
+                                            setViewingQuotation(quotation)
+                                            setIsRequoteMessageDialogOpen(true)
+                                          }}
+                                        >
+                                          Re-Quote
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant={quotation.userResponse === 'accepted' ? 'default' : 'destructive'}
+                                        >
+                                          {quotation.userResponse === 'accepted' ? 'Accepted' : 'Rejected'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">-</span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center space-x-2">
@@ -4882,6 +5533,24 @@ export function DashboardPage() {
                                       title="View quotation details"
                                     >
                                       <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => router.push(`/dashboard/quotation?id=${quotation._id}`)}
+                                      title="View Quotation Layout"
+                                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRequote(quotation)}
+                                      title="Requote"
+                                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    >
+                                      <Copy className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
@@ -5019,6 +5688,35 @@ export function DashboardPage() {
 
                       <div className="flex justify-end">
                         <Button onClick={() => setIsViewQuotationDialogOpen(false)}>
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Re-Quote Message Dialog */}
+              <Dialog open={isRequoteMessageDialogOpen} onOpenChange={setIsRequoteMessageDialogOpen}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Re-Quote Request Message</DialogTitle>
+                    <DialogDescription>
+                      Message from customer requesting changes to the quotation
+                    </DialogDescription>
+                  </DialogHeader>
+                  {viewingQuotation && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Customer Message</Label>
+                        <div className="mt-2 p-4 bg-muted rounded-md">
+                          <p className="text-sm whitespace-pre-wrap">
+                            {viewingQuotation.requoteMessage || 'No message provided'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button onClick={() => setIsRequoteMessageDialogOpen(false)}>
                           Close
                         </Button>
                       </div>
@@ -5654,6 +6352,15 @@ export function DashboardPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleSendQuotation(enquiry)}
+                                title="Send Quotation"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleEditEnquiry(enquiry)}
                                 title="Edit enquiry"
                               >
@@ -5746,7 +6453,14 @@ export function DashboardPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      onClick={() => handleSendQuotation(viewingEnquiry)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Send Quotation
+                    </Button>
                     <Button onClick={() => setIsViewEnquiryDialogOpen(false)}>
                       Close
                     </Button>
@@ -5928,8 +6642,23 @@ export function DashboardPage() {
                     ))}
                   </TableBody>
                 </Table>
+                {/* Notes Field */}
+                <div className="mt-4">
+                  <Label htmlFor="retopup-notes">Notes (Optional)</Label>
+                  <Textarea
+                    id="retopup-notes"
+                    placeholder="Add any notes about this re-top up..."
+                    value={retopUpNotes}
+                    onChange={(e) => setRetopUpNotes(e.target.value)}
+                    rows={3}
+                    className="mt-2"
+                  />
+                </div>
                 <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsRetopUpDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => {
+                    setIsRetopUpDialogOpen(false)
+                    setRetopUpNotes("")
+                  }}>
                     Cancel
                   </Button>
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
