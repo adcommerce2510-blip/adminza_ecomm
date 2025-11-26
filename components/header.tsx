@@ -58,6 +58,7 @@ export function Header() {
     }
 
     // Load cart items from localStorage
+    const loadCartItems = () => {
     const savedCart = localStorage.getItem("cart")
     if (savedCart) {
       try {
@@ -66,6 +67,36 @@ export function Header() {
         console.error("Error parsing cart data:", error)
         setCartItems([])
       }
+      } else {
+        setCartItems([])
+      }
+    }
+
+    loadCartItems()
+
+    // Listen for storage changes (when cart is updated from other tabs/components)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "cart") {
+        loadCartItems()
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+
+    // Also listen for custom events for same-tab updates
+    const handleCartUpdate = () => {
+      loadCartItems()
+    }
+
+    window.addEventListener("cartUpdated", handleCartUpdate)
+
+    // Poll for changes (fallback for same-tab updates)
+    const interval = setInterval(loadCartItems, 500)
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      window.removeEventListener("cartUpdated", handleCartUpdate)
+      clearInterval(interval)
     }
   }, [])
 
@@ -349,40 +380,44 @@ export function Header() {
                   {/* User Dropdown Card */}
                   {isUserDropdownOpen && (
                     <div 
-                      className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border z-50 overflow-hidden"
+                      className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
                       onMouseEnter={handleUserDropdownEnter}
                       onMouseLeave={handleUserDropdownLeave}
                     >
-                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                            <User className="h-6 w-6" />
+                      <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-5 text-white">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30 shadow-lg">
+                            <User className="h-7 w-7" />
                           </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-base">{userName}</p>
-                            <p className="text-xs text-blue-100">{userEmail}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-lg truncate">{userName}</p>
+                            <p className="text-sm text-orange-100 truncate mt-0.5">{userEmail}</p>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="p-2">
+                      <div className="p-3">
                         <Link 
                           href="/my-accounts" 
-                          className="flex items-center px-3 py-2 hover:bg-gray-100 rounded-md transition-colors"
+                          className="flex items-center px-4 py-3 hover:bg-orange-50 rounded-lg transition-all duration-200 group"
                           onClick={() => setIsUserDropdownOpen(false)}
                         >
-                          <User className="h-4 w-4 mr-3 text-gray-600" />
-                          <span className="text-sm text-gray-700">Accounts</span>
+                          <div className="w-9 h-9 bg-orange-100 group-hover:bg-orange-200 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                            <User className="h-4 w-4 text-orange-600" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Accounts</span>
                         </Link>
                         
-                        <div className="border-t my-2"></div>
+                        <div className="border-t border-gray-200 my-2"></div>
                         
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center px-3 py-2 hover:bg-red-50 rounded-md transition-colors text-red-600"
+                          className="w-full flex items-center px-4 py-3 hover:bg-red-50 rounded-lg transition-all duration-200 group"
                         >
-                          <LogOut className="h-4 w-4 mr-3" />
-                          <span className="text-sm font-medium">Logout</span>
+                          <div className="w-9 h-9 bg-red-100 group-hover:bg-red-200 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                            <LogOut className="h-4 w-4 text-red-600" />
+                          </div>
+                          <span className="text-sm font-medium text-red-600">Logout</span>
                         </button>
                       </div>
                     </div>
@@ -450,7 +485,7 @@ export function Header() {
             className="z-[101] w-full max-w-md px-4"
             style={{ 
               position: 'fixed', 
-              top: '7%', 
+              top: '8%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)'
             }}
@@ -523,7 +558,7 @@ export function Header() {
             className="z-[101] w-full max-w-2xl px-4"
             style={{ 
               position: 'fixed', 
-              top: '6%', 
+              top: '6.2%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)',
               maxHeight: '90vh',

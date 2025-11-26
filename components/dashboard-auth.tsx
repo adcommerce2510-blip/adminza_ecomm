@@ -30,11 +30,32 @@ export function DashboardAuth({ children }: DashboardAuthProps) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Check if user is already authenticated
-    const authStatus = localStorage.getItem("dashboard_auth")
-    if (authStatus === "authenticated") {
-      setIsAuthenticated(true)
+    // Check if there's a valid session (within 24 hours)
+    const checkSession = () => {
+      const authData = localStorage.getItem("dashboard_auth")
+      if (authData) {
+        try {
+          const { timestamp } = JSON.parse(authData)
+          const now = Date.now()
+          const sessionDuration = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+          
+          // Check if session is still valid (within 24 hours)
+          if (timestamp && (now - timestamp) < sessionDuration) {
+            setIsAuthenticated(true)
+            return
+          } else {
+            // Session expired, clear it
+            localStorage.removeItem("dashboard_auth")
+          }
+        } catch (error) {
+          // Invalid format, clear it
+          localStorage.removeItem("dashboard_auth")
+        }
+      }
+      setIsAuthenticated(false)
     }
+    
+    checkSession()
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,7 +65,12 @@ export function DashboardAuth({ children }: DashboardAuthProps) {
 
     // Simple authentication check
     if (username === "admin_01" && password === "admin@123") {
-      localStorage.setItem("dashboard_auth", "authenticated")
+      // Store authentication with timestamp for 24-hour session
+      const authData = {
+        authenticated: true,
+        timestamp: Date.now()
+      }
+      localStorage.setItem("dashboard_auth", JSON.stringify(authData))
       setIsAuthenticated(true)
     } else {
       setError("Invalid username or password")

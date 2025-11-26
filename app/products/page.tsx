@@ -121,6 +121,9 @@ export default function AllProductsPage() {
       localStorage.setItem("cart", JSON.stringify(newItems))
     }
 
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
+
     alert(`${product.name} added to cart!`)
   }
 

@@ -51,17 +51,23 @@ export default function CartPage() {
     )
     setCartItems(updatedItems)
     localStorage.setItem("cart", JSON.stringify(updatedItems))
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
   }
 
   const removeItem = (id: string) => {
     const updatedItems = cartItems.filter(item => item.id !== id)
     setCartItems(updatedItems)
     localStorage.setItem("cart", JSON.stringify(updatedItems))
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
   }
 
   const clearCart = () => {
     setCartItems([])
     localStorage.removeItem("cart")
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
   }
 
   const getTotalPrice = () => {

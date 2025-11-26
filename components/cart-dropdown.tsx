@@ -7,11 +7,12 @@ import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
 interface CartItem {
-  id: number
+  id: string | number
   name: string
   price: number
   quantity: number
-  image: string
+  image?: string
+  category?: string
 }
 
 interface CartDropdownProps {
@@ -21,26 +22,71 @@ interface CartDropdownProps {
 }
 
 export function CartDropdown({ isOpen, onClose, triggerRef }: CartDropdownProps) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    {
-      id: 1,
-      name: "Premium Office Stationery Bundle",
-      price: 214.29,
-      quantity: 1,
-      image: "/office-stationery-bundle.jpg"
-    }
-  ])
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
 
-  const removeItem = (id: number) => {
-    setCartItems(cartItems.filter(item => item.id !== id))
+  // Load cart items from localStorage
+  useEffect(() => {
+    const loadCartItems = () => {
+      const savedCart = localStorage.getItem("cart")
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart)
+          setCartItems(parsedCart || [])
+        } catch (error) {
+          console.error("Error parsing cart data:", error)
+          setCartItems([])
+        }
+      } else {
+        setCartItems([])
+      }
+    }
+
+    loadCartItems()
+
+    // Listen for storage changes (when cart is updated from other tabs/components)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "cart") {
+        loadCartItems()
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+
+    // Also listen for custom events for same-tab updates
+    const handleCartUpdate = () => {
+      loadCartItems()
+    }
+
+    window.addEventListener("cartUpdated", handleCartUpdate)
+
+    // Poll for changes (fallback for same-tab updates)
+    const interval = setInterval(loadCartItems, 500)
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      window.removeEventListener("cartUpdated", handleCartUpdate)
+      clearInterval(interval)
+    }
+  }, [])
+
+  const removeItem = (id: string | number) => {
+    const updatedItems = cartItems.filter(item => item.id !== id)
+    setCartItems(updatedItems)
+    localStorage.setItem("cart", JSON.stringify(updatedItems))
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
   }
 
-  const updateQuantity = (id: number, change: number) => {
-    setCartItems(cartItems.map(item => 
+  const updateQuantity = (id: string | number, change: number) => {
+    const updatedItems = cartItems.map(item => 
       item.id === id 
         ? { ...item, quantity: Math.max(1, item.quantity + change) }
         : item
-    ))
+    )
+    setCartItems(updatedItems)
+    localStorage.setItem("cart", JSON.stringify(updatedItems))
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
   }
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
@@ -105,16 +151,17 @@ export function CartDropdown({ isOpen, onClose, triggerRef }: CartDropdownProps)
               {cartItems.map((item) => (
                 <div key={item.id} className="flex items-center space-x-3">
                   <img
-                    src={item.image}
+                    src={item.image || "/placeholder.jpg"}
                     alt={item.name}
                     className="w-12 h-12 object-cover rounded"
                   />
-                  <div className="flex-1">
-                    <span className="text-sm text-gray-700">{item.quantity} × ₹{item.price.toLocaleString()}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                    <span className="text-xs text-gray-600">{item.quantity} × ₹{item.price.toLocaleString()}</span>
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-400 hover:text-red-500 flex-shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </button>

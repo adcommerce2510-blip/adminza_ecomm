@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRightIcon } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { AnimatedWrapper, StaggeredContainer } from "@/components/animated-wrapper"
 
 interface CategoryCard {
@@ -185,40 +186,46 @@ export function CategoriesSection() {
           {categoryCards.map((card) => (
             <Link key={card.id} href={card.href}>
               <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] cursor-pointer overflow-hidden h-[320px] relative category-card-premium">
-                <div 
-                  className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-500 hover:scale-105"
-                  style={{ backgroundImage: `url(${card.image})` }}
-                >
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-black/60 hover:bg-black/50 transition-all duration-300"></div>
+                {/* Background Image */}
+                <div className="absolute inset-0">
+                  <Image
+                    src={card.image}
+                    alt={card.title}
+                    fill
+                    className="object-cover transition-transform duration-500 hover:scale-105"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={card.id <= 3}
+                  />
+                </div>
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-black/60 hover:bg-black/50 transition-all duration-300 z-[1]"></div>
                   
-                  {/* Content */}
-                  <div className="relative z-10 h-full p-6 flex flex-col justify-between text-white">
-                    <div>
-                        <h3 className="text-xl font-bold mb-3 leading-tight text-white drop-shadow-lg font-serif category-title-premium">
-                          {card.title}
-                        </h3>
-                      <p className="text-base mb-4 leading-relaxed line-clamp-2 text-white drop-shadow-md font-serif">
-                        {card.description}
-                      </p>
-                      
-                      {/* Feature List - Show only 2 items */}
-                      <div className="space-y-2 mb-4">
-                        {card.items.slice(0, 2).map((item: string, index: number) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                            <span className="text-sm text-white drop-shadow-sm font-serif">{item}</span>
-                          </div>
-                        ))}
-                      </div>
+                {/* Content */}
+                <div className="relative z-10 h-full p-6 flex flex-col justify-between text-white">
+                  <div>
+                    <h3 className="text-xl font-bold mb-3 leading-tight text-white drop-shadow-lg font-serif category-title-premium">
+                      {card.title}
+                    </h3>
+                    <p className="text-base mb-4 leading-relaxed line-clamp-2 text-white drop-shadow-md font-serif">
+                      {card.description}
+                    </p>
+                    
+                    {/* Feature List - Show only 2 items */}
+                    <div className="space-y-2 mb-4">
+                      {card.items.slice(0, 2).map((item: string, index: number) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          <span className="text-sm text-white drop-shadow-sm font-serif">{item}</span>
+                        </div>
+                      ))}
                     </div>
-
-                    {/* Button */}
-                    <Button className="w-fit text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:shadow-lg category-button-premium" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-                      {card.buttonText}
-                      <ArrowRightIcon className="ml-2 h-3 w-3" />
-                    </Button>
                   </div>
+
+                  {/* Button */}
+                  <Button className="w-fit text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:shadow-lg category-button-premium" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
+                    {card.buttonText}
+                    <ArrowRightIcon className="ml-2 h-3 w-3" />
+                  </Button>
                 </div>
               </Card>
             </Link>

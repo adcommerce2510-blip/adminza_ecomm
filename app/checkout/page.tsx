@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [checkoutType, setCheckoutType] = useState<"billing" | "quotation">("billing")
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -106,6 +107,8 @@ export default function CheckoutPage() {
 
     // HANDLE QUOTATION SUBMISSION
     if (checkoutType === "quotation") {
+      setSubmitting(true) // Show loading state
+      
       const quotationData = {
         userEmail,
         userName: formData.name,
@@ -151,12 +154,24 @@ export default function CheckoutPage() {
         const result = await response.json()
         console.log("Quotation created:", result)
 
-        // Clear cart and redirect
+        // Clear cart AFTER successful submission (but don't trigger redirects)
         localStorage.removeItem("cart")
         setCartItems([])
-        alert("Quotation request submitted successfully! You can view it in your Accounts.")
-        router.push("/my-accounts")
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new Event("cartUpdated"))
+        
+        // Directly redirect to view quotation without going through cart
+        if (result.success && result.data && result.data._id) {
+          // Use replace instead of push to avoid going back to cart
+          router.replace(`/user-quotation?id=${result.data._id}`)
+        } else {
+          setSubmitting(false)
+          alert("Quotation request submitted successfully! You can view it in your Accounts.")
+          router.replace("/my-accounts")
+        }
       } catch (error) {
+        setSubmitting(false)
         console.error("Error creating quotation:", error)
         const errorMsg = error instanceof Error ? error.message : "Unknown error"
         alert(`Error submitting quotation: ${errorMsg}`)
@@ -165,13 +180,19 @@ export default function CheckoutPage() {
     }
 
     // HANDLE BILLING/ORDER SUBMISSION
+    setSubmitting(true) // Show loading state
+    
     const orderData = {
       userEmail,
+      customerName: formData.name,
+      customerPhone: formData.phone,
+      customerEmail: formData.email || userEmail,
       items: cartItems.map((item: any) => ({
         productId: item.id,
         productName: item.name,
         quantity: item.quantity,
-        price: item.price
+        price: item.price,
+        hslCode: item.hslCode || ''
       })),
       totalAmount: getTotalPrice() * 1.18, // Including 18% tax
       shippingAddress: {
@@ -206,12 +227,49 @@ export default function CheckoutPage() {
       const result = await response.json()
       console.log("Order created:", result)
 
-      // Clear cart and redirect
-      localStorage.removeItem("cart")
-      setCartItems([])
-      alert("Order placed successfully! You can view it in your Accounts.")
-      router.push("/my-accounts")
+      // Generate invoice and redirect to invoice page BEFORE clearing cart
+      if (result.success && result.data) {
+        const order = result.data
+        
+        // Prepare invoice data - capture cartItems BEFORE clearing
+        const invoiceItems = cartItems.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+          hslCode: item.hslCode || ''
+        }))
+
+        // Try to find customer from eshop-inventory or use order data
+        let customerId = order.userId || order._id || order._id
+        
+        // Encode items for URL
+        const encodedItems = encodeURIComponent(JSON.stringify(invoiceItems))
+        
+        // Encode customer email for URL
+        const customerEmail = encodeURIComponent(formData.email || order.customerEmail || userEmail || '')
+        
+        // Clear cart AFTER capturing data (but don't trigger redirects)
+        localStorage.removeItem("cart")
+        setCartItems([])
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new Event("cartUpdated"))
+        
+        // Redirect directly to public invoice page using replace to avoid cart page
+        router.replace(`/invoice?customerId=${customerId}&items=${encodedItems}&orderId=${order._id}&customerEmail=${customerEmail}`)
+      } else {
+        // Clear cart
+        localStorage.removeItem("cart")
+        setCartItems([])
+        window.dispatchEvent(new Event("cartUpdated"))
+        
+        setSubmitting(false)
+        alert("Order placed successfully! You can view it in your Accounts.")
+        router.replace("/my-accounts")
+      }
     } catch (error) {
+      setSubmitting(false)
       console.error("Error creating order:", error)
       alert("There was an error processing your order. Please try again.")
     }
@@ -224,6 +282,28 @@ export default function CheckoutPage() {
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading checkout...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading overlay when submitting (quotation or billing)
+  if (submitting) {
+    const loadingMessage = checkoutType === "quotation" 
+      ? "Processing Your Quotation Request"
+      : "Processing Your Order"
+    const loadingDescription = checkoutType === "quotation"
+      ? "Please wait while we submit your quotation request..."
+      : "Please wait while we process your order..."
+    
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">{loadingMessage}</h3>
+            <p className="text-gray-600">{loadingDescription}</p>
           </div>
         </div>
       </div>

@@ -1,11 +1,10 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, ShoppingCart, FileText, Mail, RefreshCw, Eye, Package } from "lucide-react"
+import { User, ShoppingCart, FileText, Mail, RefreshCw, Eye, Package, ArrowLeft, LogOut } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,11 +30,11 @@ export default function MyAccountsPage() {
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false)
   const [isEnquiryDialogOpen, setIsEnquiryDialogOpen] = useState(false)
 
-  const fetchSubmissions = async () => {
-    try {
+    const fetchSubmissions = async () => {
+      try {
       setRefreshing(true)
-      const user = localStorage.getItem("user")
-      if (!user) return
+        const user = localStorage.getItem("user")
+        if (!user) return
 
       const userDataObj = JSON.parse(user)
       const email = userDataObj.email
@@ -44,8 +43,8 @@ export default function MyAccountsPage() {
 
       // Fetch orders - check both userEmail and customerEmail
       const ordersRes = await fetch(`/api/orders`)
-      if (ordersRes.ok) {
-        const ordersData = await ordersRes.json()
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json()
         if (ordersData.success) {
           // Filter by email (check both userEmail and customerEmail)
           const filteredOrders = ordersData.data.filter((order: any) => 
@@ -54,21 +53,21 @@ export default function MyAccountsPage() {
           )
           setOrders(filteredOrders)
         }
-      }
+        }
 
-      // Fetch quotations
-      const quotationsRes = await fetch(`/api/quotations?email=${encodeURIComponent(email)}`)
-      if (quotationsRes.ok) {
-        const quotationsData = await quotationsRes.json()
-        setQuotations(quotationsData.success ? quotationsData.data : [])
-      }
+        // Fetch quotations
+        const quotationsRes = await fetch(`/api/quotations?email=${encodeURIComponent(email)}`)
+        if (quotationsRes.ok) {
+          const quotationsData = await quotationsRes.json()
+          setQuotations(quotationsData.success ? quotationsData.data : [])
+        }
 
-      // Fetch enquiries
-      const enquiriesRes = await fetch(`/api/enquiries?email=${encodeURIComponent(email)}`)
-      if (enquiriesRes.ok) {
-        const enquiriesData = await enquiriesRes.json()
-        setEnquiries(enquiriesData.success ? enquiriesData.data : [])
-      }
+        // Fetch enquiries
+        const enquiriesRes = await fetch(`/api/enquiries?email=${encodeURIComponent(email)}`)
+        if (enquiriesRes.ok) {
+          const enquiriesData = await enquiriesRes.json()
+          setEnquiries(enquiriesData.success ? enquiriesData.data : [])
+        }
 
       // Fetch stock inventory with history - first get customer by email, then filter by customerId
       try {
@@ -189,13 +188,13 @@ export default function MyAccountsPage() {
         console.error('Error fetching stock inventory:', stockError)
         // Don't clear existing stock inventory on error - keep what we have
       }
-    } catch (error) {
-      console.error('Error fetching submissions:', error)
-    } finally {
-      setLoading(false)
+      } catch (error) {
+        console.error('Error fetching submissions:', error)
+      } finally {
+        setLoading(false)
       setRefreshing(false)
+      }
     }
-  }
 
   useEffect(() => {
     fetchSubmissions()
@@ -254,13 +253,17 @@ export default function MyAccountsPage() {
     setIsEnquiryDialogOpen(true)
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem("user")
+    localStorage.removeItem("isLoggedIn")
+    router.push("/")
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header />
-      
-      <div className="flex flex-1 pt-20">
+      <div className="flex flex-1">
         {/* Sidebar */}
-        <div className="w-64 bg-card border-r fixed left-0 top-48 z-10 h-[calc(100vh-8rem)] overflow-y-auto">
+        <div className="w-64 bg-card border-r fixed left-0 top-0 z-10 h-screen overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -276,8 +279,8 @@ export default function MyAccountsPage() {
               className="w-full justify-start"
               onClick={() => setActiveSection("profile")}
             >
-              <User className="h-4 w-4 mr-2" />
-              Profile
+                <User className="h-4 w-4 mr-2" />
+                Profile
             </Button>
             
             <Button 
@@ -285,8 +288,8 @@ export default function MyAccountsPage() {
               className="w-full justify-start"
               onClick={() => setActiveSection("orders")}
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Orders
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Orders
             </Button>
             
             <Button 
@@ -294,8 +297,8 @@ export default function MyAccountsPage() {
               className="w-full justify-start"
               onClick={() => setActiveSection("quotations")}
             >
-              <FileText className="h-4 w-4 mr-2" />
-              Quotations
+                <FileText className="h-4 w-4 mr-2" />
+                Quotations
             </Button>
             
             <Button 
@@ -303,8 +306,8 @@ export default function MyAccountsPage() {
               className="w-full justify-start"
               onClick={() => setActiveSection("enquiries")}
             >
-              <Mail className="h-4 w-4 mr-2" />
-              Enquiries
+                <Mail className="h-4 w-4 mr-2" />
+                Enquiries
             </Button>
             
             <Button 
@@ -321,6 +324,22 @@ export default function MyAccountsPage() {
         {/* Main Content */}
         <main className="flex-1 ml-64">
           <div className="container mx-auto px-4 py-8">
+            <div className="mb-6 flex justify-between items-center">
+              <Link href="/">
+                <Button variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-50">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Home
+                </Button>
+              </Link>
+              <Button 
+                variant="outline" 
+                onClick={handleLogout}
+                className="text-red-600 border-red-600 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
             <div className="mb-8 flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-bold">
@@ -673,11 +692,9 @@ export default function MyAccountsPage() {
                 </CardContent>
               </Card>
             )}
-          </div>
-        </main>
+        </div>
+      </main>
       </div>
-
-      <Footer />
 
       {/* Order Details Dialog */}
       <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>

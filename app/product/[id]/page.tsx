@@ -85,7 +85,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       const newItems = [...cartItems, { 
         id: product._id,
         name: product.name,
-        price: product.price,
+        price: product.finalPrice || product.price,
         image: product.images?.[0],
         category: product.category,
         quantity: quantity
@@ -93,6 +93,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       setCartItems(newItems)
       localStorage.setItem("cart", JSON.stringify(newItems))
     }
+
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event("cartUpdated"))
 
     alert(`${quantity} x ${product.name} added to cart!`)
   }

@@ -56,7 +56,7 @@ const QuotationPreview = ({ data = {} as QuotationData }) => {
   const customerGstNumber = data?.gstNumber || "N/A"
   const company = data?.company || ""
 
-  const quotationNo = data?.quotationNo || `QUO-${Date.now()}`
+  const quotationNo = data?.quotationNo || 'QUO-0001'
   const quotationDate = data?.quotationDate || new Date().toLocaleDateString('en-IN')
 
   const items = data?.items || []
@@ -255,7 +255,7 @@ export default function UserQuotationPage() {
               ...quotation,
               items: itemsWithTotals,
               totalAmount,
-              quotationNo: quotation.quotationNo || `QUO-${quotation._id?.toString().slice(-8) || Date.now()}`,
+              quotationNo: quotation.quotationNo || 'QUO-0001',
               quotationDate: quotation.quotationDate ? new Date(quotation.quotationDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')
             })
           } else {

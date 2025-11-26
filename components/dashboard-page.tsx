@@ -1,4 +1,4 @@
-     "use client"
+"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -46,7 +46,8 @@ import {
   Lock,
   LogOut,
   X,
-  Copy
+  Copy,
+  RefreshCw
 } from "lucide-react"
 
 // API functions
@@ -132,6 +133,12 @@ const fetchEnquiries = async () => {
   return data.success ? data.data : []
 }
 
+const fetchInvoices = async () => {
+  const response = await fetch('/api/invoices')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
 const fetchCategories = async () => {
   const response = await fetch('/api/categories')
   const data = await response.json()
@@ -179,6 +186,441 @@ const mainCategories = [
   { value: "service", label: "Service" }
 ]
 
+// Helper functions for Reports
+const getGrandTotalFromInvoice = (inv: any): number => {
+  if (!inv) return 0
+  
+  // Calculate grand total from invoice data
+  const subtotal = inv.subtotal || 0
+  const gstRate = inv.gstRate || 18
+  const gstType = inv.gstType || 'CGST/SGST'
+  
+  let tax = 0
+  if (gstType === 'IGST') {
+    tax = subtotal * (gstRate / 100)
+  } else {
+    tax = subtotal * (gstRate / 100) // CGST + SGST = total GST
+  }
+  
+  const additionalChargesTotal = (inv.additionalCharges || []).reduce((sum: number, charge: any) => sum + (charge.amount || 0), 0)
+  const grandTotal = subtotal + tax + additionalChargesTotal
+  
+  return grandTotal || inv.total || 0
+}
+
+const parseDate = (dateString: string): Date | null => {
+  if (!dateString) return null
+  
+  try {
+    // Try ISO format first
+    if (dateString.includes('T') || dateString.includes('Z')) {
+      return new Date(dateString)
+    }
+    
+    // Try DD/MM/YYYY
+    if (dateString.includes('/')) {
+      const parts = dateString.split('/')
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+      }
+    }
+    
+    // Try DD-MM-YYYY
+    if (dateString.includes('-') && dateString.split('-')[0].length <= 2) {
+      const parts = dateString.split('-')
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+      }
+    }
+    
+    // Try YYYY-MM-DD
+    if (dateString.includes('-')) {
+      const parts = dateString.split('-')
+      if (parts.length === 3 && parts[0].length === 4) {
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+      }
+    }
+    
+    // Fallback to standard Date parsing
+    return new Date(dateString)
+  } catch (error) {
+    console.error('Error parsing date:', dateString, error)
+    return null
+  }
+}
+
+const parseDateForMonth = (dateString: string): Date | null => {
+  return parseDate(dateString)
+}
+
+// Invoice Reports Section Component
+const InvoiceReportsSection = ({
+  invoices,
+  startDate,
+  endDate,
+  selectedCustomer,
+  onStartDateChange,
+  onEndDateChange,
+  onCustomerChange,
+  generatingReport,
+  onGenerateReport
+}: {
+  invoices: any[]
+  startDate: string
+  endDate: string
+  selectedCustomer: string
+  onStartDateChange: (date: string) => void
+  onEndDateChange: (date: string) => void
+  onCustomerChange: (customer: string) => void
+  generatingReport: boolean
+  onGenerateReport: (generating: boolean) => void
+}) => {
+  // Filter invoices
+  const filteredInvoices = invoices.filter((inv) => {
+    let dateMatch = true
+    if (startDate && endDate) {
+      const invoiceDate = parseDate(inv.invoiceDate || inv.createdAt)
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999) // Include entire end date
+      if (invoiceDate) {
+        dateMatch = invoiceDate >= start && invoiceDate <= end
+      }
+    }
+    
+    const customerMatch = !selectedCustomer || inv.customerName === selectedCustomer
+    
+    return dateMatch && customerMatch
+  })
+
+  // Get unique customers
+  const uniqueCustomers = Array.from(new Set(invoices.map(inv => inv.customerName).filter(Boolean))).sort()
+
+  // Statistics
+  const totalInvoices = invoices.length
+  const totalRevenue = invoices.reduce((sum, inv) => sum + getGrandTotalFromInvoice(inv), 0)
+  
+  const currentDate = new Date()
+  const currentMonth = currentDate.getMonth()
+  const currentYear = currentDate.getFullYear()
+  
+  const thisMonthInvoices = invoices.filter((inv) => {
+    const invoiceDate = parseDateForMonth(inv.invoiceDate || inv.createdAt)
+    if (!invoiceDate) return false
+    return invoiceDate.getMonth() === currentMonth && invoiceDate.getFullYear() === currentYear
+  })
+  
+  const thisMonthRevenue = thisMonthInvoices.reduce((sum, inv) => sum + getGrandTotalFromInvoice(inv), 0)
+  
+  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+  
+  const lastMonthInvoices = invoices.filter((inv) => {
+    const invoiceDate = parseDateForMonth(inv.invoiceDate || inv.createdAt)
+    if (!invoiceDate) return false
+    return invoiceDate.getMonth() === lastMonth && invoiceDate.getFullYear() === lastMonthYear
+  })
+  
+  const lastMonthRevenue = lastMonthInvoices.reduce((sum, inv) => sum + getGrandTotalFromInvoice(inv), 0)
+
+  // Generate Excel Report
+  const generateExcelReport = () => {
+    if (!startDate && !endDate && !selectedCustomer) {
+      alert('Please apply at least one filter (date range or customer) before generating a report.')
+      return
+    }
+
+    if (filteredInvoices.length === 0) {
+      alert('No invoices found matching the selected filters.')
+      return
+    }
+
+    onGenerateReport(true)
+
+    try {
+      // Prepare data for Excel
+      const excelData = filteredInvoices.map((inv, index) => {
+        const grandTotal = getGrandTotalFromInvoice(inv)
+        const cgst = inv.gstType === 'IGST' ? 0 : (inv.subtotal || 0) * ((inv.gstRate || 18) / 200)
+        const sgst = inv.gstType === 'IGST' ? 0 : (inv.subtotal || 0) * ((inv.gstRate || 18) / 200)
+        const additionalChargesTotal = (inv.additionalCharges || []).reduce((sum: number, charge: any) => sum + (charge.amount || 0), 0)
+        
+        return {
+          'SR. NO': index + 1,
+          'INVOICE NO': inv.invoiceNo || 'N/A',
+          'CUSTOMER NAME': inv.customerName || 'N/A',
+          'CUSTOMER EMAIL': inv.customerEmail || 'N/A',
+          'CUSTOMER PHONE': inv.customerPhone || 'N/A',
+          'CUSTOMER ADDRESS': inv.customerAddress || 'N/A',
+          'CUSTOMER CITY': inv.customerCity || 'N/A',
+          'CUSTOMER STATE': inv.customerState || 'N/A',
+          'CUSTOMER ZIP CODE': inv.customerZipCode || 'N/A',
+          'CUSTOMER GST': inv.customerGstNumber || 'N/A',
+          'INVOICE DATE': inv.invoiceDate || 'N/A',
+          'SUBTOTAL': (inv.subtotal || 0).toFixed(2),
+          'CGST': cgst.toFixed(2),
+          'SGST': sgst.toFixed(2),
+          'ADDITIONAL CHARGES': additionalChargesTotal.toFixed(2),
+          'GRAND TOTAL': grandTotal.toFixed(2),
+          'ITEMS COUNT': (inv.items || []).length,
+          'TOTAL QUANTITY': (inv.items || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+        }
+      })
+
+      // Create workbook
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(excelData)
+
+      // Set column widths
+      const colWidths = [
+        { wch: 8 },   // SR. NO
+        { wch: 18 },  // INVOICE NO
+        { wch: 25 },  // CUSTOMER NAME
+        { wch: 25 },  // CUSTOMER EMAIL
+        { wch: 15 },  // CUSTOMER PHONE
+        { wch: 30 },  // CUSTOMER ADDRESS
+        { wch: 15 },  // CUSTOMER CITY
+        { wch: 15 },  // CUSTOMER STATE
+        { wch: 12 },  // CUSTOMER ZIP CODE
+        { wch: 18 },  // CUSTOMER GST
+        { wch: 15 },  // INVOICE DATE
+        { wch: 14 },  // SUBTOTAL
+        { wch: 12 },  // CGST
+        { wch: 12 },  // SGST
+        { wch: 18 },  // ADDITIONAL CHARGES
+        { wch: 14 },  // GRAND TOTAL
+        { wch: 12 },  // ITEMS COUNT
+        { wch: 14 }   // TOTAL QUANTITY
+      ]
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Invoice Report')
+
+      // Generate filename
+      let filename = 'Invoice_Report'
+      if (startDate && endDate) {
+        const start = new Date(startDate).toLocaleDateString('en-GB').replace(/\//g, '-')
+        const end = new Date(endDate).toLocaleDateString('en-GB').replace(/\//g, '-')
+        filename += `_${start}_to_${end}`
+      }
+      if (selectedCustomer) {
+        filename += `_${selectedCustomer.replace(/[^a-zA-Z0-9]/g, '_')}`
+      }
+      if (!startDate && !endDate && selectedCustomer) {
+        filename += '_AllDates'
+      }
+      filename += '.xlsx'
+
+      // Download
+      XLSX.writeFile(wb, filename)
+      onGenerateReport(false)
+    } catch (error) {
+      console.error('Error generating Excel report:', error)
+      alert('Error generating report. Please try again.')
+      onGenerateReport(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="border-orange-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Invoices</p>
+                <p className="text-2xl font-bold">{totalInvoices}</p>
+              </div>
+              <FileText className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                <p className="text-2xl font-bold">₹{totalRevenue.toLocaleString('en-IN')}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">This Month Invoices</p>
+                <p className="text-2xl font-bold">{thisMonthInvoices.length}</p>
+              </div>
+              <Calendar className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-indigo-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Last Month Invoices</p>
+                <p className="text-2xl font-bold">{lastMonthInvoices.length}</p>
+              </div>
+              <Calendar className="h-8 w-8 text-indigo-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Monthly Revenue</p>
+                <p className="text-2xl font-bold">₹{thisMonthRevenue.toLocaleString('en-IN')}</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filter Section */}
+      <Card className="border-orange-200">
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="start-date">Start Date</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => onStartDateChange(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => onEndDateChange(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-select">Customer</Label>
+              <Select value={selectedCustomer || "all"} onValueChange={(value) => onCustomerChange(value === "all" ? "" : value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="All Customers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  {uniqueCustomers.map((customer) => (
+                    <SelectItem key={customer} value={customer}>
+                      {customer}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredInvoices.length} invoice(s)
+              {(startDate || endDate || selectedCustomer) && (
+                <span className="ml-2">
+                  (Filtered: {startDate && endDate && `Date: ${startDate} to ${endDate}`}
+                  {selectedCustomer && `, Customer: ${selectedCustomer}`})
+                </span>
+              )}
+            </div>
+            <Button
+              onClick={generateExcelReport}
+              disabled={generatingReport || (!startDate && !endDate && !selectedCustomer)}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {generatingReport ? 'Generating...' : 'Generate Report'}
+              <Download className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* All Invoices Table */}
+      <Card className="border-orange-200">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Invoices</CardTitle>
+            <div className="text-sm text-muted-foreground">
+              {filteredInvoices.length} of {invoices.length} invoice(s)
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SR. NO</TableHead>
+                  <TableHead>Invoice No</TableHead>
+                  <TableHead>Customer Name</TableHead>
+                  <TableHead>Invoice Date</TableHead>
+                  <TableHead>Total Amount</TableHead>
+                  <TableHead>Items Count</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInvoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No invoices found</p>
+                        <p className="text-sm">
+                          {invoices.length === 0 
+                            ? 'Generated invoices will appear here'
+                            : 'No invoices match the selected filters'}
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredInvoices.map((inv, index) => {
+                    const grandTotal = getGrandTotalFromInvoice(inv)
+                    const itemsCount = (inv.items || []).length
+                    
+                    return (
+                      <TableRow key={inv._id} className="hover:bg-orange-50">
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">{inv.invoiceNo || 'N/A'}</TableCell>
+                        <TableCell>{inv.customerName || 'N/A'}</TableCell>
+                        <TableCell>
+                          {inv.invoiceDate 
+                            ? new Date(inv.invoiceDate).toLocaleDateString('en-IN')
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell className="font-semibold">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell>{itemsCount}</TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const [products, setProducts] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
@@ -190,12 +632,14 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadingExcel, setUploadingExcel] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const excelFileInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState("dashboard")
   const [activeSubSection, setActiveSubSection] = useState("all-items")
   const [isProductsManagementExpanded, setIsProductsManagementExpanded] = useState(false)
   const [isCustomerManagementExpanded, setIsCustomerManagementExpanded] = useState(false)
   const [isOrdersExpanded, setIsOrdersExpanded] = useState(false)
+  const [isReportsExpanded, setIsReportsExpanded] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [categoryForm, setCategoryForm] = useState({
@@ -289,6 +733,11 @@ export function DashboardPage() {
   const [viewingEnquiry, setViewingEnquiry] = useState<any>(null)
   const [isEditEnquiryDialogOpen, setIsEditEnquiryDialogOpen] = useState(false)
   const [editingEnquiry, setEditingEnquiry] = useState<any>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [invoiceStartDate, setInvoiceStartDate] = useState("")
+  const [invoiceEndDate, setInvoiceEndDate] = useState("")
+  const [selectedCustomer, setSelectedCustomer] = useState("")
+  const [generatingReport, setGeneratingReport] = useState(false)
   const [isViewProductDetailsDialogOpen, setIsViewProductDetailsDialogOpen] = useState(false)
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -401,41 +850,118 @@ export function DashboardPage() {
     images: [] as string[]
   })
 
+  // Load data function - can be called on mount or refresh
+  const loadData = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
+      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData] = await Promise.all([
+        fetchProducts(),
+        fetchServices(),
+        fetchCategories(),
+        fetchSubCategories(),
+        fetchLevel2Categories(),
+        fetchCustomers(),
+        fetchEshopInventory(),
+        fetchOrders(),
+        fetchQuotations(),
+        fetchEnquiries(),
+        fetchInvoices()
+      ])
+      setProducts(productsData)
+      setServices(servicesData)
+      setCategories(categoriesData)
+      setSubCategories(subCategoriesData)
+      setLevel2Categories(level2CategoriesData)
+      setCustomers(customersData)
+      setEshopInventory(eshopData)
+      setOrders(ordersData)
+      setQuotations(quotationsData)
+      setEnquiries(enquiriesData)
+      setInvoices(invoicesData)
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
   // Load data on component mount
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData] = await Promise.all([
-          fetchProducts(),
-          fetchServices(),
-          fetchCategories(),
-          fetchSubCategories(),
-          fetchLevel2Categories(),
-          fetchCustomers(),
-          fetchEshopInventory(),
-          fetchOrders(),
-          fetchQuotations(),
-          fetchEnquiries()
-        ])
-        setProducts(productsData)
-        setServices(servicesData)
-        setCategories(categoriesData)
-        setSubCategories(subCategoriesData)
-        setLevel2Categories(level2CategoriesData)
-        setCustomers(customersData)
-        setEshopInventory(eshopData)
-        setOrders(ordersData)
-        setQuotations(quotationsData)
-        setEnquiries(enquiriesData)
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
     loadData()
   }, [])
+
+  // Refresh function for Orders tab
+  const refreshOrdersData = async () => {
+    try {
+      setRefreshing(true)
+      const [ordersData, quotationsData, enquiriesData] = await Promise.all([
+        fetchOrders(),
+        fetchQuotations(),
+        fetchEnquiries()
+      ])
+      setOrders(ordersData)
+      setQuotations(quotationsData)
+      setEnquiries(enquiriesData)
+    } catch (error) {
+      console.error('Error refreshing orders data:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Refresh function for Quotations tab
+  const refreshQuotationsData = async () => {
+    try {
+      setRefreshing(true)
+      const quotationsData = await fetchQuotations()
+      setQuotations(quotationsData)
+    } catch (error) {
+      console.error('Error refreshing quotations data:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Refresh function for Enquiries tab
+  const refreshEnquiriesData = async () => {
+    try {
+      setRefreshing(true)
+      const enquiriesData = await fetchEnquiries()
+      setEnquiries(enquiriesData)
+    } catch (error) {
+      console.error('Error refreshing enquiries data:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Refresh function for Dashboard
+  const refreshDashboardData = async () => {
+    try {
+      setRefreshing(true)
+      const [productsData, servicesData, ordersData, quotationsData, enquiriesData] = await Promise.all([
+        fetchProducts(),
+        fetchServices(),
+        fetchOrders(),
+        fetchQuotations(),
+        fetchEnquiries()
+      ])
+      setProducts(productsData)
+      setServices(servicesData)
+      setOrders(ordersData)
+      setQuotations(quotationsData)
+      setEnquiries(enquiriesData)
+    } catch (error) {
+      console.error('Error refreshing dashboard data:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   // Create category
   const createCategory = async (categoryData: any) => {
@@ -1055,21 +1581,21 @@ export function DashboardPage() {
         }
 
         // Order created successfully, now update quotation status
-        const response = await fetch(`/api/quotations/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ status }),
-        })
+      const response = await fetch(`/api/quotations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
             // Update quotations list
-            setQuotations(quotations.map((quotation: any) => 
-              quotation._id === id ? data.data : quotation
-            ))
+          setQuotations(quotations.map((quotation: any) => 
+            quotation._id === id ? data.data : quotation
+          ))
             
             // Add order to orders list and switch to orders tab
             const updatedOrders = await fetchOrders()
@@ -1080,10 +1606,10 @@ export function DashboardPage() {
             // Get the order number from the response
             const createdOrderNo = orderResult.data?.orderNo || 'N/A'
             alert(`Quotation accepted! Order ${createdOrderNo} has been created successfully.`)
-          }
-          return data
         }
-        return { success: false, error: 'Failed to update quotation status' }
+        return data
+      }
+      return { success: false, error: 'Failed to update quotation status' }
       } else {
         // For other statuses, just update normally
         const response = await fetch(`/api/quotations/${id}`, {
@@ -1204,12 +1730,7 @@ export function DashboardPage() {
       // Extract name from email if userName is not available
       const userName = enquiry.userName || enquiry.userEmail.split('@')[0] || 'Guest'
       
-      // Generate unique quotation number
-      const timestamp = Date.now()
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-      const quotationNo = `QUO-${timestamp}-${random}`
-      
-      // Create quotation from enquiry
+      // Create quotation from enquiry (quotationNo will be generated by API)
       const quotationData = {
         userId: enquiry.userId || 'guest',
         userEmail: enquiry.userEmail,
@@ -1228,7 +1749,7 @@ export function DashboardPage() {
         gstNumber: enquiry.gstNumber || '',
         status: enquiry.status || 'pending', // Use enquiry status
         quotationDate: new Date(),
-        quotationNo: quotationNo, // Generate unique quotation number
+        // Don't set quotationNo - let API generate sequential number
         notes: enquiry.responseNotes || ''
       }
 
@@ -1544,32 +2065,15 @@ export function DashboardPage() {
     try {
       let customerId = null
       
-      // Try to find customer from eshop-inventory by email or name
-      if (order.customerEmail || order.customerName) {
-        try {
-          const inventoryResponse = await fetch('/api/eshop-inventory')
-          const inventoryData = await inventoryResponse.json()
-          const inventoryArray = inventoryData.data || inventoryData
-          const customerInventory = inventoryArray.find((item: any) => 
-            (order.customerEmail && item.customerEmail === order.customerEmail) || 
-            (order.customerName && item.customerName === order.customerName)
-          )
-          if (customerInventory) {
-            customerId = customerInventory.customerId
-          }
-        } catch (error) {
-          console.error('Error fetching inventory:', error)
-        }
-      }
-
-      // If still no customerId, try to find from customers collection
-      if (!customerId && order.customerEmail) {
+      // Try to find customer from customers collection first
+      if (order.customerEmail || order.userEmail) {
         try {
           const customersResponse = await fetch('/api/customers')
           const customersData = await customersResponse.json()
           if (customersData.success && customersData.data) {
             const customer = customersData.data.find((c: any) => 
               c.email === order.customerEmail || 
+              c.email === order.userEmail ||
               c.name === order.customerName
             )
             if (customer) {
@@ -1581,21 +2085,45 @@ export function DashboardPage() {
         }
       }
 
-      // If still no customerId, use order.userId or order._id as fallback
-      if (!customerId) {
-        customerId = order.userId || order._id
+      // If still no customerId, try to find from eshop-inventory by email or name
+      if (!customerId && (order.customerEmail || order.userEmail || order.customerName)) {
+        try {
+          const inventoryResponse = await fetch('/api/eshop-inventory')
+          const inventoryData = await inventoryResponse.json()
+          const inventoryArray = inventoryData.data || inventoryData
+          const customerInventory = inventoryArray.find((item: any) => 
+            (order.customerEmail && item.customerEmail === order.customerEmail) || 
+            (order.userEmail && item.customerEmail === order.userEmail) ||
+            (order.customerName && item.customerName === order.customerName)
+          )
+          if (customerInventory) {
+            customerId = customerInventory.customerId
+          }
+        } catch (error) {
+          console.error('Error fetching inventory:', error)
+        }
       }
 
-      // Convert order items to invoice format
+      // If still no customerId, use order.userId or order._id as fallback
+      if (!customerId) {
+        customerId = order.userId || order._id || 'guest'
+      }
+
+      // Convert order items to invoice format with hslCode if available
       const invoiceItems = (order.items || []).map((item: any) => ({
         name: item.productName || item.name || 'Product',
         quantity: item.quantity || 1,
-        price: item.price || 0
+        price: item.price || 0,
+        hslCode: item.hslCode || ''
       }))
 
-      // Navigate to invoice page with order data
+      // Navigate to invoice page with order data including orderId and customerEmail
       const itemsParam = encodeURIComponent(JSON.stringify(invoiceItems))
-      router.push(`/dashboard/invoice?customerId=${customerId}&items=${itemsParam}`)
+      const orderIdParam = order._id ? `&orderId=${order._id}` : ''
+      const customerEmailParam = order.customerEmail || order.userEmail ? `&customerEmail=${encodeURIComponent(order.customerEmail || order.userEmail)}` : ''
+      const orderNoParam = order.orderNo ? `&orderNo=${encodeURIComponent(order.orderNo)}` : ''
+      
+      router.push(`/dashboard/invoice?customerId=${customerId}&items=${itemsParam}${orderIdParam}${customerEmailParam}${orderNoParam}`)
     } catch (error) {
       console.error('Error generating invoice:', error)
       alert('Error generating invoice. Please try again.')
@@ -2442,6 +2970,7 @@ export function DashboardPage() {
               setIsProductsManagementExpanded(false)
               setIsCustomerManagementExpanded(false)
               setIsOrdersExpanded(false)
+              setIsReportsExpanded(false)
             }}
           >
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -2657,6 +3186,47 @@ export function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Reports Section */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between w-full">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start"
+                onClick={() => {
+                  setIsReportsExpanded(!isReportsExpanded)
+                }}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Reports
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-1"
+                onClick={() => setIsReportsExpanded(!isReportsExpanded)}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${isReportsExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
+            
+            {/* Sub-items - Only show when expanded */}
+            {isReportsExpanded && (
+              <div className="ml-6 space-y-1">
+                <Button 
+                  variant={activeSubSection === "invoice-reports" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("reports")
+                    setActiveSubSection("invoice-reports")
+                  }}
+                >
+                  <FileText className="h-3 w-3 mr-2" />
+                  Invoice Reports
+                </Button>
+              </div>
+            )}
+          </div>
         </nav>
       </div>
 
@@ -2671,10 +3241,17 @@ export function DashboardPage() {
                 <p className="text-muted-foreground">Manage your products and services</p>
               </div>
               <div className="flex items-center space-x-4">
-                <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Data
-                </Button>
+                {activeSection === "dashboard" && (
+                  <Button
+                    onClick={refreshDashboardData}
+                    disabled={refreshing}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                )}
                 <Button 
                   variant="outline"
                   onClick={handleLogout}
@@ -3268,16 +3845,16 @@ export function DashboardPage() {
                                     </div>
                                   </div>
                                 )}
-                                <div>
-                                  <Label htmlFor="product-stock">Stock Quantity</Label>
-                                  <Input
-                                    id="product-stock"
-                                    type="number"
-                                    placeholder="0"
-                                    value={productForm.stock}
-                                    onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
-                                    required
-                                  />
+                                  <div>
+                                    <Label htmlFor="product-stock">Stock Quantity</Label>
+                                    <Input
+                                      id="product-stock"
+                                      type="number"
+                                      placeholder="0"
+                                      value={productForm.stock}
+                                      onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                                      required
+                                    />
                                 </div>
                                 <div>
                                   <Label htmlFor="product-description">Description</Label>
@@ -4476,7 +5053,7 @@ export function DashboardPage() {
                                     const firstProduct = customerData.products[0];
                                     handleRetopUp(firstProduct);
                                   }}
-                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                  className="text-blue-600 border-blue-600 hover:bg-blue-100 hover:text-blue-700"
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   Re-top up
@@ -4495,7 +5072,7 @@ export function DashboardPage() {
                                     });
                                     window.open(`/dashboard/invoice?${queryParams.toString()}`, '_blank');
                                   }}
-                                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                  className="text-blue-600 border-blue-600 hover:bg-blue-100 hover:text-blue-700"
                                 >
                                   <FileText className="h-4 w-4 mr-2" />
                                   Generate Invoice
@@ -4953,6 +5530,16 @@ export function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle>All Orders</CardTitle>
                     <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={refreshOrdersData}
+                        disabled={refreshing}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                         <Input
@@ -5180,14 +5767,14 @@ export function DashboardPage() {
                             {viewingOrder.items?.map((item: any, index: number) => {
                               const itemTotal = item.total || (item.price || 0) * (item.quantity || 0)
                               return (
-                                <TableRow key={index}>
-                                  <TableCell>
-                                    <div className="font-medium">{item.productName}</div>
-                                  </TableCell>
-                                  <TableCell>{item.quantity}</TableCell>
+                              <TableRow key={index}>
+                                <TableCell>
+                                  <div className="font-medium">{item.productName}</div>
+                                </TableCell>
+                                <TableCell>{item.quantity}</TableCell>
                                   <TableCell>₹{(item.price || 0).toLocaleString()}</TableCell>
                                   <TableCell>₹{itemTotal.toLocaleString()}</TableCell>
-                                </TableRow>
+                              </TableRow>
                               )
                             })}
                           </TableBody>
@@ -5359,14 +5946,14 @@ export function DashboardPage() {
                             {orderEditForm.items?.map((item: any, index: number) => {
                               const itemTotal = item.total || (item.price || 0) * (item.quantity || 0)
                               return (
-                                <TableRow key={index}>
-                                  <TableCell>
-                                    <div className="font-medium">{item.productName}</div>
-                                  </TableCell>
-                                  <TableCell>{item.quantity}</TableCell>
+                              <TableRow key={index}>
+                                <TableCell>
+                                  <div className="font-medium">{item.productName}</div>
+                                </TableCell>
+                                <TableCell>{item.quantity}</TableCell>
                                   <TableCell>₹{(item.price || 0).toLocaleString()}</TableCell>
                                   <TableCell>₹{itemTotal.toLocaleString()}</TableCell>
-                                </TableRow>
+                              </TableRow>
                               )
                             })}
                           </TableBody>
@@ -5401,6 +5988,16 @@ export function DashboardPage() {
                     <div className="flex items-center justify-between">
                       <CardTitle>Received Quotations</CardTitle>
                       <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={refreshQuotationsData}
+                          disabled={refreshing}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </Button>
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                           <Input
@@ -5492,7 +6089,6 @@ export function DashboardPage() {
                                         <SelectItem value="accepted">Accepted</SelectItem>
                                         <SelectItem value="rejected">Rejected</SelectItem>
                                         <SelectItem value="sent re-quote">Sent Re-Quote</SelectItem>
-                                        <SelectItem value="received re-quote">Received Re-Quote</SelectItem>
                                         <SelectItem value="requested re-quote">Requested Re-Quote</SelectItem>
                                       </SelectContent>
                                     </Select>
@@ -5538,7 +6134,7 @@ export function DashboardPage() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => router.push(`/dashboard/quotation?id=${quotation._id}`)}
-                                      title="View Quotation Layout"
+                                      title="View Quotation"
                                       className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                     >
                                       <FileText className="h-4 w-4" />
@@ -5549,14 +6145,6 @@ export function DashboardPage() {
                                       onClick={() => handleRequote(quotation)}
                                       title="Requote"
                                       className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditQuotation(quotation)}
-                                      title="Edit quotation"
                                     >
                                       <Edit className="h-4 w-4" />
                                     </Button>
@@ -6253,6 +6841,16 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Enquiries</CardTitle>
                   <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={refreshEnquiriesData}
+                      disabled={refreshing}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                       <Input
@@ -6727,6 +7325,31 @@ export function DashboardPage() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Reports Section */}
+          {activeSection === "reports" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Invoice Reports</h2>
+                <p className="text-muted-foreground">View analytics and generate reports for invoices</p>
+              </div>
+
+              {/* Invoice Reports Tab */}
+              {activeSubSection === "invoice-reports" && (
+                <InvoiceReportsSection
+                  invoices={invoices}
+                  startDate={invoiceStartDate}
+                  endDate={invoiceEndDate}
+                  selectedCustomer={selectedCustomer}
+                  onStartDateChange={setInvoiceStartDate}
+                  onEndDateChange={setInvoiceEndDate}
+                  onCustomerChange={setSelectedCustomer}
+                  generatingReport={generatingReport}
+                  onGenerateReport={setGeneratingReport}
+                />
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>

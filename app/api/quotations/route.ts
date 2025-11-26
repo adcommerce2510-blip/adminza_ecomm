@@ -2,12 +2,59 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongodb'
 import Quotation from '@/models/Quotation'
 
+// Helper function to generate sequential quotation number
+async function generateQuotationNumber(): Promise<string> {
+  try {
+    await dbConnect()
+    // Get all quotations with quotationNo to find the highest number
+    const quotations = await Quotation.find({
+      quotationNo: { $exists: true, $ne: null, $regex: /^QUO-\d+$/ }
+    }).select('quotationNo').lean()
+    
+    let maxNumber = 0
+    
+    // Extract numeric part from each quotationNo and find the maximum
+    quotations.forEach((quotation: any) => {
+      if (quotation.quotationNo) {
+        const match = quotation.quotationNo.match(/^QUO-(\d+)$/)
+        if (match) {
+          const num = parseInt(match[1], 10)
+          if (num > maxNumber) {
+            maxNumber = num
+          }
+        }
+      }
+    })
+    
+    // Increment by 1
+    const nextNumber = maxNumber + 1
+    
+    // Format as QUO-0001, QUO-0002, etc. (4 digits with leading zeros)
+    return `QUO-${nextNumber.toString().padStart(4, '0')}`
+  } catch (error) {
+    console.error('Error generating quotation number:', error)
+    // Fallback: use timestamp if query fails
+    const timestamp = Date.now()
+    return `QUO-${timestamp.toString().slice(-4)}`
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
     
     const searchParams = request.nextUrl.searchParams
     const email = searchParams.get('email')
+    const nextNumber = searchParams.get('nextNumber') // New parameter to get next quotation number
+    
+    // If requesting next quotation number
+    if (nextNumber === 'true') {
+      const nextQuotationNo = await generateQuotationNumber()
+      return NextResponse.json({
+        success: true,
+        nextQuotationNo: nextQuotationNo
+      })
+    }
     
     let query: any = {}
     if (email) {
@@ -57,12 +104,17 @@ export async function POST(request: NextRequest) {
       quotationDate = new Date(quotationDate)
     }
     
-    // Generate unique quotation number if not provided
+    // Generate sequential quotation number if not provided
     let quotationNo = body.quotationNo
     if (!quotationNo) {
-      const timestamp = Date.now()
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-      quotationNo = `QUO-${timestamp}-${random}`
+      quotationNo = await generateQuotationNumber()
+    } else {
+      // Check if quotation with same quotationNo already exists
+      const existingQuotation = await Quotation.findOne({ quotationNo: quotationNo })
+      if (existingQuotation) {
+        // If exists, generate a new sequential number
+        quotationNo = await generateQuotationNumber()
+      }
     }
     
     const quotationData = {
