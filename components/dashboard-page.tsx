@@ -2530,9 +2530,13 @@ export function DashboardPage() {
           const gstAmount = (offerPrice * gstPercentage) / 100
           const finalPrice = offerPrice + gstAmount
 
-          // Parse images (if provided, can be comma-separated URLs or paths)
-          const imageArray = images ? images.split(',').map((img: string) => img.trim()).filter((img: string) => img) : []
-
+          // Parse images (if provided, can be comma-separated)
+          // Can be either:
+          // 1. Direct URLs (http:// or https://) - used as-is
+          // 2. Image names - fetched from Cloudinary using existing credentials
+          const imageNames = images ? images.split(',').map((img: string) => img.trim()).filter((img: string) => img) : []
+          
+          // Store image names for later processing (will fetch Cloudinary URLs before creating products)
           productsToCreate.push({
             name: productName,
             category: categoryString || 'Uncategorized',
@@ -2548,7 +2552,8 @@ export function DashboardPage() {
             stock: stock,
             description: description || `${productName} - Quality product`,
             hslCode: hslCode || '',
-            images: imageArray,
+            imageNames: imageNames, // Store image names temporarily
+            images: [], // Will be populated with Cloudinary URLs
             vendor: "Admin"
           })
         } catch (rowError) {
@@ -2560,6 +2565,49 @@ export function DashboardPage() {
         alert('No valid products found in Excel file. Please check your data.')
         setUploadingExcel(false)
         return
+      }
+
+      // Fetch Cloudinary URLs for all products with image names/URLs
+      for (const productData of productsToCreate) {
+        if (productData.imageNames && productData.imageNames.length > 0) {
+          const imageUrls: string[] = []
+          for (const imageValue of productData.imageNames) {
+            try {
+              // Check if it's already a full URL (starts with http/https)
+              if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) {
+                // It's a direct URL, use it as-is
+                imageUrls.push(imageValue)
+              } else {
+                // It's an image name, fetch from Cloudinary
+                const response = await fetch('/api/cloudinary/fetch-image', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    imageName: imageValue,
+                    folder: 'adminza/products' // Default folder for product images
+                  })
+                })
+                
+                const imageData = await response.json()
+                if (imageData.success && imageData.url) {
+                  imageUrls.push(imageData.url)
+                } else {
+                  // Log warning but don't block product creation
+                  console.warn(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found'}`)
+                  errors.push(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found in Cloudinary'}`)
+                }
+              }
+            } catch (error) {
+              console.error(`Error processing image ${imageValue}:`, error)
+              errors.push(`${productData.name}: Failed to process image "${imageValue}"`)
+            }
+          }
+          // Update product data with image URLs (Cloudinary URLs or direct URLs)
+          productData.images = imageUrls
+          delete productData.imageNames // Remove temporary field
+        }
       }
 
       // Create products
