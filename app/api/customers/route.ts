@@ -20,3 +20,62 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    await dbConnect()
+
+    const body = await request.json()
+
+    // Derive a username if one is not explicitly provided
+    const derivedUsername =
+      body.username?.trim() ||
+      (body.email ? body.email.split('@')[0] : undefined)
+
+    if (!derivedUsername) {
+      return NextResponse.json(
+        { success: false, error: 'Username or email is required' },
+        { status: 400 }
+      )
+    }
+
+    // Prevent duplicates by username or email
+    const existing = await Customer.findOne({
+      $or: [{ email: body.email }, { username: derivedUsername }],
+    })
+
+    if (existing) {
+      return NextResponse.json(
+        { success: false, error: 'Customer with this email/username already exists' },
+        { status: 409 }
+      )
+    }
+
+    const customer = new Customer({
+      name: body.name,
+      username: derivedUsername,
+      email: body.email,
+      phone: body.phone,
+      password: body.password,
+      address: body.address,
+      city: body.city,
+      state: body.state,
+      zipCode: body.zipCode,
+      country: body.country || 'India',
+      gstNumber: body.gstNumber,
+    })
+
+    await customer.save()
+
+    return NextResponse.json({
+      success: true,
+      data: customer,
+    })
+  } catch (error) {
+    console.error('Error creating customer:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to create customer' },
+      { status: 500 }
+    )
+  }
+}

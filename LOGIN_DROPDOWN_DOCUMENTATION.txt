@@ -1,0 +1,605 @@
+================================================================================
+LOGIN BUTTON DROPDOWN - COMPLETE DOCUMENTATION
+================================================================================
+Component: components/header.tsx
+Feature: User Account Dropdown (appears when user is signed in)
+Location: Main website navbar (header component)
+
+================================================================================
+OVERVIEW
+================================================================================
+
+When a user is logged in, the "Login" button in the navbar is replaced with a 
+User icon button. Clicking or hovering over this button reveals a dropdown 
+menu showing user information and account options.
+
+================================================================================
+VISIBILITY & TRIGGER CONDITIONS
+================================================================================
+
+DISPLAY CONDITIONS:
+- User must be logged in (isLoggedIn === true)
+- Checked via: localStorage.getItem("isLoggedIn") === "true"
+- User data must exist in localStorage.getItem("user")
+
+WHEN NOT LOGGED IN:
+- Shows "Login" button instead (with User icon and "Login" text)
+- Clicking opens login dialog popup
+
+WHEN LOGGED IN:
+- Shows User icon button (ghost variant, icon only)
+- Visible only on medium+ screens (hidden on mobile: className="hidden md:flex")
+- Button is rounded-xl styled
+
+================================================================================
+DROPDOWN TRIGGER MECHANISM
+================================================================================
+
+OPENING THE DROPDOWN:
+1. Click Trigger:
+   - onClick handler: setIsUserDropdownOpen(!isUserDropdownOpen)
+   - Toggles dropdown open/closed state
+
+2. Hover Trigger:
+   - onMouseEnter: handleUserDropdownEnter()
+   - Opens dropdown when mouse enters button or dropdown area
+   - Clears any pending close timeout
+
+CLOSING THE DROPDOWN:
+1. Mouse Leave:
+   - onMouseLeave: handleUserDropdownLeave()
+   - Sets 200ms delay before closing
+   - Uses setTimeout to prevent accidental closes
+
+2. Click Outside:
+   - Clicking "Accounts" link closes dropdown
+   - Logout action closes dropdown
+
+TIMEOUT MECHANISM:
+- userDropdownTimeoutRef: Stores timeout reference
+- Delay: 200 milliseconds (0.2 seconds)
+- Purpose: Prevents dropdown from closing when moving mouse between button and dropdown
+
+================================================================================
+DROPDOWN STRUCTURE & LAYOUT
+================================================================================
+
+POSITIONING:
+- Position: absolute
+- Alignment: right-0 (aligned to right edge of button)
+- Vertical: top-full (below the button)
+- Margin: mt-2 (8px gap from button)
+- Z-index: z-50 (high z-index to appear above other elements)
+
+CONTAINER STYLING:
+- Width: w-72 (288px / 18rem)
+- Background: bg-white (white background)
+- Border Radius: rounded-xl (12px rounded corners)
+- Shadow: shadow-2xl (large shadow for depth)
+- Border: border border-gray-200 (light gray border)
+- Overflow: overflow-hidden (clips content to rounded corners)
+
+================================================================================
+SECTION 1: USER INFO HEADER
+================================================================================
+
+LOCATION: Top section of dropdown
+BACKGROUND: Gradient from orange-500 to orange-600
+PADDING: p-5 (20px padding)
+
+LAYOUT STRUCTURE:
+- Flex container with items-center and space-x-4
+- Two main elements: Avatar icon and User info text
+
+1. AVATAR ICON:
+   - Container: w-14 h-14 (56px × 56px)
+   - Background: bg-white/20 (20% white opacity)
+   - Backdrop: backdrop-blur-sm (blur effect)
+   - Shape: rounded-full (circular)
+   - Border: border-2 border-white/30 (2px white border at 30% opacity)
+   - Shadow: shadow-lg (large shadow)
+   - Icon: User icon (h-7 w-7, 28px × 28px)
+   - Alignment: flex items-center justify-center
+
+2. USER INFORMATION:
+   - Container: flex-1 min-w-0 (takes remaining space, allows truncation)
+   
+   a. User Name:
+      - Source: userName state variable
+      - Display: Font-bold, text-lg (18px)
+      - Color: text-white
+      - Truncation: truncate (ellipsis if too long)
+      - Fallback: "User" if name not available
+   
+   b. User Email:
+      - Source: userEmail state variable
+      - Display: text-sm (14px)
+      - Color: text-orange-100 (light orange, 90% opacity)
+      - Truncation: truncate (ellipsis if too long)
+      - Margin: mt-0.5 (2px top margin)
+      - Fallback: Empty string if email not available
+
+DATA SOURCES:
+- userName: Extracted from localStorage user object (userData.name)
+- userEmail: Extracted from localStorage user object (userData.email)
+- Both set on component mount and after login/register
+
+================================================================================
+SECTION 2: MENU ITEMS
+================================================================================
+
+LOCATION: Bottom section of dropdown
+PADDING: p-3 (12px padding)
+BACKGROUND: White (default background)
+
+MENU ITEM 1: ACCOUNTS
+- Type: Link component (Next.js Link)
+- Destination: /my-accounts
+- Styling: 
+  * Container: flex items-center
+  * Padding: px-4 py-3 (16px horizontal, 12px vertical)
+  * Hover: hover:bg-orange-50 (light orange background on hover)
+  * Border Radius: rounded-lg (8px rounded corners)
+  * Transition: transition-all duration-200 (smooth transitions)
+  * Group: group class for nested hover effects
+
+- Icon Container:
+  * Size: w-9 h-9 (36px × 36px)
+  * Background: bg-orange-100 (light orange)
+  * Hover Background: group-hover:bg-orange-200 (darker orange on hover)
+  * Border Radius: rounded-lg
+  * Alignment: flex items-center justify-center
+  * Margin: mr-3 (12px right margin)
+  * Transition: transition-colors
+
+- Icon:
+  * Type: User icon
+  * Size: h-4 w-4 (16px × 16px)
+  * Color: text-orange-600
+
+- Text:
+  * Content: "Accounts"
+  * Size: text-sm (14px)
+  * Weight: font-medium
+  * Color: text-gray-700
+  * Hover Color: group-hover:text-orange-600
+
+- Action:
+  * onClick: setIsUserDropdownOpen(false) - Closes dropdown
+  * Navigation: Router navigates to /my-accounts page
+
+SEPARATOR:
+- Type: Divider line
+- Styling:
+  * Border: border-t border-gray-200 (top border, light gray)
+  * Margin: my-2 (8px vertical margin)
+
+MENU ITEM 2: LOGOUT
+- Type: Button element
+- Styling:
+  * Width: w-full (full width)
+  * Container: flex items-center
+  * Padding: px-4 py-3
+  * Hover: hover:bg-red-50 (light red background on hover)
+  * Border Radius: rounded-lg
+  * Transition: transition-all duration-200
+  * Group: group class for nested hover effects
+
+- Icon Container:
+  * Size: w-9 h-9
+  * Background: bg-red-100 (light red)
+  * Hover Background: group-hover:bg-red-200 (darker red on hover)
+  * Border Radius: rounded-lg
+  * Alignment: flex items-center justify-center
+  * Margin: mr-3
+  * Transition: transition-colors
+
+- Icon:
+  * Type: LogOut icon
+  * Size: h-4 w-4
+  * Color: text-red-600
+
+- Text:
+  * Content: "Logout"
+  * Size: text-sm
+  * Weight: font-medium
+  * Color: text-red-600 (red text)
+
+- Action:
+  * onClick: handleLogout() function
+  * Functionality:
+    1. Removes "user" from localStorage
+    2. Removes "isLoggedIn" from localStorage
+    3. Sets isLoggedIn state to false
+    4. Clears userName state
+    5. Clears userEmail state
+    6. Closes dropdown (setIsUserDropdownOpen(false))
+    7. Navigates to home page (router.push("/"))
+    8. Refreshes router (router.refresh())
+
+================================================================================
+STATE MANAGEMENT
+================================================================================
+
+REACT STATE VARIABLES:
+
+1. isLoggedIn: boolean
+   - Purpose: Tracks if user is authenticated
+   - Source: localStorage.getItem("isLoggedIn")
+   - Updated: On login, register, logout, component mount
+
+2. userName: string
+   - Purpose: Stores user's display name
+   - Source: userData.name from localStorage
+   - Fallback: "User" if not available
+   - Updated: On login, register, component mount
+
+3. userEmail: string
+   - Purpose: Stores user's email address
+   - Source: userData.email from localStorage
+   - Updated: On login, register, component mount
+
+4. isUserDropdownOpen: boolean
+   - Purpose: Controls dropdown visibility
+   - Default: false (closed)
+   - Updated: On button click, hover enter/leave, menu item clicks
+
+REF OBJECTS:
+
+1. userButtonRef: useRef<HTMLButtonElement>(null)
+   - Purpose: Reference to the user button element
+   - Usage: Can be used for focus management or positioning
+
+2. userDropdownTimeoutRef: useRef<NodeJS.Timeout | null>(null)
+   - Purpose: Stores timeout reference for delayed dropdown close
+   - Usage: Prevents accidental dropdown closure on mouse movement
+
+================================================================================
+EVENT HANDLERS
+================================================================================
+
+1. handleUserDropdownEnter()
+   - Trigger: onMouseEnter event
+   - Actions:
+     * Clears any pending close timeout (if exists)
+     * Sets isUserDropdownOpen to true
+   - Purpose: Opens dropdown when mouse enters button or dropdown area
+
+2. handleUserDropdownLeave()
+   - Trigger: onMouseLeave event
+   - Actions:
+     * Sets a 200ms timeout
+     * After timeout, sets isUserDropdownOpen to false
+   - Purpose: Closes dropdown after mouse leaves, with delay to prevent flicker
+
+3. handleLogout()
+   - Trigger: onClick on Logout button
+   - Actions:
+     * localStorage.removeItem("user")
+     * localStorage.removeItem("isLoggedIn")
+     * setIsLoggedIn(false)
+     * setUserName("")
+     * setUserEmail("")
+     * setIsUserDropdownOpen(false)
+     * router.push("/")
+     * router.refresh()
+   - Purpose: Logs out user and redirects to home
+
+================================================================================
+USER DATA RETRIEVAL
+================================================================================
+
+ON COMPONENT MOUNT (useEffect):
+1. Check localStorage for "isLoggedIn" flag
+2. Check localStorage for "user" object
+3. If both exist:
+   - Parse user JSON: JSON.parse(user)
+   - Extract name: userData.name || "User"
+   - Extract email: userData.email || ""
+   - Update state: setIsLoggedIn(true), setUserName(), setUserEmail()
+
+ON LOGIN SUCCESS:
+1. API Response: /api/auth/login returns customer object
+2. Store in localStorage:
+   - localStorage.setItem("user", JSON.stringify(data.customer))
+   - localStorage.setItem("isLoggedIn", "true")
+3. Update state:
+   - setIsLoggedIn(true)
+   - setUserName(data.customer.name)
+   - setUserEmail(data.customer.email)
+
+ON REGISTER SUCCESS:
+1. API Response: /api/auth/register returns customer object
+2. Store in localStorage:
+   - localStorage.setItem("user", JSON.stringify(data.customer))
+   - localStorage.setItem("isLoggedIn", "true")
+3. Update state:
+   - setIsLoggedIn(true)
+   - setUserName(data.customer.name)
+   - setUserEmail(data.customer.email)
+
+================================================================================
+STYLING DETAILS
+================================================================================
+
+COLOR SCHEME:
+- Primary/Active: Orange (orange-500, orange-600, orange-50, orange-100, orange-200)
+- Error/Action: Red (red-50, red-100, red-200, red-600)
+- Text: Gray (gray-700, gray-200)
+- Background: White (white, white/20, white/30)
+
+GRADIENT:
+- Header Background: from-orange-500 to-orange-600
+- Direction: Left to right (to-r)
+- Colors: Orange-500 (#f97316) to Orange-600 (#ea580c)
+
+SHADOWS:
+- Dropdown Container: shadow-2xl (very large shadow)
+- Avatar Icon: shadow-lg (large shadow)
+
+BORDERS:
+- Dropdown Container: border border-gray-200 (1px light gray)
+- Avatar Icon: border-2 border-white/30 (2px white at 30% opacity)
+- Separator: border-t border-gray-200 (top border, light gray)
+
+BORDER RADIUS:
+- Dropdown Container: rounded-xl (12px)
+- Menu Items: rounded-lg (8px)
+- Icon Containers: rounded-lg (8px)
+- Avatar Icon: rounded-full (circular)
+
+TRANSITIONS:
+- Menu Items: transition-all duration-200 (all properties, 200ms)
+- Icon Containers: transition-colors (color transitions only)
+- Smooth hover effects on all interactive elements
+
+SPACING:
+- Dropdown Padding: p-3 (12px)
+- Header Padding: p-5 (20px)
+- Menu Item Padding: px-4 py-3 (16px horizontal, 12px vertical)
+- Icon Container Margin: mr-3 (12px right margin)
+- Separator Margin: my-2 (8px vertical margin)
+
+TYPOGRAPHY:
+- User Name: font-bold text-lg (bold, 18px)
+- User Email: text-sm text-orange-100 (14px, light orange)
+- Menu Item Text: text-sm font-medium (14px, medium weight)
+
+================================================================================
+RESPONSIVE BEHAVIOR
+================================================================================
+
+DESKTOP (md and above):
+- User button visible: className="hidden md:flex"
+- Dropdown fully functional
+- Hover and click interactions work
+
+MOBILE (below md breakpoint):
+- User button hidden
+- Dropdown not accessible
+- Alternative navigation may be needed (mobile menu)
+
+================================================================================
+ACCESSIBILITY FEATURES
+================================================================================
+
+1. KEYBOARD NAVIGATION:
+   - Button is focusable
+   - Can be activated with Enter/Space keys
+   - Dropdown items are clickable buttons/links
+
+2. VISUAL FEEDBACK:
+   - Hover states on all interactive elements
+   - Color changes on hover
+   - Smooth transitions for better UX
+
+3. TEXT TRUNCATION:
+   - User name and email truncate with ellipsis if too long
+   - Prevents layout breaking with long text
+
+4. Z-INDEX MANAGEMENT:
+   - Dropdown has z-50 to appear above other content
+   - Ensures visibility when opened
+
+================================================================================
+INTERACTION FLOW
+================================================================================
+
+SCENARIO 1: Opening Dropdown
+1. User hovers over or clicks User icon button
+2. handleUserDropdownEnter() clears any timeout
+3. isUserDropdownOpen set to true
+4. Dropdown appears below button
+
+SCENARIO 2: Closing Dropdown (Mouse Leave)
+1. User moves mouse away from button/dropdown
+2. handleUserDropdownLeave() triggered
+3. 200ms timeout starts
+4. If mouse doesn't return, dropdown closes after timeout
+
+SCENARIO 3: Clicking Accounts
+1. User clicks "Accounts" menu item
+2. setIsUserDropdownOpen(false) closes dropdown
+3. Router navigates to /my-accounts
+4. Dropdown closes immediately
+
+SCENARIO 4: Clicking Logout
+1. User clicks "Logout" menu item
+2. handleLogout() executes
+3. localStorage cleared
+4. State reset
+5. Dropdown closes
+6. User redirected to home page
+
+SCENARIO 5: Moving Between Button and Dropdown
+1. User moves mouse from button to dropdown
+2. Mouse enters dropdown area
+3. handleUserDropdownEnter() clears timeout
+4. Dropdown stays open
+5. User can interact with menu items
+
+================================================================================
+DATA FLOW
+================================================================================
+
+USER LOGIN FLOW:
+1. User submits login form
+2. API call to /api/auth/login
+3. Response contains customer object
+4. Store in localStorage:
+   - "user" = JSON.stringify(customer)
+   - "isLoggedIn" = "true"
+5. Update React state:
+   - isLoggedIn = true
+   - userName = customer.name
+   - userEmail = customer.email
+6. Dropdown becomes available
+7. User info displayed in dropdown header
+
+USER LOGOUT FLOW:
+1. User clicks Logout button
+2. handleLogout() executes
+3. Clear localStorage:
+   - removeItem("user")
+   - removeItem("isLoggedIn")
+4. Reset React state:
+   - isLoggedIn = false
+   - userName = ""
+   - userEmail = ""
+5. Close dropdown
+6. Navigate to home page
+7. Login button appears instead of dropdown
+
+PAGE RELOAD FLOW:
+1. Component mounts
+2. useEffect runs
+3. Check localStorage for "isLoggedIn" and "user"
+4. If found, parse user data
+5. Update state with user info
+6. Dropdown available if logged in
+
+================================================================================
+INTEGRATION WITH OTHER COMPONENTS
+================================================================================
+
+RELATED COMPONENTS:
+1. Login Dialog: Opens when not logged in
+2. Register Dialog: Opens from login dialog
+3. Cart Dropdown: Similar hover/click pattern
+4. My Accounts Page: Destination of "Accounts" link
+
+SHARED STATE:
+- localStorage: Shared across all components
+- Router: Next.js navigation
+- User session: Persists across page reloads
+
+EVENT COORDINATION:
+- Login/Register success updates dropdown state
+- Logout clears session globally
+- Page refresh maintains session via localStorage
+
+================================================================================
+ERROR HANDLING
+================================================================================
+
+MISSING USER DATA:
+- userName fallback: "User" if name not available
+- userEmail fallback: Empty string if email not available
+- Component still renders with fallback values
+
+LOCALSTORAGE ERRORS:
+- JSON.parse wrapped in try-catch (not shown but recommended)
+- Graceful degradation if localStorage unavailable
+
+STATE CONSISTENCY:
+- State updates synchronized with localStorage
+- Multiple state variables updated together
+- Prevents inconsistent UI states
+
+================================================================================
+PERFORMANCE CONSIDERATIONS
+================================================================================
+
+1. TIMEOUT MANAGEMENT:
+   - Timeouts cleared before setting new ones
+   - Prevents memory leaks
+   - Cleanup in event handlers
+
+2. CONDITIONAL RENDERING:
+   - Dropdown only renders when isUserDropdownOpen is true
+   - Reduces DOM nodes when closed
+
+3. STATE UPDATES:
+   - Minimal state updates
+   - Batch updates where possible
+   - Efficient re-renders
+
+4. EVENT LISTENERS:
+   - Mouse events only active when needed
+   - No global listeners required
+   - Component-scoped handlers
+
+================================================================================
+BROWSER COMPATIBILITY
+================================================================================
+
+REQUIRED FEATURES:
+- localStorage API (all modern browsers)
+- CSS Grid/Flexbox (all modern browsers)
+- CSS Gradients (all modern browsers)
+- CSS Backdrop Filter (modern browsers, graceful degradation)
+
+FALLBACKS:
+- backdrop-blur-sm may not work in older browsers
+- Falls back to solid background if unsupported
+- No functionality loss
+
+================================================================================
+NOTES & LIMITATIONS
+================================================================================
+
+LIMITATIONS:
+1. Mobile Hidden: Dropdown not visible on mobile devices
+2. No Keyboard Navigation: Limited keyboard support for dropdown items
+3. Single Session: Only one user session at a time
+4. No Session Expiry: Session persists until manual logout
+
+IMPROVEMENTS POSSIBLE:
+1. Add keyboard navigation (Arrow keys, Enter, Escape)
+2. Add mobile menu alternative
+3. Add session timeout functionality
+4. Add loading states during logout
+5. Add confirmation dialog for logout
+
+================================================================================
+CODE REFERENCES
+================================================================================
+
+KEY FUNCTIONS:
+- handleUserDropdownEnter(): Lines 116-121
+- handleUserDropdownLeave(): Lines 123-127
+- handleLogout(): Lines 144-153
+- useEffect (user data): Lines 48-101
+
+KEY STATE:
+- isLoggedIn: Line 21
+- userName: Line 22
+- userEmail: Line 23
+- isUserDropdownOpen: Line 26
+
+KEY REFS:
+- userButtonRef: Line 27
+- userDropdownTimeoutRef: Line 28
+
+DROPDOWN JSX:
+- Button: Lines 370-378
+- Dropdown Container: Lines 382-424
+- User Info Header: Lines 387-397
+- Accounts Link: Lines 400-409
+- Separator: Lines 411
+- Logout Button: Lines 413-421
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+

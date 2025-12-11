@@ -1,0 +1,630 @@
+================================================================================
+MY ACCOUNTS PAGE - COMPLETE DOCUMENTATION
+================================================================================
+Route: /my-accounts
+Component: app/my-accounts/page.tsx
+Type: Client Component (uses "use client")
+
+================================================================================
+PAGE STRUCTURE
+================================================================================
+
+1. LAYOUT STRUCTURE
+   - Full-screen layout with fixed sidebar (left side)
+   - Main content area (right side, with left margin for sidebar)
+   - No Header component (removed)
+   - No Footer component (removed)
+   - Fixed sidebar: width 64 (w-64), full height (h-screen), positioned left-0, top-0
+
+2. NAVIGATION BUTTONS (Top of main content)
+   - "Back to Home" button: Links to "/" (home page)
+     * Styling: Orange border and text (text-orange-600, border-orange-600)
+     * Icon: ArrowLeft
+   - "Logout" button: Clears user session and redirects to home
+     * Styling: Red border and text (text-red-600, border-red-600)
+     * Icon: LogOut
+     * Function: Removes "user" and "isLoggedIn" from localStorage
+
+3. REFRESH BUTTON
+   - Located in top-right of main content area
+   - Icon: RefreshCw (spins when refreshing)
+   - Function: Calls fetchSubmissions() to reload all data
+   - Auto-refresh: Every 30 seconds (automatic background refresh)
+
+================================================================================
+SIDEBAR NAVIGATION
+================================================================================
+
+Sidebar contains 5 navigation tabs:
+
+1. PROFILE TAB
+   - Icon: User
+   - Label: "Profile"
+   - Active state: Orange background when selected
+   - Section ID: "profile"
+
+2. ORDERS TAB
+   - Icon: ShoppingCart
+   - Label: "Orders"
+   - Active state: Orange background when selected
+   - Section ID: "orders"
+
+3. QUOTATIONS TAB
+   - Icon: FileText
+   - Label: "Quotations"
+   - Active state: Orange background when selected
+   - Section ID: "quotations"
+   - Note: Invoice/Quotation functionality excluded as per request
+
+4. ENQUIRIES TAB
+   - Icon: Mail
+   - Label: "Enquiries"
+   - Active state: Orange background when selected
+   - Section ID: "enquiries"
+
+5. STOCK IN HAND TAB
+   - Icon: Package
+   - Label: "Stock in Hand"
+   - Active state: Orange background when selected
+   - Section ID: "stock"
+
+================================================================================
+STATE MANAGEMENT
+================================================================================
+
+React State Variables:
+- activeSection: string - Current active tab ("profile", "orders", "quotations", "enquiries", "stock")
+- orders: any[] - Array of order objects
+- quotations: any[] - Array of quotation objects
+- enquiries: any[] - Array of enquiry objects
+- stockInventory: any[] - Array of stock inventory items
+- loading: boolean - Loading state for data fetching
+- userEmail: string - User's email address
+- userData: any - Complete user data object from localStorage
+- refreshing: boolean - Refresh button loading state
+
+Dialog States (for viewing details):
+- viewingOrder: any - Currently selected order for viewing
+- viewingQuotation: any - Currently selected quotation for viewing
+- viewingEnquiry: any - Currently selected enquiry for viewing
+- isOrderDialogOpen: boolean - Order details dialog visibility
+- isQuotationDialogOpen: boolean - Quotation details dialog visibility
+- isEnquiryDialogOpen: boolean - Enquiry details dialog visibility
+
+================================================================================
+API ENDPOINTS USED
+================================================================================
+
+1. /api/orders
+   - Method: GET
+   - Purpose: Fetch all orders
+   - Filtering: Client-side filtering by userEmail or customerEmail
+   - Response: { success: boolean, data: Order[] }
+
+2. /api/quotations?email={email}
+   - Method: GET
+   - Purpose: Fetch quotations for specific user email
+   - Query Parameter: email (URL encoded)
+   - Response: { success: boolean, data: Quotation[] }
+
+3. /api/enquiries?email={email}
+   - Method: GET
+   - Purpose: Fetch enquiries for specific user email
+   - Query Parameter: email (URL encoded)
+   - Response: { success: boolean, data: Enquiry[] }
+
+4. /api/customers
+   - Method: GET
+   - Purpose: Fetch all customers to find customerId by email
+   - Response: { success: boolean, data: Customer[] }
+
+5. /api/eshop-inventory
+   - Method: GET
+   - Purpose: Fetch current stock inventory
+   - Filtering: Client-side filtering by customerId
+   - Response: { success: boolean, data: InventoryItem[] }
+
+6. /api/retopup-history?customerId={customerId}
+   - Method: GET
+   - Purpose: Fetch re-top-up history for a customer
+   - Query Parameter: customerId
+   - Response: { success: boolean, data: RetopupHistory[] }
+
+================================================================================
+TAB 1: PROFILE SECTION
+================================================================================
+
+Section ID: "profile"
+Title: "Profile Settings"
+Subtitle: "Manage your profile information"
+
+DATA DISPLAYED:
+1. Full Name
+   - Source: userData?.name
+   - Display: Text field (read-only)
+   - Fallback: "N/A" if not available
+
+2. Email
+   - Source: userEmail (from localStorage)
+   - Display: Text field (read-only)
+   - Fallback: "N/A" if not available
+
+3. Phone
+   - Source: userData?.phone
+   - Display: Text field (read-only)
+   - Fallback: "N/A" if not available
+
+4. Address
+   - Source: userData?.address, userData?.city, userData?.state
+   - Display: Combined text field (read-only)
+   - Format: "{address} {city} {state}" (trimmed)
+   - Fallback: "N/A" if none available
+
+LAYOUT:
+- Grid layout: 2 columns on medium+ screens, 1 column on mobile
+- Card component with header and content sections
+
+================================================================================
+TAB 2: ORDERS SECTION
+================================================================================
+
+Section ID: "orders"
+Title: "My Orders"
+Subtitle: "View and track your orders"
+
+DATA TABLE COLUMNS:
+1. Order No.
+   - Source: order.orderNo
+   - Display: Font-medium text
+   - Fallback: "N/A"
+
+2. Order Date
+   - Source: order.orderDate
+   - Display: Formatted date (toLocaleDateString)
+   - Format: Locale-specific date format
+
+3. Total Amount
+   - Source: order.totalAmount
+   - Display: ₹{amount} with thousand separators
+   - Format: toLocaleString() for number formatting
+   - Fallback: ₹0
+
+4. Status
+   - Source: order.status
+   - Display: Badge component with color coding
+   - Color Logic:
+     * pending → Yellow (bg-yellow-100 text-yellow-800)
+     * confirmed/viewed → Blue (bg-blue-100 text-blue-800)
+     * shipped → Purple (bg-purple-100 text-purple-800)
+     * delivered/order placed → Green (bg-green-100 text-green-800)
+     * cancelled/rejected/closed → Red (bg-red-100 text-red-800)
+     * default → Gray (bg-gray-100 text-gray-800)
+
+5. Items
+   - Source: order.items?.length
+   - Display: "{count} items"
+   - Fallback: "0 items"
+
+6. Action
+   - Button: Eye icon (View)
+   - Function: Opens order details dialog
+   - onClick: handleViewOrder(order)
+
+EMPTY STATE:
+- Icon: ShoppingCart (gray, 16x16)
+- Message: "No orders found"
+- Sub-message: "Orders will appear here when your quotations are accepted by admin"
+
+ORDER DETAILS DIALOG (when viewing order):
+- Title: "Order Details - {orderNo}"
+- Data Displayed:
+  1. Order Date: Formatted date and time
+  2. Status: Badge with color coding
+  3. Total Amount: ₹{amount} formatted
+  4. Customer Name: order.customerName or shippingAddress.receiverName
+  5. Items List:
+     * Product Name: item.productName or item.itemName
+     * Quantity × Price: item.quantity × ₹{item.price}
+  6. Shipping Address (if available):
+     * Format: "{street}, {city}, {state} {zipCode}"
+  7. Notes (if available): order.notes
+
+ORDER DATA PARAMETERS:
+- _id: string - Order unique identifier
+- orderNo: string - Order number
+- orderDate: Date/string - Order creation date
+- totalAmount: number - Total order amount
+- status: string - Order status
+- items: Array<{
+    productName?: string
+    itemName?: string
+    quantity: number
+    price: number
+  }>
+- customerName?: string - Customer name
+- shippingAddress?: {
+    street?: string
+    city?: string
+    state?: string
+    zipCode?: string
+    receiverName?: string
+  }
+- notes?: string - Additional notes
+- userEmail?: string - User email
+- customerEmail?: string - Customer email
+
+================================================================================
+TAB 3: QUOTATIONS SECTION
+================================================================================
+
+Section ID: "quotations"
+Title: "My Quotations"
+Subtitle: "View your quotations"
+
+Note: Invoice/Quotation functionality excluded as per request. Only basic display documented.
+
+DATA TABLE COLUMNS:
+1. Quotation No.
+   - Source: quote.quotationNo
+   - Display: Font-medium text
+   - Fallback: "N/A"
+
+2. Items Requested
+   - Source: quote.items?.length
+   - Display: "{count} item(s)"
+   - Fallback: "N/A"
+
+3. Total Amount
+   - Source: quote.totalAmount
+   - Display: ₹{amount} with thousand separators
+   - Format: toLocaleString()
+   - Fallback: ₹0
+
+4. Date
+   - Source: quote.quotationDate
+   - Display: Formatted date (toLocaleDateString)
+
+5. Status
+   - Source: quote.status
+   - Display: Badge with color coding (same logic as orders)
+   - Color Logic: Same as Orders section
+
+6. Action
+   - Button: Eye icon + "View" text
+   - Function: Navigates to /user-quotation?id={quote._id}
+   - onClick: router.push(`/user-quotation?id=${quote._id}`)
+
+EMPTY STATE:
+- Icon: FileText (gray, 16x16)
+- Message: "No quotations found"
+- Sub-message: "Quotations will appear here when admin converts your enquiries to quotations"
+
+QUOTATION DATA PARAMETERS:
+- _id: string - Quotation unique identifier
+- quotationNo: string - Quotation number
+- quotationDate: Date/string - Quotation creation date
+- totalAmount: number - Total quotation amount
+- status: string - Quotation status
+- items: Array<{
+    itemName?: string
+    productName?: string
+    quantity: number
+    price: number
+  }>
+- userName?: string - User name
+- userEmail?: string - User email
+
+================================================================================
+TAB 4: ENQUIRIES SECTION
+================================================================================
+
+Section ID: "enquiries"
+Title: "My Enquiries"
+Subtitle: "View your enquiries"
+
+DATA TABLE COLUMNS:
+1. Item
+   - Source: enquiry.itemName
+   - Display: Font-medium text
+
+2. Type
+   - Source: enquiry.itemType
+   - Display: Badge with outline variant
+   - Format: Capitalized text
+
+3. Date
+   - Source: enquiry.enquiryDate
+   - Display: Formatted date (toLocaleDateString)
+
+4. Status
+   - Source: enquiry.status
+   - Display: Badge with color coding
+   - Color Logic:
+     * pending → Yellow
+     * request/requested → Orange (bg-orange-100 text-orange-800)
+     * requested re-quote → Purple (bg-purple-100 text-purple-800)
+     * received re-quote → Indigo (bg-indigo-100 text-indigo-800)
+     * confirmed/quoted/accepted → Blue
+     * responded → Purple
+     * rejected/closed → Red
+     * default → Gray
+
+5. Action
+   - Button: Eye icon (View)
+   - Function: Opens enquiry details dialog
+   - onClick: handleViewEnquiry(enquiry)
+
+EMPTY STATE:
+- Icon: Mail (gray, 16x16)
+- Message: "No enquiries found"
+- Sub-message: "You haven't submitted any enquiries for products or services yet"
+
+ENQUIRY DETAILS DIALOG (when viewing enquiry):
+- Title: "Enquiry Details"
+- Data Displayed:
+  1. Item Name: enquiry.itemName (font-medium)
+  2. Type: Badge with capitalized itemType
+  3. Enquiry Date: Formatted date and time
+  4. Status: Badge with color coding
+  5. Message (if available): enquiry.message
+  6. Admin Response (if available): enquiry.responseNotes
+
+ENQUIRY DATA PARAMETERS:
+- _id: string - Enquiry unique identifier
+- itemName: string - Name of the item enquired
+- itemType: string - Type of item (product/service)
+- enquiryDate: Date/string - Enquiry creation date
+- status: string - Enquiry status
+- message?: string - User's enquiry message
+- responseNotes?: string - Admin's response
+- userEmail?: string - User email
+
+================================================================================
+TAB 5: STOCK IN HAND SECTION
+================================================================================
+
+Section ID: "stock"
+Title: "Stock in Hand"
+Subtitle: "View your current stock inventory managed by admin"
+
+DATA SOURCES:
+1. Initial Inventory: From /api/eshop-inventory (filtered by customerId)
+2. Re-top-up History: From /api/retopup-history (filtered by customerId)
+3. Combined and sorted by date (newest first), then by product name
+
+DATA TABLE COLUMNS:
+1. Product Name
+   - Source: item.productName
+   - Display: Font-medium text
+
+2. Quantity Added
+   - Source: item.quantityAdded or item.quantity
+   - Display: Badge with blue styling
+   - Format: "+{quantity}"
+   - Styling: bg-blue-50 text-blue-700 border-blue-200
+
+3. Total Quantity
+   - Source: item.quantity
+   - Display: Font-semibold text
+
+4. Available Stock
+   - Source: item.availableStock or (item.quantity - item.invoicedQuantity)
+   - Display: Badge with conditional coloring
+   - Color Logic:
+     * > 0 → Green (bg-green-100 text-green-800)
+     * = 0 → Red (bg-red-100 text-red-800)
+
+5. Price (₹)
+   - Source: item.price
+   - Display: ₹{amount} with thousand separators
+   - Format: toLocaleString()
+   - Fallback: ₹0
+
+6. Date & Time
+   - Source: item.updateDate or item.lastUpdated or item.updatedAt or item.createdAt
+   - Display: Formatted date and time
+   - Format: Locale 'en-IN'
+   - Example: "15 Jan 2024, 10:30 AM"
+   - Format Options:
+     * year: 'numeric'
+     * month: 'short'
+     * day: 'numeric'
+     * hour: '2-digit'
+     * minute: '2-digit'
+     * hour12: true
+
+7. Notes
+   - Source: item.notes
+   - Display: Text (max-width constraint)
+   - Fallback: "-"
+   - Tooltip: Shows full notes on hover
+
+STOCK ENTRY STRUCTURE:
+Each stock entry contains:
+- _id: string - Unique identifier (may include suffixes like "_initial" or timestamps)
+- productId: string - Product identifier
+- productName: string - Product name
+- quantity: number - Total quantity at this point
+- quantityAdded: number - Quantity added in this update
+- availableStock: number - Available stock (quantity - invoicedQuantity)
+- price: number - Product price
+- updateDate: Date/string - Date of this update
+- notes: string - Notes about this update
+- updateType: string - Type of update ("initial" or "retopup")
+
+INITIAL INVENTORY ENTRIES:
+- Created from /api/eshop-inventory data
+- updateType: "initial"
+- notes: "Initial product assignment" or item.notes
+- quantityAdded: Same as quantity (initial assignment)
+
+RE-TOP-UP HISTORY ENTRIES:
+- Created from /api/retopup-history data
+- updateType: "retopup"
+- notes: "Re-topped up with {quantityAdded} units" or historyEntry.notes
+- Each product in historyEntry.products creates a separate entry
+
+SORTING LOGIC:
+1. Primary: By date (newest first) - Date descending
+2. Secondary: By product name (alphabetical) - If dates are equal
+
+EMPTY STATE:
+- Icon: Package (gray, 16x16)
+- Message: "No stock inventory found"
+- Sub-message: "Stock inventory will appear here when admin assigns products to you"
+
+CUSTOMER ID RESOLUTION:
+1. Fetch all customers from /api/customers
+2. Find customer by matching email (case-insensitive)
+3. Extract customerId (_id) from found customer
+4. Use customerId to filter inventory and history
+
+================================================================================
+DATA FETCHING LOGIC
+================================================================================
+
+FUNCTION: fetchSubmissions()
+- Called on component mount (useEffect)
+- Called manually via refresh button
+- Called automatically every 30 seconds (auto-refresh)
+
+FETCHING SEQUENCE:
+1. Get user from localStorage
+   - Parse JSON to get userData object
+   - Extract email: userDataObj.email
+   - Set userEmail and userData state
+
+2. Fetch Orders (Parallel)
+   - GET /api/orders
+   - Filter by: userEmail or customerEmail matching user's email
+   - Set orders state
+
+3. Fetch Quotations (Parallel)
+   - GET /api/quotations?email={email}
+   - Set quotations state
+
+4. Fetch Enquiries (Parallel)
+   - GET /api/enquiries?email={email}
+   - Set enquiries state
+
+5. Fetch Stock Inventory (Sequential - requires customerId)
+   a. Fetch Customers
+      - GET /api/customers
+      - Find customer by email (case-insensitive)
+      - Extract customerId
+   
+   b. Fetch Inventory (Parallel with history)
+      - GET /api/eshop-inventory
+      - Filter by customerId
+   
+   c. Fetch Re-top-up History (Parallel with inventory)
+      - GET /api/retopup-history?customerId={customerId}
+   
+   d. Combine and Process
+      - Create entries from initial inventory
+      - Create entries from re-top-up history
+      - Sort by date (newest first), then by product name
+      - Set stockInventory state
+
+ERROR HANDLING:
+- Try-catch blocks around each fetch operation
+- Console.error for debugging
+- State not cleared on error (maintains existing data)
+- Loading state set to false in finally block
+
+LOADING STATES:
+- loading: Set to true at start, false in finally block
+- refreshing: Set to true when refresh button clicked, false in finally block
+
+================================================================================
+AUTHENTICATION & SESSION MANAGEMENT
+================================================================================
+
+USER AUTHENTICATION:
+- Source: localStorage.getItem("user")
+- Format: JSON string containing user object
+- Required fields: email (used for filtering data)
+
+LOGOUT FUNCTIONALITY:
+- Function: handleLogout()
+- Actions:
+  1. Remove "user" from localStorage
+  2. Remove "isLoggedIn" from localStorage
+  3. Navigate to "/" (home page)
+  4. Refresh router
+
+SESSION PERSISTENCE:
+- User data persists across page reloads via localStorage
+- No automatic session expiration
+- Manual logout required to clear session
+
+================================================================================
+UI COMPONENTS USED
+================================================================================
+
+From @/components/ui:
+- Card, CardContent, CardHeader, CardTitle
+- Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+- Badge
+- Button
+- Dialog, DialogContent, DialogHeader, DialogTitle
+
+Icons (from lucide-react):
+- User, ShoppingCart, FileText, Mail, RefreshCw, Eye, Package, ArrowLeft, LogOut
+
+================================================================================
+STYLING & THEMING
+================================================================================
+
+COLOR SCHEME:
+- Primary/Active: Orange (orange-600, orange-500)
+- Success: Green (green-100, green-800)
+- Warning: Yellow (yellow-100, yellow-800)
+- Error: Red (red-100, red-800)
+- Info: Blue (blue-100, blue-800)
+- Neutral: Gray (gray-100, gray-800)
+
+LAYOUT:
+- Sidebar: Fixed, 64 units wide (w-64), full height
+- Main Content: Margin-left 64 units (ml-64) to account for sidebar
+- Container: Max-width container with horizontal padding
+- Responsive: Grid layouts adjust for mobile (1 column) and desktop (2 columns)
+
+SPACING:
+- Padding: p-4, p-6, py-8
+- Margins: mb-6, mb-8, mt-2
+- Gaps: gap-2, gap-4, gap-6
+
+================================================================================
+AUTO-REFRESH MECHANISM
+================================================================================
+
+IMPLEMENTATION:
+- useEffect hook sets up interval on component mount
+- Interval: 30 seconds (30000 milliseconds)
+- Function: fetchSubmissions() (same as manual refresh)
+- Cleanup: clearInterval on component unmount
+
+PURPOSE:
+- Keep data synchronized with admin changes
+- No user interaction required
+- Background updates
+
+================================================================================
+NOTES & EXCLUSIONS
+================================================================================
+
+EXCLUDED FUNCTIONALITY (as per request):
+- Invoice generation/viewing functionality
+- Quotation generation/editing functionality
+- Any actions that create or modify invoices/quotations
+
+INCLUDED BUT LIMITED:
+- Quotations tab: Only displays quotations (view-only)
+- No quotation creation, editing, or acceptance actions
+- No invoice viewing or download actions
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+
