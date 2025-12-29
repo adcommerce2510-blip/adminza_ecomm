@@ -804,6 +804,8 @@ export function DashboardPage() {
   // Inventory Management States
   const [isInventoryManagementExpanded, setIsInventoryManagementExpanded] = useState(false)
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
+  const [currentPOPage, setCurrentPOPage] = useState(1)
+  const poPerPage = 5
   const [warehouseStock, setWarehouseStock] = useState<any[]>([])
   const [wasteEntries, setWasteEntries] = useState<any[]>([])
   const [isPODialogOpen, setIsPODialogOpen] = useState(false)
@@ -954,6 +956,66 @@ export function DashboardPage() {
       }
     }
   }, [isGRNDialogOpen])
+
+  // Update overlay height when Re-top Up dialog is open and scroll dialog into view
+  useEffect(() => {
+    if (isEshopDialogOpen && editingCustomerId) {
+      const updateOverlayHeight = () => {
+        const overlay = document.querySelector('[data-overlay="retopup-view"]') as HTMLElement
+        if (overlay) {
+          const scrollHeight = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight,
+            window.innerHeight
+          )
+          overlay.style.height = scrollHeight + 'px'
+          overlay.style.minHeight = scrollHeight + 'px'
+        }
+      }
+      
+      // Initial update
+      updateOverlayHeight()
+      
+      // Store current scroll position
+      const currentScrollPosition = window.scrollY || window.pageYOffset
+      
+      // Prevent body scroll while dialog is open - this keeps the viewport in place
+      const originalOverflow = document.body.style.overflow
+      const originalPosition = document.body.style.position
+      const originalTop = document.body.style.top
+      const originalWidth = document.body.style.width
+      
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${currentScrollPosition}px`
+      document.body.style.width = '100%'
+      
+      // Update on scroll and resize
+      window.addEventListener('scroll', updateOverlayHeight, true)
+      window.addEventListener('resize', updateOverlayHeight)
+      
+      // Update when content changes
+      const observer = new MutationObserver(updateOverlayHeight)
+      observer.observe(document.body, { childList: true, subtree: true })
+      
+      // Cleanup: restore scroll position and remove listeners when dialog closes
+      return () => {
+        // Restore original body styles
+        document.body.style.overflow = originalOverflow
+        document.body.style.position = originalPosition
+        document.body.style.top = originalTop
+        document.body.style.width = originalWidth
+        
+        // Restore scroll position
+        window.scrollTo(0, currentScrollPosition)
+        
+        // Remove event listeners
+        window.removeEventListener('scroll', updateOverlayHeight, true)
+        window.removeEventListener('resize', updateOverlayHeight)
+        observer.disconnect()
+      }
+    }
+  }, [isEshopDialogOpen, editingCustomerId])
 
   // Update overlay height when Waste dialog is open
   useEffect(() => {
@@ -6530,8 +6592,23 @@ export function DashboardPage() {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ) : (
-                            purchaseOrders.map((po: any, index: number) => (
+                          ) : (() => {
+                            // Sort purchase orders by date (newest first)
+                            const sortedPOs = [...purchaseOrders].sort((a: any, b: any) => {
+                              const dateA = new Date(a.createdAt || a.date || 0).getTime()
+                              const dateB = new Date(b.createdAt || b.date || 0).getTime()
+                              return dateB - dateA // Newest first
+                            })
+                            
+                            const totalPages = Math.ceil(sortedPOs.length / poPerPage)
+                            const startIndex = (currentPOPage - 1) * poPerPage
+                            const endIndex = startIndex + poPerPage
+                            const currentPOs = sortedPOs.slice(startIndex, endIndex)
+                            
+                            return (
+                              <>
+                                {currentPOs.map((po: any, index: number) => {
+                                  return (
                               <TableRow 
                                 key={po._id}
                                 className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
@@ -6653,8 +6730,53 @@ export function DashboardPage() {
                                   </Button>
                                 </TableCell>
                               </TableRow>
-                            ))
-                          )}
+                                  )
+                                })}
+                              {sortedPOs.length > poPerPage && (
+                                <TableRow>
+                                  <TableCell colSpan={7} className="py-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-muted-foreground">
+                                        Showing {startIndex + 1}-{Math.min(endIndex, sortedPOs.length)} of {sortedPOs.length} purchase orders
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setCurrentPOPage(prev => Math.max(1, prev - 1))}
+                                          disabled={currentPOPage === 1}
+                                        >
+                                          Previous
+                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                            <Button
+                                              key={page}
+                                              variant={currentPOPage === page ? "default" : "outline"}
+                                              size="sm"
+                                              onClick={() => setCurrentPOPage(page)}
+                                              className="min-w-[40px]"
+                                            >
+                                              {page}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setCurrentPOPage(prev => Math.min(totalPages, prev + 1))}
+                                          disabled={currentPOPage === totalPages}
+                                        >
+                                          Next
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )
+                        })()}
                         </TableBody>
                       </Table>
                     </div>
@@ -8321,31 +8443,74 @@ export function DashboardPage() {
                 </DialogContent>
               </Dialog>
 
-              {/* Re-top up Dialog */}
-              <Dialog open={isEshopDialogOpen} onOpenChange={setIsEshopDialogOpen}>
-                <DialogContent 
-                  className="max-w-none w-[98vw] max-h-[90vh] overflow-y-auto !top-[5%] !left-[1%] !translate-x-0 !translate-y-0" 
-                  style={{ 
-                    width: '98vw', 
-                    maxWidth: '98vw',
-                    maxHeight: '90vh',
-                    position: 'fixed',
-                    top: '5%',
-                    left: '1%',
-                    transform: 'none !important',
-                    margin: 0
-                  }}
-                >
-                  <DialogTitle>
+              {/* Re-top up Full-Page Overlay */}
+              {isEshopDialogOpen && editingCustomerId && (
+                <>
+                  {/* Translucent Black Overlay - Full Document Height */}
+                  <div 
+                    data-overlay="retopup-view"
+                    className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                    style={{ 
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      width: '100%',
+                      position: 'fixed',
+                      minHeight: '100vh'
+                    }}
+                    onClick={() => {
+                      setIsEshopDialogOpen(false)
+                      setIsRetopUpMode(false)
+                      setCustomerProducts([])
+                      setEditingCustomerId(null)
+                    }}
+                  />
+                  
+                  {/* Content Container - Positioned in current viewport */}
+                  <div 
+                    className="fixed z-[9999] flex items-center justify-center pointer-events-none" 
+                    id="retopup-content-container"
+                    style={{
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: '100vw',
+                      height: '100vh'
+                    }}
+                  >
+                    {/* Content Card - Centered in Viewport */}
+                    <div className="relative z-10 w-full max-w-[98vw] mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto max-h-[90vh] overflow-y-auto" id="retopup-content-card">
+                      {/* Header with Close Button */}
+                      <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
+                        <div>
+                          <h2 className="text-2xl font-bold">
                     {isRetopUpMode ? `Re-top up Stock for ${editingCustomer?.name}` : `Edit Products for ${editingCustomer?.name}`}
-                  </DialogTitle>
-                  <DialogDescription>
+                          </h2>
+                          <p className="text-sm text-muted-foreground mt-1">
                     {isRetopUpMode 
                       ? "Enter additional quantities to add to current stock (shown in quantity fields)"
                       : "Manage products and quantities for this customer"
                     }
-                  </DialogDescription>
-
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsEshopDialogOpen(false)
+                            setIsRetopUpMode(false)
+                            setCustomerProducts([])
+                            setEditingCustomerId(null)
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="p-6">
                   <div className="space-y-6">
                     {/* Add Product Button */}
                     <div className="flex justify-between items-center">
@@ -8497,7 +8662,21 @@ export function DashboardPage() {
                     })()}
 
                     {/* Action Buttons */}
-                    <div className="flex justify-end space-x-4">
+                          <div className="flex justify-between items-center pt-4 border-t">
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                setIsEshopDialogOpen(false)
+                                setIsRetopUpMode(false)
+                                setCustomerProducts([])
+                                setEditingCustomerId(null)
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Back to My Customers
+                            </Button>
+                            <div className="flex gap-2">
                       <Button 
                         variant="outline" 
                         onClick={() => {
@@ -8517,8 +8696,12 @@ export function DashboardPage() {
                       </Button>
                     </div>
                   </div>
-                </DialogContent>
-              </Dialog>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
