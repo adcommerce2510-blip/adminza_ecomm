@@ -47,7 +47,11 @@ import {
   LogOut,
   X,
   Copy,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft,
+  CheckCircle2 as CheckCircle,
+  Clock,
+  UserCircle
 } from "lucide-react"
 
 // API functions
@@ -165,6 +169,24 @@ const fetchEshopInventory = async () => {
 
 const fetchCustomers = async () => {
   const response = await fetch('/api/customers')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchPurchaseOrders = async () => {
+  const response = await fetch('/api/purchase-orders')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchWarehouseStock = async () => {
+  const response = await fetch('/api/warehouse-stock')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchWasteEntries = async () => {
+  const response = await fetch('/api/waste')
   const data = await response.json()
   return data.success ? data.data : []
 }
@@ -689,7 +711,9 @@ export function DashboardPage() {
     customerName: "",
     quantity: "",
     price: 0,
-    notes: ""
+    notes: "",
+    deliveryType: "from_warehouse" as "from_warehouse" | "direct_from_supplier",
+    supplierName: ""
   })
   const [multipleProducts, setMultipleProducts] = useState<any[]>([{
     productId: "",
@@ -718,10 +742,14 @@ export function DashboardPage() {
   const [usedQuantity, setUsedQuantity] = useState("")
   const [orders, setOrders] = useState<any[]>([])
   const [orderSearchTerm, setOrderSearchTerm] = useState("")
+  const [currentOrderPage, setCurrentOrderPage] = useState(1)
+  const ordersPerPage = 5
   const [isViewOrderDialogOpen, setIsViewOrderDialogOpen] = useState(false)
   const [viewingOrder, setViewingOrder] = useState<any>(null)
   const [quotations, setQuotations] = useState<any[]>([])
   const [quotationSearchTerm, setQuotationSearchTerm] = useState("")
+  const [currentQuotationPage, setCurrentQuotationPage] = useState(1)
+  const quotationsPerPage = 5
   const [isViewQuotationDialogOpen, setIsViewQuotationDialogOpen] = useState(false)
   const [viewingQuotation, setViewingQuotation] = useState<any>(null)
   const [isEditQuotationDialogOpen, setIsEditQuotationDialogOpen] = useState(false)
@@ -729,6 +757,8 @@ export function DashboardPage() {
   const [isRequoteMessageDialogOpen, setIsRequoteMessageDialogOpen] = useState(false)
   const [enquiries, setEnquiries] = useState<any[]>([])
   const [enquirySearchTerm, setEnquirySearchTerm] = useState("")
+  const [currentEnquiryPage, setCurrentEnquiryPage] = useState(1)
+  const enquiriesPerPage = 5
   const [isViewEnquiryDialogOpen, setIsViewEnquiryDialogOpen] = useState(false)
   const [viewingEnquiry, setViewingEnquiry] = useState<any>(null)
   const [isEditEnquiryDialogOpen, setIsEditEnquiryDialogOpen] = useState(false)
@@ -771,6 +801,66 @@ export function DashboardPage() {
   const [isEshopEditOpen, setIsEshopEditOpen] = useState(false)
   const [eshopEditForm, setEshopEditForm] = useState<{ id: string; productName: string; quantity: number; price: number; notes?: string }>({ id: "", productName: "", quantity: 1, price: 0, notes: "" })
 
+  // Inventory Management States
+  const [isInventoryManagementExpanded, setIsInventoryManagementExpanded] = useState(false)
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
+  const [warehouseStock, setWarehouseStock] = useState<any[]>([])
+  const [wasteEntries, setWasteEntries] = useState<any[]>([])
+  const [isPODialogOpen, setIsPODialogOpen] = useState(false)
+  const [isGRNDialogOpen, setIsGRNDialogOpen] = useState(false)
+  const [isWasteDialogOpen, setIsWasteDialogOpen] = useState(false)
+  const [isViewPODialogOpen, setIsViewPODialogOpen] = useState(false)
+  const [viewingPO, setViewingPO] = useState<any>(null)
+  const [poForm, setPOForm] = useState({
+    supplierName: "",
+    items: [] as any[],
+    deliveryType: "to_warehouse" as "to_warehouse" | "direct_to_customer",
+    customerId: "",
+    customerName: "",
+    expectedDate: "",
+    notes: ""
+  })
+  const [grnForm, setGRNForm] = useState({
+    poNumber: "",
+    receivedQuantity: "",
+    warehouseName: "Main Warehouse",
+    items: [] as Array<{
+      productId: string
+      productName: string
+      orderedQuantity: number
+      receivedQuantity: number
+      damagedQuantity: number
+      lostQuantity: number
+    }>
+  })
+  const [wasteForm, setWasteForm] = useState({
+    productId: "",
+    productName: "",
+    quantity: "",
+    reason: "damaged" as "damaged" | "expired" | "lost" | "other",
+    description: "",
+    warehouseName: "Main Warehouse"
+  })
+  const [selectedPO, setSelectedPO] = useState<any>(null)
+
+  // Supplier Management States
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<any>(null)
+  const [supplierForm, setSupplierForm] = useState({
+    name: "",
+    contact: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    gstNumber: "",
+    notes: "",
+    isActive: true
+  })
+
   // Use logout function from context
   const { handleLogout } = useDashboardLogout()
   const router = useRouter()
@@ -794,6 +884,111 @@ export function DashboardPage() {
       }
     }
   }, [searchParams])
+
+  // Update overlay height when PO dialog is open
+  useEffect(() => {
+    if (isViewPODialogOpen) {
+      const updateOverlayHeight = () => {
+        const overlay = document.querySelector('[data-overlay="po-view"]') as HTMLElement
+        if (overlay) {
+          const scrollHeight = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight,
+            window.innerHeight
+          )
+          overlay.style.height = scrollHeight + 'px'
+          overlay.style.minHeight = scrollHeight + 'px'
+        }
+      }
+      
+      // Initial update
+      updateOverlayHeight()
+      
+      // Update on scroll and resize
+      window.addEventListener('scroll', updateOverlayHeight, true)
+      window.addEventListener('resize', updateOverlayHeight)
+      
+      // Update when content changes
+      const observer = new MutationObserver(updateOverlayHeight)
+      observer.observe(document.body, { childList: true, subtree: true })
+      
+      return () => {
+        window.removeEventListener('scroll', updateOverlayHeight, true)
+        window.removeEventListener('resize', updateOverlayHeight)
+        observer.disconnect()
+      }
+    }
+  }, [isViewPODialogOpen])
+
+  // Update overlay height when GRN dialog is open
+  useEffect(() => {
+    if (isGRNDialogOpen) {
+      const updateOverlayHeight = () => {
+        const overlay = document.querySelector('[data-overlay="grn-view"]') as HTMLElement
+        if (overlay) {
+          const scrollHeight = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight,
+            window.innerHeight
+          )
+          overlay.style.height = scrollHeight + 'px'
+          overlay.style.minHeight = scrollHeight + 'px'
+        }
+      }
+      
+      // Initial update
+      updateOverlayHeight()
+      
+      // Update on scroll and resize
+      window.addEventListener('scroll', updateOverlayHeight, true)
+      window.addEventListener('resize', updateOverlayHeight)
+      
+      // Update when content changes
+      const observer = new MutationObserver(updateOverlayHeight)
+      observer.observe(document.body, { childList: true, subtree: true })
+      
+      return () => {
+        window.removeEventListener('scroll', updateOverlayHeight, true)
+        window.removeEventListener('resize', updateOverlayHeight)
+        observer.disconnect()
+      }
+    }
+  }, [isGRNDialogOpen])
+
+  // Update overlay height when Waste dialog is open
+  useEffect(() => {
+    if (isWasteDialogOpen) {
+      const updateOverlayHeight = () => {
+        const overlay = document.querySelector('[data-overlay="waste-view"]') as HTMLElement
+        if (overlay) {
+          const scrollHeight = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight,
+            window.innerHeight
+          )
+          overlay.style.height = scrollHeight + 'px'
+          overlay.style.minHeight = scrollHeight + 'px'
+        }
+      }
+      
+      // Initial update
+      updateOverlayHeight()
+      
+      // Update on scroll and resize
+      window.addEventListener('scroll', updateOverlayHeight, true)
+      window.addEventListener('resize', updateOverlayHeight)
+      
+      // Update when content changes
+      const observer = new MutationObserver(updateOverlayHeight)
+      observer.observe(document.body, { childList: true, subtree: true })
+      
+      return () => {
+        window.removeEventListener('scroll', updateOverlayHeight, true)
+        window.removeEventListener('resize', updateOverlayHeight)
+        observer.disconnect()
+      }
+    }
+  }, [isWasteDialogOpen])
 
   // Get categories for products (main categories with mainUse = "product")
   const productCategories = categories
@@ -858,7 +1053,7 @@ export function DashboardPage() {
       } else {
         setLoading(true)
       }
-      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData] = await Promise.all([
+      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData, purchaseOrdersData, warehouseStockData, wasteEntriesData, suppliersData] = await Promise.all([
         fetchProducts(),
         fetchServices(),
         fetchCategories(),
@@ -869,7 +1064,11 @@ export function DashboardPage() {
         fetchOrders(),
         fetchQuotations(),
         fetchEnquiries(),
-        fetchInvoices()
+        fetchInvoices(),
+        fetchPurchaseOrders(),
+        fetchWarehouseStock(),
+        fetchWasteEntries(),
+        fetch('/api/suppliers?isActive=true').then(res => res.json()).then(data => data.success ? data.data : []).catch(() => [])
       ])
       setProducts(productsData)
       setServices(servicesData)
@@ -882,6 +1081,10 @@ export function DashboardPage() {
       setQuotations(quotationsData)
       setEnquiries(enquiriesData)
       setInvoices(invoicesData)
+      setPurchaseOrders(purchaseOrdersData)
+      setWarehouseStock(warehouseStockData)
+      setWasteEntries(wasteEntriesData)
+      setSuppliers(suppliersData)
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -2235,6 +2438,19 @@ export function DashboardPage() {
     }
   }, [openOrderDropdownId])
 
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentOrderPage(1)
+  }, [orderSearchTerm])
+
+  useEffect(() => {
+    setCurrentQuotationPage(1)
+  }, [quotationSearchTerm])
+
+  useEffect(() => {
+    setCurrentEnquiryPage(1)
+  }, [enquirySearchTerm])
+
   // Handle edit mode toggle
   const handleEditModeToggle = () => {
     setIsEditMode(!isEditMode)
@@ -2797,10 +3013,288 @@ export function DashboardPage() {
       
       setIsEshopDialogOpen(false)
       setEditingEshopItem(null)
-      setEshopForm({ customerId: '', customerName: '', productId: '', productName: '', quantity: '', price: 0, notes: '' })
+      setEshopForm({ customerId: '', customerName: '', productId: '', productName: '', quantity: '', price: 0, notes: '', deliveryType: 'from_warehouse', supplierName: '' })
+      
+      // If delivery type is from_warehouse, deduct from warehouse stock
+      if (eshopForm.deliveryType === 'from_warehouse') {
+        try {
+          const warehouseStockResponse = await fetch('/api/warehouse-stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId: eshopForm.productId,
+              productName: eshopForm.productName,
+              availableStock: -parseInt(eshopForm.quantity),
+              warehouseName: 'Main Warehouse'
+            })
+          })
+          const wsResult = await warehouseStockResponse.json()
+          if (!wsResult.success) {
+            console.error('Error updating warehouse stock:', wsResult.error)
+          }
+        } catch (error) {
+          console.error('Error updating warehouse stock:', error)
+        }
+      }
+      
+      // Refresh warehouse stock
+      const wsData = await fetchWarehouseStock()
+      setWarehouseStock(wsData)
     } catch (error) {
       console.error('Error submitting inventory:', error)
       alert('Error submitting inventory')
+    }
+  }
+
+  // Purchase Order Handlers
+  const handlePOSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!poForm.supplierName || poForm.items.length === 0) {
+        alert('Please add supplier name and at least one item')
+        return
+      }
+      
+      const response = await fetch('/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...poForm,
+          expectedDate: poForm.expectedDate ? new Date(poForm.expectedDate) : undefined
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // If delivery type is to_warehouse, automatically update warehouse stock
+        if (poForm.deliveryType === 'to_warehouse') {
+          try {
+            for (const item of poForm.items) {
+              await fetch('/api/warehouse-stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  productId: item.productId,
+                  productName: item.productName,
+                  availableStock: item.quantity,
+                  quantityAdded: item.quantity,
+                  lastSupplier: poForm.supplierName,
+                  warehouseName: 'Main Warehouse'
+                })
+              })
+            }
+            // Refresh warehouse stock
+            const wsData = await fetchWarehouseStock()
+            setWarehouseStock(wsData)
+          } catch (error) {
+            console.error('Error updating warehouse stock:', error)
+          }
+        }
+        
+        setPurchaseOrders([...purchaseOrders, result.data])
+        setPOForm({
+          supplierName: "",
+          items: [],
+          deliveryType: "to_warehouse",
+          customerId: "",
+          customerName: "",
+          expectedDate: "",
+          notes: ""
+        })
+        setIsPODialogOpen(false)
+        alert('Purchase order created successfully' + (poForm.deliveryType === 'to_warehouse' ? ' and warehouse stock updated' : ''))
+      } else {
+        alert('Error creating purchase order: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error creating purchase order:', error)
+      alert('Error creating purchase order')
+    }
+  }
+
+  // Update PO Status Handler
+  const handlePOStatusUpdate = async (poId: string, newStatus: string) => {
+    try {
+      const po = purchaseOrders.find((p: any) => p._id === poId)
+      if (!po) return
+
+      const response = await fetch(`/api/purchase-orders/${poId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        // If status is "reached" and delivery type is direct_to_customer, update customer inventory
+        if (newStatus === 'reached' && po.deliveryType === 'direct_to_customer' && po.customerId) {
+          try {
+            for (const item of po.items) {
+              // API now handles existing products automatically - adds to quantity if exists
+              const response = await fetch('/api/eshop-inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  productId: item.productId,
+                  productName: item.productName,
+                  customerId: po.customerId,
+                  customerName: po.customerName || '',
+                  quantity: item.quantity,
+                  price: item.unitPrice,
+                  notes: `Direct delivery from ${po.supplierName} - PO ${po.poNumber}`
+                })
+              })
+              const result = await response.json()
+              if (!result.success) {
+                console.error('Error adding to customer inventory:', result.error)
+              }
+            }
+            // Refresh customer inventory
+            const eshopData = await fetchEshopInventory()
+            setEshopInventory(eshopData)
+            alert('Customer inventory updated successfully')
+          } catch (error) {
+            console.error('Error updating customer inventory:', error)
+            alert('Error updating customer inventory. Please check console.')
+          }
+        }
+
+        // Refresh purchase orders
+        const poData = await fetchPurchaseOrders()
+        setPurchaseOrders(poData)
+        alert('Purchase order status updated successfully')
+      } else {
+        alert('Error updating purchase order status: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error updating purchase order status:', error)
+      alert('Error updating purchase order status')
+    }
+  }
+
+  // GRN Handler
+  const handleGRNSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!grnForm.poNumber || !selectedPO) {
+        alert('Please select a purchase order')
+        return
+      }
+
+      // Validate items
+      for (const item of grnForm.items) {
+        const acceptedQty = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
+        if (acceptedQty < 0) {
+          alert(`Invalid quantities for ${item.productName}. Accepted quantity cannot be negative.`)
+          return
+        }
+        if (item.receivedQuantity > item.orderedQuantity) {
+          alert(`Received quantity for ${item.productName} cannot exceed ordered quantity.`)
+          return
+        }
+      }
+      
+      const response = await fetch('/api/grn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poNumber: grnForm.poNumber,
+          warehouseName: grnForm.warehouseName,
+          items: grnForm.items.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName,
+            receivedQuantity: item.receivedQuantity,
+            damagedQuantity: item.damagedQuantity || 0,
+            lostQuantity: item.lostQuantity || 0,
+            acceptedQuantity: item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+          }))
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data
+        const [poData, wsData, eshopData, wasteData] = await Promise.all([
+          fetchPurchaseOrders(),
+          fetchWarehouseStock(),
+          fetchEshopInventory(),
+          fetchWasteEntries()
+        ])
+        setPurchaseOrders(poData)
+        setWarehouseStock(wsData)
+        setEshopInventory(eshopData)
+        setWasteEntries(wasteData)
+        setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+        setSelectedPO(null)
+        setIsGRNDialogOpen(false)
+        alert('Goods received successfully! Stock has been added to warehouse.')
+      } else {
+        alert('Error processing GRN: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error processing GRN:', error)
+      alert('Error processing GRN')
+    }
+  }
+
+  // Waste Entry Handler
+  const handleWasteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!wasteForm.productId || !wasteForm.quantity) {
+        alert('Please select product and enter quantity')
+        return
+      }
+      
+      // Check if warehouse has enough stock
+      const warehouseItem = warehouseStock.find((ws: any) => ws.productId === wasteForm.productId)
+      if (!warehouseItem) {
+        alert('Product not found in warehouse stock')
+        return
+      }
+      if (warehouseItem.availableStock < parseInt(wasteForm.quantity)) {
+        alert(`Insufficient stock. Available: ${warehouseItem.availableStock}`)
+        return
+      }
+      
+      // Get warehouse name from selected stock item
+      const warehouseName = warehouseItem?.warehouseName || wasteForm.warehouseName || "Main Warehouse"
+      
+      const response = await fetch('/api/waste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...wasteForm,
+          quantity: parseInt(wasteForm.quantity),
+          warehouseName
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data
+        const [wasteData, wsData] = await Promise.all([
+          fetchWasteEntries(),
+          fetchWarehouseStock()
+        ])
+        setWasteEntries(wasteData)
+        setWarehouseStock(wsData)
+        setWasteForm({
+          productId: "",
+          productName: "",
+          quantity: "",
+          reason: "damaged",
+          description: "",
+          warehouseName: "Main Warehouse"
+        })
+        setIsWasteDialogOpen(false)
+        alert('Waste entry recorded successfully')
+      } else {
+        alert('Error recording waste: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error recording waste:', error)
+      alert('Error recording waste')
     }
   }
 
@@ -2858,7 +3352,9 @@ export function DashboardPage() {
           customerName: "",
           quantity: "1",
           price: 0,
-          notes: ""
+          notes: "",
+          deliveryType: "from_warehouse",
+          supplierName: ""
         });
         setMultipleProducts([{
           productId: "",
@@ -2997,7 +3493,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen" style={{ backgroundColor: '#d1e4f3' }}>
       {/* Sidebar */}
       <div className="w-64 bg-card border-r">
         <div className="p-6">
@@ -3169,9 +3665,84 @@ export function DashboardPage() {
                   <Edit className="h-3 w-3 mr-2" />
                   Edit Customer Details
                 </Button>
+                <Button 
+                  variant={activeSubSection === "supplier-management" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("customer-management")
+                    setActiveSubSection("supplier-management")
+                  }}
+                >
+                  <Package className="h-3 w-3 mr-2" />
+                  Supplier Management
+                </Button>
               </div>
             )}
           </div>
+          
+          {/* Inventory Management Section */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between w-full">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start"
+                onClick={() => {
+                  setIsInventoryManagementExpanded(!isInventoryManagementExpanded)
+                }}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Inventory Management
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-1"
+                onClick={() => setIsInventoryManagementExpanded(!isInventoryManagementExpanded)}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${isInventoryManagementExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
+            
+            {/* Sub-items - Only show when expanded */}
+            {isInventoryManagementExpanded && (
+              <div className="ml-6 space-y-1">
+                <Button 
+                  variant={activeSubSection === "purchase-orders" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("purchase-orders")
+                  }}
+                >
+                  <FileText className="h-3 w-3 mr-2" />
+                  Purchase Orders
+                </Button>
+                <Button 
+                  variant={activeSubSection === "warehouse-stock" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("warehouse-stock")
+                  }}
+                >
+                  <Package className="h-3 w-3 mr-2" />
+                  Warehouse Stock
+                </Button>
+                <Button 
+                  variant={activeSubSection === "waste-management" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("waste-management")
+                  }}
+                >
+                  <Trash2 className="h-3 w-3 mr-2" />
+                  Waste Management
+                </Button>
+              </div>
+            )}
+          </div>
+          
           {/* Orders Section */}
           <div className="space-y-1">
             <div className="flex items-center justify-between w-full">
@@ -3272,6 +3843,17 @@ export function DashboardPage() {
                   <FileText className="h-3 w-3 mr-2" />
                   Invoice Reports
                 </Button>
+                <Button 
+                  variant={activeSubSection === "supplier-reports" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("reports")
+                    setActiveSubSection("supplier-reports")
+                  }}
+                >
+                  <Package className="h-3 w-3 mr-2" />
+                  Supplier Reports
+                </Button>
               </div>
             )}
           </div>
@@ -3317,7 +3899,7 @@ export function DashboardPage() {
         )}
 
         {/* Dashboard Content */}
-        <main className="p-6 space-y-6">
+        <main className="p-6 space-y-6" style={{ backgroundColor: '#d1e4f3', minHeight: '100%' }}>
           {/* Dashboard Section */}
           {activeSection === "dashboard" && (
             <div className="space-y-6">
@@ -4774,7 +5356,9 @@ export function DashboardPage() {
                               customerName: "",
                               quantity: "1",
                               price: 0,
-                              notes: ""
+                              notes: "",
+                              deliveryType: "from_warehouse",
+                              supplierName: ""
                             });
                             setMultipleProducts([{
                               productId: "",
@@ -4846,6 +5430,40 @@ export function DashboardPage() {
                                   <p className="text-xs text-blue-600 mt-1">
                                     Products will be assigned to this customer
                                   </p>
+                                </div>
+                              )}
+
+                              {/* Delivery Type Selection */}
+                              <div className="space-y-2">
+                                <Label className="text-base font-medium">Delivery Type</Label>
+                                <Select
+                                  value={eshopForm.deliveryType}
+                                  onValueChange={(value: any) => setEshopForm({...eshopForm, deliveryType: value})}
+                                >
+                                  <SelectTrigger className="h-12">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="from_warehouse">From Warehouse</SelectItem>
+                                    <SelectItem value="direct_from_supplier">Direct from Supplier</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                  {eshopForm.deliveryType === 'from_warehouse' 
+                                    ? 'Stock will be deducted from warehouse inventory'
+                                    : 'Stock will be added directly to customer (no warehouse deduction)'}
+                                </p>
+                              </div>
+
+                              {/* Supplier Name (for direct delivery) */}
+                              {eshopForm.deliveryType === 'direct_from_supplier' && (
+                                <div className="space-y-2">
+                                  <Label className="text-base font-medium">Supplier Name (Optional)</Label>
+                                  <Input
+                                    value={eshopForm.supplierName}
+                                    onChange={(e) => setEshopForm({...eshopForm, supplierName: e.target.value})}
+                                    placeholder="Enter supplier name"
+                                  />
                                 </div>
                               )}
 
@@ -5021,7 +5639,9 @@ export function DashboardPage() {
                                 customerName: "",
                                 quantity: "1",
                                 price: 0,
-                                notes: ""
+                                notes: "",
+                                deliveryType: "from_warehouse",
+                                supplierName: ""
                               });
                               setMultipleProducts([{
                                 productId: "",
@@ -5088,7 +5708,10 @@ export function DashboardPage() {
                           <CardHeader>
                             <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle className="text-xl">{customerData.customerName}</CardTitle>
+                                <CardTitle className="text-xl flex items-center gap-2">
+                                  <User className="h-5 w-5 text-indigo-500" />
+                                  {customerData.customerName}
+                                </CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {customerData.products.length} product{customerData.products.length !== 1 ? 's' : ''} in stock
                                 </p>
@@ -5132,13 +5755,13 @@ export function DashboardPage() {
                             <div className="overflow-visible">
                               <Table>
                               <TableHeader>
-                                <TableRow>
-                                  <TableHead>Product Name</TableHead>
-                                  <TableHead>Available Stock</TableHead>
-                                  <TableHead>Invoiced Qty</TableHead>
-                                  <TableHead>Last Updated</TableHead>
-                                  <TableHead>Notes</TableHead>
-                                  <TableHead>Actions</TableHead>
+                                <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Available Stock</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Invoiced Qty</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Updated</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Notes</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -5146,27 +5769,36 @@ export function DashboardPage() {
                                   const invoicedQty = item.invoicedQuantity || 0;
                                   const remainingQty = item.quantity - invoicedQty;
                                   return (
-                                    <TableRow key={item._id}>
-                                      <TableCell>
-                                        <div className="font-medium">{item.productName}</div>
+                                    <TableRow 
+                                      key={item._id}
+                                      className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                    >
+                                      <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                        <div className="flex items-center gap-2">
+                                          <Package className="h-4 w-4 text-blue-500" />
+                                          {item.productName}
+                                        </div>
                                       </TableCell>
-                                      <TableCell>
-                                        <Badge variant={remainingQty < 10 ? "destructive" : "default"}>
+                                      <TableCell className="py-4">
+                                        <Badge variant={remainingQty < 10 ? "destructive" : "default"} className={remainingQty >= 10 ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}>
+                                          {remainingQty >= 10 && <CheckCircle className="h-3 w-3 mr-1" />}
                                           {remainingQty} units
                                         </Badge>
                                       </TableCell>
-                                      <TableCell>
-                                        <Badge variant="outline">
+                                      <TableCell className="py-4">
+                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
+                                          <FileText className="h-3 w-3 mr-1" />
                                           {invoicedQty} units
                                         </Badge>
                                       </TableCell>
-                                    <TableCell>
-                                      <div className="text-sm text-muted-foreground">
+                                    <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <Calendar className="h-4 w-4 text-indigo-500" />
                                         {new Date(item.lastUpdated).toLocaleDateString()}
                                       </div>
                                     </TableCell>
-                                    <TableCell>
-                                      <div className="text-sm text-muted-foreground max-w-xs truncate">
+                                    <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                      <div className="text-sm max-w-xs truncate">
                                         {item.notes || "-"}
                                       </div>
                                     </TableCell>
@@ -5187,7 +5819,10 @@ export function DashboardPage() {
                                           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999]">
                                             <div className="py-1">
                                               <button
-                                                onClick={() => handleViewProductDetails(item)}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleViewProductDetails(item)
+                                                }}
                                                 className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                                               >
                                                 <Eye className="h-4 w-4 mr-2" />
@@ -5226,6 +5861,83 @@ export function DashboardPage() {
                 </div>
               )}
 
+              {/* View Product Details Dialog */}
+              <Dialog open={isViewProductDetailsDialogOpen} onOpenChange={setIsViewProductDetailsDialogOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Product Details - {viewingProductDetails?.productName}</DialogTitle>
+                    <DialogDescription>
+                      View detailed information about this inventory item for {viewingProductDetails?.customerName}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {viewingProductDetails && (
+                    <div className="space-y-6">
+                      {/* Product Information */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Product Name</Label>
+                          <p className="text-sm font-medium mt-1">{viewingProductDetails.productName}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Customer Name</Label>
+                          <p className="text-sm font-medium mt-1">{viewingProductDetails.customerName}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Available Stock</Label>
+                          <p className="text-sm mt-1">
+                            <Badge variant="default" className="bg-green-100 text-green-700 border-green-200">
+                              {(viewingProductDetails.quantity || 0) - (viewingProductDetails.invoicedQuantity || 0)} units
+                            </Badge>
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Total Quantity</Label>
+                          <p className="text-sm mt-1">
+                            <Badge variant="outline">
+                              {viewingProductDetails.quantity || 0} units
+                            </Badge>
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Invoiced Quantity</Label>
+                          <p className="text-sm mt-1">
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              {viewingProductDetails.invoicedQuantity || 0} units
+                            </Badge>
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Price</Label>
+                          <p className="text-sm font-medium mt-1">₹{viewingProductDetails.price?.toLocaleString() || '0'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                          <p className="text-sm mt-1">
+                            {viewingProductDetails.lastUpdated 
+                              ? new Date(viewingProductDetails.lastUpdated).toLocaleString()
+                              : new Date(viewingProductDetails.createdAt || Date.now()).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      {viewingProductDetails.notes && (
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                          <p className="text-sm mt-1 p-3 bg-muted rounded-md">{viewingProductDetails.notes}</p>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end">
+                        <Button onClick={() => setIsViewProductDetailsDialogOpen(false)}>
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
               {/* Edit Customer Details Tab */}
               {activeSubSection === "edit-customer-details" && (
                 <Card>
@@ -5248,15 +5960,15 @@ export function DashboardPage() {
                   <CardContent>
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Address</TableHead>
-                          <TableHead>Joined Date</TableHead>
-                          <TableHead>Last Login</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
+                        <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Customer Name</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Email</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Phone</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Address</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Joined Date</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Login</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -5283,38 +5995,58 @@ export function DashboardPage() {
                               customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                               customer.phone.includes(customerSearchTerm)
                             )
-                            .map((customer: any) => (
-                              <TableRow key={customer._id}>
-                                <TableCell>
-                                  <div className="font-medium">{customer.name}</div>
+                            .map((customer: any, index: number) => (
+                              <TableRow 
+                                key={customer._id}
+                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                style={{ animationDelay: `${index * 50}ms` }}
+                              >
+                                <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-indigo-500" />
+                                    {customer.name}
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{customer.email}</div>
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Mail className="h-4 w-4 text-blue-500" />
+                                    {customer.email}
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{customer.phone}</div>
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Phone className="h-4 w-4 text-green-500" />
+                                    {customer.phone}
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground max-w-xs truncate">
+                                <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                  <div className="flex items-center gap-2 text-sm max-w-xs truncate">
+                                    <MapPin className="h-4 w-4 text-orange-500" />
                                     {customer.address ? `${customer.address}, ${customer.city || ''}` : '-'}
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Calendar className="h-4 w-4 text-indigo-500" />
                                     {new Date(customer.createdAt).toLocaleDateString()}
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Clock className="h-4 w-4 text-purple-500" />
                                     {customer.lastLogin ? new Date(customer.lastLogin).toLocaleString() : 'Never'}
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <Badge variant={customer.isBlocked ? "destructive" : "default"}>
+                                <TableCell className="py-4">
+                                  <Badge 
+                                    variant={customer.isBlocked ? "destructive" : "default"}
+                                    className={!customer.isBlocked ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
+                                  >
+                                    {!customer.isBlocked && <CheckCircle className="h-3 w-3 mr-1" />}
                                     {customer.isBlocked ? "Blocked" : "Active"}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="py-4">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="sm">
@@ -5332,6 +6064,175 @@ export function DashboardPage() {
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Supplier Management Tab */}
+              {activeSubSection === "supplier-management" && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Supplier Management</CardTitle>
+                      <Button 
+                        onClick={() => {
+                          setSupplierForm({
+                            name: "",
+                            contact: "",
+                            email: "",
+                            phone: "",
+                            address: "",
+                            city: "",
+                            state: "",
+                            pincode: "",
+                            gstNumber: "",
+                            notes: "",
+                            isActive: true
+                          })
+                          setEditingSupplier(null)
+                          setIsSupplierDialogOpen(true)
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Supplier
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Supplier Name</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Contact</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Email</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Phone</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>City</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>GST Number</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
+                          <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {suppliers.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8">
+                              <div className="text-muted-foreground">
+                                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                <p>No suppliers found</p>
+                                <p className="text-sm">Add your first supplier to get started</p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          suppliers.map((supplier: any, index: number) => (
+                            <TableRow 
+                              key={supplier._id}
+                              className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                              style={{ animationDelay: `${index * 50}ms` }}
+                            >
+                              <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4 text-indigo-500" />
+                                  {supplier.name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <UserCircle className="h-4 w-4 text-blue-500" />
+                                  {supplier.contact || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <Mail className="h-4 w-4 text-blue-500" />
+                                  {supplier.email || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <Phone className="h-4 w-4 text-green-500" />
+                                  {supplier.phone || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4 text-orange-500" />
+                                  {supplier.city || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-purple-500" />
+                                  {supplier.gstNumber || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4">
+                                <Badge 
+                                  variant={supplier.isActive ? "default" : "secondary"}
+                                  className={supplier.isActive ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : "bg-gray-100 text-gray-700 border-gray-200"}
+                                >
+                                  {supplier.isActive && <CheckCircle className="h-3 w-3 mr-1" />}
+                                  {supplier.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => {
+                                      setEditingSupplier(supplier)
+                                      setSupplierForm({
+                                        name: supplier.name,
+                                        contact: supplier.contact || "",
+                                        email: supplier.email || "",
+                                        phone: supplier.phone || "",
+                                        address: supplier.address || "",
+                                        city: supplier.city || "",
+                                        state: supplier.state || "",
+                                        pincode: supplier.pincode || "",
+                                        gstNumber: supplier.gstNumber || "",
+                                        notes: supplier.notes || "",
+                                        isActive: supplier.isActive !== undefined ? supplier.isActive : true
+                                      })
+                                      setIsSupplierDialogOpen(true)
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={async () => {
+                                      if (confirm(`Are you sure you want to delete ${supplier.name}?`)) {
+                                        try {
+                                          const response = await fetch(`/api/suppliers/${supplier._id}`, {
+                                            method: 'DELETE'
+                                          })
+                                          const result = await response.json()
+                                          if (result.success) {
+                                            setSuppliers(suppliers.filter((s: any) => s._id !== supplier._id))
+                                            alert('Supplier deleted successfully')
+                                          } else {
+                                            alert('Error deleting supplier: ' + result.error)
+                                          }
+                                        } catch (error) {
+                                          console.error('Error deleting supplier:', error)
+                                          alert('Error deleting supplier')
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -5561,22 +6462,589 @@ export function DashboardPage() {
             </div>
           )}
 
+          {/* Inventory Management Section */}
+          {activeSection === "inventory-management" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Inventory Management</h2>
+                <p className="text-muted-foreground">Manage purchase orders, warehouse stock, and waste entries</p>
+              </div>
 
+              {/* Purchase Orders Tab */}
+              {activeSubSection === "purchase-orders" && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Purchase Orders</CardTitle>
+                      <Button 
+                        onClick={() => {
+                          setPOForm({
+                            supplierName: "",
+                            items: [{ productId: "", productName: "", quantity: 1, unitPrice: 0 }],
+                            deliveryType: "to_warehouse",
+                            customerId: "",
+                            customerName: "",
+                            expectedDate: "",
+                            notes: ""
+                          })
+                          setIsPODialogOpen(true)
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Purchase Order
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>PO Number</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Supplier</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Items</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Delivery Type</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loading ? (
+                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                              <TableCell colSpan={7} className="text-center py-8">
+                                <div className="flex items-center justify-center gap-2">
+                                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                  <span className="text-gray-600">Loading...</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : purchaseOrders.length === 0 ? (
+                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                              <TableCell colSpan={7} className="text-center py-12">
+                                <div className="flex flex-col items-center text-muted-foreground">
+                                  <FileText className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
+                                  <p className="text-lg font-medium">No purchase orders found</p>
+                                  <p className="text-sm mt-1">Create your first purchase order to get started</p>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            purchaseOrders.map((po: any, index: number) => (
+                              <TableRow 
+                                key={po._id}
+                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                onClick={() => {
+                                  setViewingPO(po)
+                                  setIsViewPODialogOpen(true)
+                                }}
+                                style={{ animationDelay: `${index * 50}ms` }}
+                              >
+                                <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-blue-500" />
+                                    {po.poNumber}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-indigo-500" />
+                                    {po.supplierName}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
+                                      <ShoppingCart className="h-3 w-3 mr-1" />
+                                      {po.items.length} item{po.items.length !== 1 ? 's' : ''}
+                                    </Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <Badge 
+                                    variant={po.deliveryType === 'to_warehouse' ? 'default' : 'secondary'}
+                                    className={
+                                      po.deliveryType === 'to_warehouse' 
+                                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-0 shadow-sm' 
+                                        : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300 shadow-sm'
+                                    }
+                                  >
+                                    {po.deliveryType === 'to_warehouse' ? (
+                                      <>
+                                        <MapPin className="h-3 w-3 mr-1" />
+                                        To Warehouse
+                                      </>
+                                    ) : (
+                                      <>
+                                        <User className="h-3 w-3 mr-1" />
+                                        Direct to Customer
+                                      </>
+                                    )}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  {po.deliveryType === 'direct_to_customer' ? (
+                                    <Select
+                                      value={po.status}
+                                      onValueChange={(value) => handlePOStatusUpdate(po._id, value)}
+                                    >
+                                      <SelectTrigger className="w-36 h-9 border-2 hover:border-blue-400 transition-colors">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                                            Pending
+                                          </div>
+                                        </SelectItem>
+                                        <SelectItem value="reached">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                            Reached
+                                          </div>
+                                        </SelectItem>
+                                        <SelectItem value="cancelled">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                            Cancelled
+                                          </div>
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge 
+                                      variant={po.status === 'received' ? 'default' : po.status === 'cancelled' ? 'destructive' : 'secondary'}
+                                      className={
+                                        po.status === 'received' 
+                                          ? 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm' 
+                                          : po.status === 'cancelled'
+                                          ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
+                                          : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                      }
+                                    >
+                                      {po.status === 'received' && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                      {po.status === 'pending' && <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div>}
+                                      {po.status === 'cancelled' && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                      {po.status}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                    <Calendar className="h-4 w-4 text-blue-500" />
+                                    {new Date(po.createdAt).toLocaleDateString()}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setViewingPO(po)
+                                      setIsViewPODialogOpen(true)
+                                    }}
+                                    className="hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-md transition-all duration-200 border-2 group/btn"
+                                  >
+                                    <Eye className="h-4 w-4 mr-1.5 group-hover/btn:scale-110 transition-transform" />
+                                    View
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Warehouse Stock Tab */}
+              {activeSubSection === "warehouse-stock" && (
+            <div className="space-y-6">
+                  {/* Pending Requests Section - Table 1 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Pending Purchase Order Requests</CardTitle>
+                      <CardDescription>Accept purchase orders to receive goods from supplier. Once accepted, goods will be added to warehouse stock below.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {(() => {
+                        const pendingPOs = purchaseOrders.filter((po: any) => 
+                          po.status === 'pending' && po.deliveryType === 'to_warehouse'
+                        )
+                        
+                        return (
+                          <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>PO Number</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Supplier</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Products</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Quantity</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Expected Date</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Created Date</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {loading ? (
+                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                    <TableCell colSpan={7} className="text-center py-8">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                        <span className="text-gray-600">Loading...</span>
+              </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : pendingPOs.length === 0 ? (
+                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                    <TableCell colSpan={7} className="text-center py-12">
+                                      <div className="flex flex-col items-center text-muted-foreground">
+                                        <FileText className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
+                                        <p className="text-lg font-medium">No pending purchase order requests</p>
+                                        <p className="text-sm mt-1">All purchase orders have been accepted</p>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  pendingPOs.map((po: any, index: number) => {
+                                    const totalQuantity = po.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+                                    return (
+                                      <TableRow 
+                                        key={po._id}
+                                        className="bg-white hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                      >
+                                        <TableCell className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors py-4">
+                                          <div className="flex items-center gap-2">
+                                            <Package className="h-4 w-4 text-blue-500" />
+                                            {po.poNumber}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                          <div className="flex items-center gap-2">
+                                            <User className="h-4 w-4 text-indigo-500" />
+                                            {po.supplierName}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <div className="space-y-1">
+                                            {po.items.map((item: any, idx: number) => (
+                                              <Badge key={idx} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 mr-1 mb-1">
+                                                <ShoppingCart className="h-3 w-3 mr-1" />
+                                                {item.productName} - {item.quantity}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors">
+                                            {totalQuantity} units
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                            <Calendar className="h-4 w-4 text-blue-500" />
+                                            {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '-'}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                            <Calendar className="h-4 w-4 text-indigo-500" />
+                                            {new Date(po.createdAt).toLocaleDateString()}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <Button
+                                            variant="default"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setSelectedPO(po)
+                                              // Initialize GRN form with all PO items
+                                              setGRNForm({
+                                                poNumber: po.poNumber,
+                                                receivedQuantity: totalQuantity.toString(),
+                                                warehouseName: "Main Warehouse",
+                                                items: po.items.map((item: any) => ({
+                                                  productId: item.productId,
+                                                  productName: item.productName,
+                                                  orderedQuantity: item.quantity,
+                                                  receivedQuantity: item.quantity, // Default: all received
+                                                  damagedQuantity: 0,
+                                                  lostQuantity: 0
+                                                }))
+                                              })
+                                              setIsGRNDialogOpen(true)
+                                            }}
+                                            className="bg-green-600 hover:bg-green-700 hover:shadow-md text-white transition-all duration-200 group/btn"
+                                          >
+                                            <Package className="h-4 w-4 mr-1.5 group-hover/btn:scale-110 transition-transform" />
+                                            Accept & Receive
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    )
+                                  })
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )
+                      })()}
+                    </CardContent>
+                  </Card>
+
+                  {/* Current Warehouse Stock Section - Table 2 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Current Warehouse Stock</CardTitle>
+                      <CardDescription>Accepted and received stock in warehouse. This shows actual physical stock available.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Admin Stock</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Warehouse Stock</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Difference</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Supplier</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Received</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Received</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {loading ? (
+                              <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                <TableCell colSpan={7} className="text-center py-8">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                    <span className="text-gray-600">Loading...</span>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : warehouseStock.length === 0 ? (
+                              <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                <TableCell colSpan={7} className="text-center py-12">
+                                  <div className="flex flex-col items-center text-muted-foreground">
+                                    <Package className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
+                                    <p className="text-lg font-medium">No warehouse stock found</p>
+                                    <p className="text-sm mt-1">Stock will appear here once goods are received</p>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              warehouseStock.map((stock: any, index: number) => {
+                                const difference = (stock.adminStock || 0) - stock.availableStock
+                                return (
+                                  <TableRow 
+                                    key={stock._id}
+                                    className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                  >
+                                    <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                      <div className="flex items-center gap-2">
+                                        <Package className="h-4 w-4 text-blue-500" />
+                                        {stock.productName}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 transition-colors">
+                                        {stock.adminStock || 0}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge 
+                                        variant={stock.availableStock < 10 ? "destructive" : "default"}
+                                        className={
+                                          stock.availableStock < 10
+                                            ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
+                                            : 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm'
+                                        }
+                                      >
+                                        {stock.availableStock < 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                        {stock.availableStock >= 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                        {stock.availableStock}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge 
+                                        variant={difference !== 0 ? "secondary" : "outline"}
+                                        className={
+                                          difference > 0
+                                            ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                            : difference < 0
+                                            ? 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 shadow-sm'
+                                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                                        }
+                                      >
+                                        {difference > 0 ? `+${difference}` : difference}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <div className="flex items-center gap-2 text-sm text-slate-700 group-hover:text-slate-900 transition-colors">
+                                        <User className="h-4 w-4 text-indigo-500" />
+                                        {stock.lastSupplier || '-'}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
+                                        {stock.totalReceivedFromSupplier || 0}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                        <Calendar className="h-4 w-4 text-blue-500" />
+                                        {stock.lastReceivedDate ? new Date(stock.lastReceivedDate).toLocaleDateString() : '-'}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Waste Management Tab */}
+              {activeSubSection === "waste-management" && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Waste Management</CardTitle>
+                      <Button 
+                        onClick={() => {
+                          setWasteForm({
+                            productId: "",
+                            productName: "",
+                            quantity: "",
+                            reason: "damaged",
+                            description: "",
+                            warehouseName: "Main Warehouse"
+                          })
+                          setIsWasteDialogOpen(true)
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Record Waste
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Reason</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Description</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loading ? (
+                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                              <TableCell colSpan={5} className="text-center py-8">
+                                <div className="flex items-center justify-center gap-2">
+                                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                  <span className="text-gray-600">Loading...</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : wasteEntries.length === 0 ? (
+                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                              <TableCell colSpan={5} className="text-center py-12">
+                                <div className="flex flex-col items-center text-muted-foreground">
+                                  <Trash2 className="h-16 w-16 mb-4 opacity-30 text-red-400" />
+                                  <p className="text-lg font-medium">No waste entries found</p>
+                                  <p className="text-sm mt-1">Record waste entries to track damaged or lost products</p>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            wasteEntries.map((waste: any, index: number) => (
+                              <TableRow 
+                                key={waste._id}
+                                className="bg-white hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                              >
+                                <TableCell className="font-semibold text-slate-900 group-hover:text-red-700 transition-colors py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-red-500" />
+                                    {waste.productName}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <Badge variant="destructive" className="bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm">
+                                    <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>
+                                    {waste.quantity} units
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <Badge 
+                                    variant="outline"
+                                    className={
+                                      waste.reason === 'damaged'
+                                        ? 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300 shadow-sm'
+                                        : waste.reason === 'expired'
+                                        ? 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 shadow-sm'
+                                        : waste.reason === 'lost'
+                                        ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300 shadow-sm'
+                                    }
+                                  >
+                                    {waste.reason === 'damaged' && <div className="h-2 w-2 rounded-full bg-orange-600 mr-1.5"></div>}
+                                    {waste.reason === 'expired' && <div className="h-2 w-2 rounded-full bg-red-600 mr-1.5"></div>}
+                                    {waste.reason === 'lost' && <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div>}
+                                    {waste.reason === 'other' && <div className="h-2 w-2 rounded-full bg-gray-600 mr-1.5"></div>}
+                                    {waste.reason.charAt(0).toUpperCase() + waste.reason.slice(1)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="text-sm text-slate-600 group-hover:text-slate-900 max-w-xs truncate transition-colors">
+                                    {waste.description || '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                    <Calendar className="h-4 w-4 text-blue-500" />
+                                    {new Date(waste.date).toLocaleDateString()}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
           {/* Orders Section */}
           {activeSection === "orders" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight">Orders Management</h2>
-                <p className="text-muted-foreground">View and manage all customer orders</p>
-              </div>
-
+            <div className="space-y-6 -mt-8">
               {/* All Orders Tab */}
               {activeSubSection === "all-orders" && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>All Orders</CardTitle>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <CardTitle className="text-3xl font-bold tracking-tight mb-1">Orders Management</CardTitle>
+                      <p className="text-muted-foreground text-sm">View and manage all customer orders</p>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <Button
                         onClick={refreshOrdersData}
@@ -5604,14 +7072,14 @@ export function DashboardPage() {
                   <div className="overflow-visible">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Order No</TableHead>
-                        <TableHead>Customer Name</TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>Total Price</TableHead>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
+                      <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Order No</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Customer Name</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Address</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Price</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date & Time</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
+                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -5631,53 +7099,92 @@ export function DashboardPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        orders
-                          .filter((order: any) => 
-                            (order.orderNo || '').toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
-                            (order.customerName || '').toLowerCase().includes(orderSearchTerm.toLowerCase())
+                      ) : (() => {
+                        const filteredOrders = orders.filter((order: any) => {
+                          const searchTerm = orderSearchTerm.toLowerCase()
+                          const customerName = (order.customerName || 
+                                               order.shippingAddress?.receiverName || 
+                                               order.userEmail?.split('@')[0] || 
+                                               '').toLowerCase()
+                          return (
+                            (order.orderNo || '').toLowerCase().includes(searchTerm) ||
+                            customerName.includes(searchTerm) ||
+                            (order.userEmail || '').toLowerCase().includes(searchTerm) ||
+                            (order.customerPhone || order.phone || '').includes(searchTerm)
                           )
-                          .map((order: any) => (
-                            <TableRow key={order._id}>
-                              <TableCell>
-                                <div className="font-medium">#{order.orderNo}</div>
+                        })
+                        
+                        const totalPages = Math.ceil(filteredOrders.length / ordersPerPage)
+                        const startIndex = (currentOrderPage - 1) * ordersPerPage
+                        const endIndex = startIndex + ordersPerPage
+                        const currentOrders = filteredOrders.slice(startIndex, endIndex)
+                        
+                        return (
+                          <>
+                            {currentOrders.map((order: any, index: number) => (
+                            <TableRow 
+                              key={order._id}
+                              className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                              style={{ animationDelay: `${index * 50}ms` }}
+                            >
+                              <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                <div className="flex items-center gap-2">
+                                  <ShoppingCart className="h-4 w-4 text-blue-500" />
+                                  #{order.orderNo}
+                                </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="font-medium">{order.customerName}</div>
-                                <div className="text-sm text-muted-foreground">{order.customerPhone}</div>
+                              <TableCell className="py-4">
+                                <div className="flex items-center gap-2 font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
+                                  <User className="h-4 w-4 text-indigo-500" />
+                                  {order.customerName || 
+                                   order.shippingAddress?.receiverName || 
+                                   order.userEmail?.split('@')[0] || 
+                                   'Unknown Customer'}
+                                </div>
+                                <div className="text-sm text-slate-600 mt-1">
+                                  {order.customerPhone || order.phone || order.userEmail || ''}
+                                </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="text-sm max-w-xs truncate">
+                              <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                <div className="flex items-center gap-2 text-sm min-w-[200px] max-w-md">
+                                  <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                                  <span className="break-words">
                                   {order.shippingAddress?.street || order.shippingAddress?.city 
                                     ? `${order.shippingAddress.street || ''}, ${order.shippingAddress.city || ''}`
                                     : '-'
                                   }
+                                  </span>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="font-medium">₹{order.totalAmount.toLocaleString()}</div>
+                              <TableCell className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors py-4">
+                                <div>
+                                  ₹{order.totalAmount.toLocaleString()}
+                                </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="text-sm">
+                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Calendar className="h-4 w-4 text-indigo-500" />
                                   {new Date(order.createdAt).toLocaleDateString()}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="text-xs text-slate-500">
                                   {new Date(order.createdAt).toLocaleTimeString()}
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <Badge variant={order.status === "Confirmed" ? "default" : "secondary"}>
+                              <TableCell className="py-4">
+                                <div className="flex items-center space-x-2">
+                                  <Badge 
+                                    variant={order.status === "Confirmed" ? "default" : "secondary"}
+                                    className={order.status === "Confirmed" ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
+                                  >
+                                    {order.status === "Confirmed" && <CheckCircle className="h-3 w-3 mr-1" />}
                                   {order.status}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
                                   <Select
                                     value={order.status}
                                     onValueChange={(value) => updateOrderStatus(order._id, value)}
                                   >
-                                    <SelectTrigger className="w-32 h-8">
-                                      <SelectValue />
+                                    <SelectTrigger className="w-auto h-auto p-0 border-0 bg-transparent hover:bg-transparent shadow-none [&>span]:hidden [&>svg:not(.custom-chevron)]:hidden focus:ring-0 focus:ring-offset-0">
+                                      <ChevronDown className="h-4 w-4 text-gray-600 cursor-pointer hover:text-gray-800 custom-chevron" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="Order Placed">Order Placed</SelectItem>
@@ -5688,70 +7195,106 @@ export function DashboardPage() {
                                       <SelectItem value="Cancelled">Cancelled</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <div className="relative">
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
                                     <Button 
-                                      variant="outline" 
+                                    variant="ghost"
                                       size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        toggleOrderDropdown(order._id)
-                                      }}
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                    
-                                    {openOrderDropdownId === order._id && (
-                                      <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999]">
-                                        <div className="py-1">
-                                          <button
-                                            onClick={() => {
                                               handleViewOrder(order)
-                                              setOpenOrderDropdownId(null)
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                          >
-                                            <Eye className="h-4 w-4 mr-2" />
-                                            View
-                                          </button>
-                                          <button
-                                            onClick={() => {
+                                    }}
+                                    title="View order details"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
                                               handleGenerateInvoice(order)
-                                              setOpenOrderDropdownId(null)
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center"
-                                          >
-                                            <FileText className="h-4 w-4 mr-2" />
-                                            Generate Invoice
-                                          </button>
-                                          <button
-                                            onClick={() => {
+                                    }}
+                                    title="Generate Invoice"
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
                                               handleEditOrder(order)
-                                              setOpenOrderDropdownId(null)
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                          >
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit
-                                          </button>
-                                          <button
-                                            onClick={() => {
+                                    }}
+                                    title="Edit order"
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
                                               deleteOrder(order._id)
-                                              setOpenOrderDropdownId(null)
                                             }}
-                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
+                                    title="Delete order"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                           >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
-                                          </button>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                         </div>
+                              </TableCell>
+                            </TableRow>
+                            ))}
+                            {filteredOrders.length > ordersPerPage && (
+                              <TableRow>
+                                <TableCell colSpan={7} className="py-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-sm text-muted-foreground">
+                                      Showing {startIndex + 1}-{Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
                                       </div>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentOrderPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentOrderPage === 1}
+                                      >
+                                        Previous
+                                      </Button>
+                                      <div className="flex items-center gap-1">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                          <Button
+                                            key={page}
+                                            variant={currentOrderPage === page ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setCurrentOrderPage(page)}
+                                            className="min-w-[40px]"
+                                          >
+                                            {page}
+                                          </Button>
+                                        ))}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentOrderPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentOrderPage === totalPages}
+                                      >
+                                        Next
+                                      </Button>
                                   </div>
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))
                       )}
+                          </>
+                        )
+                      })()}
                     </TableBody>
                   </Table>
                   </div>
@@ -5804,24 +7347,30 @@ export function DashboardPage() {
                         <Label className="text-sm font-medium text-muted-foreground mb-3 block">Order Items</Label>
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead>Product Name</TableHead>
-                              <TableHead>Quantity</TableHead>
-                              <TableHead>Price</TableHead>
-                              <TableHead>Total</TableHead>
+                            <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Price</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {viewingOrder.items?.map((item: any, index: number) => {
                               const itemTotal = item.total || (item.price || 0) * (item.quantity || 0)
                               return (
-                              <TableRow key={index}>
-                                <TableCell>
-                                  <div className="font-medium">{item.productName}</div>
+                              <TableRow 
+                                key={index}
+                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 border-b border-gray-100"
+                              >
+                                <TableCell className="font-semibold text-slate-900 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-blue-500" />
+                                    {item.productName}
+                                  </div>
                                 </TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                  <TableCell>₹{(item.price || 0).toLocaleString()}</TableCell>
-                                  <TableCell>₹{itemTotal.toLocaleString()}</TableCell>
+                                <TableCell className="py-4">{item.quantity}</TableCell>
+                                  <TableCell className="text-slate-700 py-4">₹{(item.price || 0).toLocaleString()}</TableCell>
+                                  <TableCell className="font-semibold text-slate-900 py-4">₹{itemTotal.toLocaleString()}</TableCell>
                               </TableRow>
                               )
                             })}
@@ -6062,14 +7611,15 @@ export function DashboardPage() {
                     <div className="overflow-visible">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>User Name</TableHead>
-                          <TableHead>Company</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Items</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
+                        <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>User Name</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Company</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Phone</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Items</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Date</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Status</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>User Response</TableHead>
+                          <TableHead className="font-bold py-4 text-center" style={{ color: '#ffffff' }}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -6081,7 +7631,7 @@ export function DashboardPage() {
                           </TableRow>
                         ) : quotations.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={9} className="text-center py-8">
+                            <TableCell colSpan={8} className="text-center py-8">
                               <div className="text-muted-foreground">
                                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No quotations found</p>
@@ -6089,46 +7639,74 @@ export function DashboardPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          quotations
-                            .filter((quotation: any) => 
+                        ) : (() => {
+                          const filteredQuotations = quotations.filter((quotation: any) => 
                               (quotation.userName?.toLowerCase() || '').includes(quotationSearchTerm.toLowerCase()) ||
                               (quotation.userEmail?.toLowerCase() || '').includes(quotationSearchTerm.toLowerCase())
                             )
-                            .map((quotation: any) => (
-                              <TableRow key={quotation._id}>
-                                <TableCell>
-                                  <div className="font-medium">{quotation.userName || 'Guest'}</div>
-                                  <div className="text-sm text-muted-foreground">{quotation.userEmail}</div>
+                          
+                          const totalPages = Math.ceil(filteredQuotations.length / quotationsPerPage)
+                          const startIndex = (currentQuotationPage - 1) * quotationsPerPage
+                          const endIndex = startIndex + quotationsPerPage
+                          const currentQuotations = filteredQuotations.slice(startIndex, endIndex)
+                          
+                          return (
+                            <>
+                              {currentQuotations.map((quotation: any, index: number) => (
+                              <TableRow 
+                                key={quotation._id}
+                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                style={{ animationDelay: `${index * 50}ms` }}
+                              >
+                                <TableCell className="py-4 text-center">
+                                  <div className="flex items-center justify-center gap-2 font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
+                                    <User className="h-4 w-4 text-indigo-500" />
+                                    {quotation.userName || 'Guest'}
+                                  </div>
+                                  <div className="text-sm text-slate-600 mt-1">{quotation.userEmail}</div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{quotation.company || '-'}</div>
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4 text-center">
+                                  <div className="flex items-center justify-center gap-2 text-sm">
+                                    <Building className="h-4 w-4 text-blue-500" />
+                                    {quotation.company || '-'}
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{quotation.userPhone || '-'}</div>
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4 text-center">
+                                  <div className="flex items-center justify-center gap-2 text-sm">
+                                    <Phone className="h-4 w-4 text-green-500" />
+                                    {quotation.userPhone || '-'}
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{quotation.items?.length || 0} items</div>
+                                <TableCell className="py-4 text-center">
+                                  <div className="flex items-center justify-center gap-2 text-sm">
+                                    <Package className="h-4 w-4 text-blue-500" />
+                                    {quotation.items?.length || 0} items
+                                  </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">
+                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4 text-center">
+                                  <div className="flex items-center justify-center gap-2 text-sm">
+                                    <Calendar className="h-4 w-4 text-indigo-500" />
                                     {new Date(quotation.quotationDate).toLocaleDateString()}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">
+                                  <div className="text-xs text-slate-500">
                                     {new Date(quotation.quotationDate).toLocaleTimeString()}
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Badge variant={quotation.status === "pending" ? "secondary" : "default"}>
+                                <TableCell className="py-4 text-center">
+                                  <div className="flex items-center justify-center space-x-2">
+                                    <Badge 
+                                      variant={quotation.status === "pending" ? "secondary" : "default"}
+                                      className={quotation.status !== "pending" ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
+                                    >
+                                      {quotation.status !== "pending" && <CheckCircle className="h-3 w-3 mr-1" />}
                                       {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
                                     </Badge>
                                     <Select
                                       value={quotation.status}
                                       onValueChange={(value) => updateQuotationStatus(quotation._id, value)}
                                     >
-                                      <SelectTrigger className="w-32 h-8">
-                                        <SelectValue />
+                                      <SelectTrigger className="w-auto h-auto p-0 border-0 bg-transparent hover:bg-transparent shadow-none [&>span]:hidden [&>svg:not(.custom-chevron)]:hidden focus:ring-0 focus:ring-offset-0">
+                                        <ChevronDown className="h-4 w-4 text-gray-600 cursor-pointer hover:text-gray-800 custom-chevron" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="pending">Pending</SelectItem>
@@ -6142,9 +7720,9 @@ export function DashboardPage() {
                                     </Select>
                                   </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-center">
                                   {quotation.userResponse ? (
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center justify-center space-x-2">
                                       {quotation.userResponse === 're-quote' ? (
                                         <Badge
                                           variant="outline"
@@ -6168,8 +7746,8 @@ export function DashboardPage() {
                                     <span className="text-sm text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-2">
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -6208,8 +7786,52 @@ export function DashboardPage() {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))
-                        )}
+                              ))}
+                              {filteredQuotations.length > quotationsPerPage && (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="py-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-muted-foreground">
+                                        Showing {startIndex + 1}-{Math.min(endIndex, filteredQuotations.length)} of {filteredQuotations.length} quotations
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setCurrentQuotationPage(prev => Math.max(1, prev - 1))}
+                                          disabled={currentQuotationPage === 1}
+                                        >
+                                          Previous
+                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                            <Button
+                                              key={page}
+                                              variant={currentQuotationPage === page ? "default" : "outline"}
+                                              size="sm"
+                                              onClick={() => setCurrentQuotationPage(page)}
+                                              className="min-w-[40px]"
+                                            >
+                                              {page}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setCurrentQuotationPage(prev => Math.min(totalPages, prev + 1))}
+                                          disabled={currentQuotationPage === totalPages}
+                                        >
+                                          Next
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )
+                        })()}
                       </TableBody>
                     </Table>
                     </div>
@@ -6276,22 +7898,28 @@ export function DashboardPage() {
                         <Label className="text-sm font-medium text-muted-foreground mb-3 block">Requested Items</Label>
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead>Item Name</TableHead>
-                              <TableHead>Quantity</TableHead>
-                              <TableHead>Price</TableHead>
-                              <TableHead>Subtotal</TableHead>
+                            <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Item Name</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Price</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Subtotal</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {viewingQuotation.items?.map((item: any, index: number) => (
-                              <TableRow key={index}>
-                                <TableCell>
-                                  <div className="font-medium">{item.itemName}</div>
+                              <TableRow 
+                                key={index}
+                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 border-b border-gray-100"
+                              >
+                                <TableCell className="font-semibold text-slate-900 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-blue-500" />
+                                    {item.itemName}
+                                  </div>
                                 </TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>₹{item.price?.toLocaleString() || '0'}</TableCell>
-                                <TableCell>₹{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</TableCell>
+                                <TableCell className="py-4">{item.quantity}</TableCell>
+                                <TableCell className="text-slate-700 py-4">₹{item.price?.toLocaleString() || '0'}</TableCell>
+                                <TableCell className="font-semibold text-slate-900 py-4">₹{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -6695,7 +8323,19 @@ export function DashboardPage() {
 
               {/* Re-top up Dialog */}
               <Dialog open={isEshopDialogOpen} onOpenChange={setIsEshopDialogOpen}>
-                <DialogContent className="max-w-none w-[98vw] max-h-[90vh] overflow-y-auto" style={{ width: '98vw', maxWidth: '98vw' }}>
+                <DialogContent 
+                  className="max-w-none w-[98vw] max-h-[90vh] overflow-y-auto !top-[5%] !left-[1%] !translate-x-0 !translate-y-0" 
+                  style={{ 
+                    width: '98vw', 
+                    maxWidth: '98vw',
+                    maxHeight: '90vh',
+                    position: 'fixed',
+                    top: '5%',
+                    left: '1%',
+                    transform: 'none !important',
+                    margin: 0
+                  }}
+                >
                   <DialogTitle>
                     {isRetopUpMode ? `Re-top up Stock for ${editingCustomer?.name}` : `Edit Products for ${editingCustomer?.name}`}
                   </DialogTitle>
@@ -7396,7 +9036,993 @@ export function DashboardPage() {
                   onGenerateReport={setGeneratingReport}
                 />
               )}
+
+              {/* Supplier Reports Tab */}
+              {activeSubSection === "supplier-reports" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Supplier Reports</CardTitle>
+                    <CardDescription>
+                      Track products received from suppliers, including damaged/lost entries with timestamps.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table className="min-w-full">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Supplier</TableHead>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Qty</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status / Reason</TableHead>
+                            <TableHead>Date & Time</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(() => {
+                            const rows = [
+                              // Purchase order items
+                              ...purchaseOrders.flatMap((po: any) =>
+                                (po.items || []).map((item: any) => ({
+                                  supplierName: po.supplierName || 'Unknown',
+                                  productName: item.productName,
+                                  qty: item.quantity,
+                                  type: 'Purchase',
+                                  status: po.status || 'pending',
+                                  reason: po.deliveryType === 'direct_to_customer' ? 'Direct to customer' : 'To warehouse',
+                                  date: po.createdAt || po.updatedAt || new Date().toISOString(),
+                                  isDamage: false
+                                }))
+                              ),
+                              // Waste entries (damaged/lost)
+                              ...wasteEntries.map((we: any) => ({
+                                supplierName: we.supplierName || 'Unknown',
+                                productName: we.productName,
+                                qty: -Math.abs(we.quantity || 0),
+                                type: 'Waste',
+                                status: we.reason || 'waste',
+                                reason: we.description || we.reason || 'Waste entry',
+                                date: we.date || we.createdAt || new Date().toISOString(),
+                                isDamage: true
+                              }))
+                            ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+                            if (rows.length === 0) {
+                              return (
+                                <TableRow>
+                                  <TableCell colSpan={6} className="text-center py-8">
+                                    <div className="text-muted-foreground">
+                                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                      <p>No supplier entries found</p>
+                                      <p className="text-sm">Purchase orders and waste entries will appear here.</p>
             </div>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            }
+
+                            return rows.map((row, idx) => (
+                              <TableRow key={`${row.supplierName}-${row.productName}-${idx}`}>
+                                <TableCell className="font-medium">{row.supplierName}</TableCell>
+                                <TableCell>{row.productName}</TableCell>
+                                <TableCell>
+                                  <Badge variant={row.qty < 0 ? "destructive" : "default"}>
+                                    {row.qty}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={row.type === 'Waste' ? "destructive" : "secondary"}>
+                                    {row.type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {row.status}{row.reason ? ` - ${row.reason}` : ''}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {new Date(row.date).toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Purchase Order Dialog */}
+          <Dialog open={isPODialogOpen} onOpenChange={setIsPODialogOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create Purchase Order</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handlePOSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Supplier Name *</Label>
+                    <Select
+                      value={poForm.supplierName}
+                      onValueChange={(value) => setPOForm({...poForm, supplierName: value})}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.filter((s: any) => s.isActive).map((supplier: any) => (
+                          <SelectItem key={supplier._id} value={supplier.name}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Delivery Type *</Label>
+                    <Select
+                      value={poForm.deliveryType}
+                      onValueChange={(value: any) => setPOForm({...poForm, deliveryType: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="to_warehouse">To Warehouse</SelectItem>
+                        <SelectItem value="direct_to_customer">Direct to Customer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {poForm.deliveryType === 'direct_to_customer' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Customer</Label>
+                      <Select
+                        value={poForm.customerId}
+                        onValueChange={(value) => {
+                          const customer = customers.find((c: any) => c._id === value)
+                          setPOForm({...poForm, customerId: value, customerName: customer?.name || ''})
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map((customer: any) => (
+                            <SelectItem key={customer._id} value={customer._id}>
+                              {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Expected Date</Label>
+                    <Input
+                      type="date"
+                      value={poForm.expectedDate}
+                      onChange={(e) => setPOForm({...poForm, expectedDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Items *</Label>
+                  <div className="space-y-2 border p-4 rounded-lg">
+                    {poForm.items.map((item: any, index: number) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5">
+                          <Select
+                            value={item.productId}
+                            onValueChange={(value) => {
+                              const product = products.find((p: any) => p._id === value)
+                              const newItems = [...poForm.items]
+                              newItems[index] = {
+                                ...newItems[index],
+                                productId: value,
+                                productName: product?.name || '',
+                                unitPrice: product?.price || 0
+                              }
+                              setPOForm({...poForm, items: newItems})
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product: any) => (
+                                <SelectItem key={product._id} value={product._id}>
+                                  {product.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newItems = [...poForm.items]
+                              newItems[index].quantity = parseInt(e.target.value) || 1
+                              setPOForm({...poForm, items: newItems})
+                            }}
+                            min="1"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            placeholder="Unit Price"
+                            value={item.unitPrice}
+                            onChange={(e) => {
+                              const newItems = [...poForm.items]
+                              newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                              setPOForm({...poForm, items: newItems})
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <div className="px-3 py-2 bg-muted rounded-md text-sm">
+                            ₹{(item.quantity * item.unitPrice).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="col-span-1">
+                          {poForm.items.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPOForm({...poForm, items: poForm.items.filter((_, i) => i !== index)})
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPOForm({...poForm, items: [...poForm.items, { productId: "", productName: "", quantity: 1, unitPrice: 0 }]})
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Item
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label>Total Amount</Label>
+                  <div className="px-3 py-2 bg-muted rounded-md font-bold">
+                    ₹{poForm.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={poForm.notes}
+                    onChange={(e) => setPOForm({...poForm, notes: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsPODialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    Create PO
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* GRN Full-Page Overlay */}
+          {isGRNDialogOpen && selectedPO && (
+            <>
+              {/* Translucent Black Overlay - Full Document Height */}
+              <div 
+                data-overlay="grn-view"
+                className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                style={{ 
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  position: 'fixed',
+                  minHeight: '100vh'
+                }}
+                onClick={() => {
+                  setIsGRNDialogOpen(false)
+                  setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+                  setSelectedPO(null)
+                }}
+              />
+              
+              {/* Content Container */}
+              <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-8 pb-8 overflow-y-auto pointer-events-none">
+                {/* Content Card - Centered */}
+                <div className="relative z-10 w-full max-w-[98vw] mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto max-h-[90vh] overflow-y-auto">
+                  {/* Header with Close Button */}
+                  <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold">Receive Goods (GRN) - {grnForm.poNumber}</h2>
+                      <p className="text-sm text-muted-foreground mt-1">Accept goods from supplier. Optionally record damaged or lost items.</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsGRNDialogOpen(false)
+                        setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+                        setSelectedPO(null)
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-6">
+                    <form onSubmit={handleGRNSubmit} className="space-y-4">
+                  <div>
+                    <Label>PO Number</Label>
+                    <Input
+                      value={grnForm.poNumber}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div>
+                    <Label>Warehouse</Label>
+                    <Input
+                      value={grnForm.warehouseName}
+                      onChange={(e) => setGRNForm({...grnForm, warehouseName: e.target.value})}
+                    />
+                  </div>
+
+                  {/* Items Table with Damaged/Lost Fields */}
+                  <div>
+                    <Label className="mb-2 block">Items - Record Received, Damaged, and Lost Quantities</Label>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table className="min-w-full">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[200px]">Product Name</TableHead>
+                            <TableHead className="min-w-[120px]">Ordered Qty</TableHead>
+                            <TableHead className="min-w-[140px]">Received Qty</TableHead>
+                            <TableHead className="min-w-[140px]">Damaged Qty</TableHead>
+                            <TableHead className="min-w-[140px]">Lost Qty</TableHead>
+                            <TableHead className="min-w-[140px]">Accepted Qty</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {grnForm.items.map((item, index) => {
+                            const acceptedQty = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
+                            return (
+                              <TableRow key={index}>
+                                <TableCell className="font-medium">{item.productName}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{item.orderedQuantity}</Badge>
+                                </TableCell>
+                                <TableCell className="min-w-[140px]">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={item.orderedQuantity}
+                                    value={item.receivedQuantity}
+                                    onChange={(e) => {
+                                      const newItems = [...grnForm.items]
+                                      newItems[index].receivedQuantity = parseInt(e.target.value) || 0
+                                      setGRNForm({...grnForm, items: newItems})
+                                    }}
+                                    className="w-full min-w-[100px]"
+                                  />
+                                </TableCell>
+                                <TableCell className="min-w-[140px]">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={item.receivedQuantity}
+                                    value={item.damagedQuantity}
+                                    onChange={(e) => {
+                                      const newItems = [...grnForm.items]
+                                      newItems[index].damagedQuantity = parseInt(e.target.value) || 0
+                                      // Auto-adjust received quantity if damaged exceeds received
+                                      if (newItems[index].damagedQuantity + newItems[index].lostQuantity > newItems[index].receivedQuantity) {
+                                        newItems[index].receivedQuantity = newItems[index].damagedQuantity + newItems[index].lostQuantity
+                                      }
+                                      setGRNForm({...grnForm, items: newItems})
+                                    }}
+                                    className="w-full min-w-[100px]"
+                                    placeholder="0"
+                                  />
+                                </TableCell>
+                                <TableCell className="min-w-[140px]">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={item.receivedQuantity}
+                                    value={item.lostQuantity}
+                                    onChange={(e) => {
+                                      const newItems = [...grnForm.items]
+                                      newItems[index].lostQuantity = parseInt(e.target.value) || 0
+                                      // Auto-adjust received quantity if lost exceeds received
+                                      if (newItems[index].damagedQuantity + newItems[index].lostQuantity > newItems[index].receivedQuantity) {
+                                        newItems[index].receivedQuantity = newItems[index].damagedQuantity + newItems[index].lostQuantity
+                                      }
+                                      setGRNForm({...grnForm, items: newItems})
+                                    }}
+                                    className="w-full min-w-[100px]"
+                                    placeholder="0"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={acceptedQty > 0 ? "default" : "destructive"}>
+                                    {acceptedQty}
+                                  </Badge>
+                                  {acceptedQty < 0 && (
+                                    <p className="text-xs text-red-600 mt-1">Invalid</p>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Accepted Qty = Received Qty - Damaged Qty - Lost Qty
+                    </p>
+                  </div>
+
+                      <div className="flex justify-end space-x-2 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={() => {
+                          setIsGRNDialogOpen(false)
+                          setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+                          setSelectedPO(null)
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          disabled={grnForm.items.some((item: any) => {
+                            const accepted = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
+                            return accepted < 0
+                          })}
+                        >
+                          Accept & Receive Goods
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* View Purchase Order Full-Page Overlay */}
+          {isViewPODialogOpen && viewingPO && (
+            <>
+              {/* Translucent Black Overlay - Full Document Height */}
+              <div 
+                data-overlay="po-view"
+                className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                style={{ 
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  position: 'fixed',
+                  minHeight: '100vh'
+                }}
+                onClick={() => {
+                  setIsViewPODialogOpen(false)
+                  setViewingPO(null)
+                  // Redirect back to Purchase Orders tab
+                  setActiveSection("inventory-management")
+                  setActiveSubSection("purchase-orders")
+                  setIsInventoryManagementExpanded(true)
+                }}
+              />
+              
+              {/* Content Container */}
+              <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-8 pb-8 overflow-y-auto pointer-events-none">
+                {/* Content Card - Centered */}
+                <div className="relative z-10 w-full max-w-5xl mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto">
+                {/* Header with Close Button */}
+                <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Purchase Order Details - {viewingPO.poNumber}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">View complete purchase order information</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsViewPODialogOpen(false)
+                      setViewingPO(null)
+                      // Redirect back to Purchase Orders tab
+                      setActiveSection("inventory-management")
+                      setActiveSubSection("purchase-orders")
+                      setIsInventoryManagementExpanded(true)
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* Content */}
+                <div className="p-6 space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
+                  {/* PO Header Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">PO Number</Label>
+                      <p className="text-sm font-medium mt-1">{viewingPO.poNumber}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <div className="mt-1">
+                        <Badge variant={viewingPO.status === 'received' ? 'default' : viewingPO.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                          {viewingPO.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Supplier Name</Label>
+                      <p className="text-sm mt-1">{viewingPO.supplierName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Delivery Type</Label>
+                      <div className="mt-1">
+                        <Badge variant={viewingPO.deliveryType === 'to_warehouse' ? 'default' : 'secondary'}>
+                          {viewingPO.deliveryType === 'to_warehouse' ? 'To Warehouse' : 'Direct to Customer'}
+                        </Badge>
+                      </div>
+                    </div>
+                    {viewingPO.deliveryType === 'direct_to_customer' && (
+                      <>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Customer Name</Label>
+                          <p className="text-sm mt-1">{viewingPO.customerName || '-'}</p>
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Expected Date</Label>
+                      <p className="text-sm mt-1">
+                        {viewingPO.expectedDate ? new Date(viewingPO.expectedDate).toLocaleDateString() : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Created Date</Label>
+                      <p className="text-sm mt-1">{new Date(viewingPO.createdAt).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Total Amount</Label>
+                      <p className="text-sm font-medium mt-1">₹{viewingPO.totalAmount?.toLocaleString() || '0'}</p>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground mb-2 block">Items</Label>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product Name</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead>Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewingPO.items.map((item: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>₹{item.unitPrice?.toLocaleString() || '0'}</TableCell>
+                            <TableCell className="font-medium">
+                              ₹{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Notes */}
+                  {viewingPO.notes && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                      <p className="text-sm mt-1 p-3 bg-muted rounded-md">{viewingPO.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-2 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsViewPODialogOpen(false)
+                        setViewingPO(null)
+                        // Redirect back to Purchase Orders tab
+                        setActiveSection("inventory-management")
+                        setActiveSubSection("purchase-orders")
+                        setIsInventoryManagementExpanded(true)
+                      }}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Purchase Orders
+                    </Button>
+                    {viewingPO.status === 'pending' && viewingPO.deliveryType === 'to_warehouse' && (
+                      <Button
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => {
+                          setIsViewPODialogOpen(false)
+                          setViewingPO(null)
+                          // Navigate to Warehouse Stock tab to accept
+                          setActiveSection("inventory-management")
+                          setActiveSubSection("warehouse-stock")
+                          setIsInventoryManagementExpanded(true)
+                        }}
+                      >
+                        Go to Warehouse Stock to Accept
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Supplier Dialog */}
+          <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
+                <DialogDescription>Manage supplier information</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                try {
+                  const url = editingSupplier ? `/api/suppliers/${editingSupplier._id}` : '/api/suppliers'
+                  const method = editingSupplier ? 'PUT' : 'POST'
+                  
+                  const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(supplierForm)
+                  })
+                  
+                  const result = await response.json()
+                  if (result.success) {
+                    if (editingSupplier) {
+                      setSuppliers(suppliers.map((s: any) => s._id === editingSupplier._id ? result.data : s))
+                      alert('Supplier updated successfully')
+                    } else {
+                      setSuppliers([...suppliers, result.data])
+                      alert('Supplier added successfully')
+                    }
+                    setIsSupplierDialogOpen(false)
+                    setEditingSupplier(null)
+                    setSupplierForm({
+                      name: "",
+                      contact: "",
+                      email: "",
+                      phone: "",
+                      address: "",
+                      city: "",
+                      state: "",
+                      pincode: "",
+                      gstNumber: "",
+                      notes: "",
+                      isActive: true
+                    })
+                  } else {
+                    alert('Error: ' + result.error)
+                  }
+                } catch (error) {
+                  console.error('Error saving supplier:', error)
+                  alert('Error saving supplier')
+                }
+              }} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Supplier Name *</Label>
+                    <Input
+                      value={supplierForm.name}
+                      onChange={(e) => setSupplierForm({...supplierForm, name: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Person</Label>
+                    <Input
+                      value={supplierForm.contact}
+                      onChange={(e) => setSupplierForm({...supplierForm, contact: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={supplierForm.email}
+                      onChange={(e) => setSupplierForm({...supplierForm, email: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Phone</Label>
+                    <Input
+                      value={supplierForm.phone}
+                      onChange={(e) => setSupplierForm({...supplierForm, phone: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Address</Label>
+                  <Input
+                    value={supplierForm.address}
+                    onChange={(e) => setSupplierForm({...supplierForm, address: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>City</Label>
+                    <Input
+                      value={supplierForm.city}
+                      onChange={(e) => setSupplierForm({...supplierForm, city: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input
+                      value={supplierForm.state}
+                      onChange={(e) => setSupplierForm({...supplierForm, state: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Pincode</Label>
+                    <Input
+                      value={supplierForm.pincode}
+                      onChange={(e) => setSupplierForm({...supplierForm, pincode: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>GST Number</Label>
+                    <Input
+                      value={supplierForm.gstNumber}
+                      onChange={(e) => setSupplierForm({...supplierForm, gstNumber: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={supplierForm.isActive ? "active" : "inactive"}
+                      onValueChange={(value) => setSupplierForm({...supplierForm, isActive: value === "active"})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={supplierForm.notes}
+                    onChange={(e) => setSupplierForm({...supplierForm, notes: e.target.value})}
+                    rows={3}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => {
+                    setIsSupplierDialogOpen(false)
+                    setEditingSupplier(null)
+                    setSupplierForm({
+                      name: "",
+                      contact: "",
+                      email: "",
+                      phone: "",
+                      address: "",
+                      city: "",
+                      state: "",
+                      pincode: "",
+                      gstNumber: "",
+                      notes: "",
+                      isActive: true
+                    })
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    {editingSupplier ? "Update Supplier" : "Add Supplier"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Waste Entry Full-Page Overlay */}
+          {isWasteDialogOpen && (
+            <>
+              {/* Translucent Black Overlay - Full Document Height */}
+              <div 
+                data-overlay="waste-view"
+                className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                style={{ 
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  position: 'fixed',
+                  minHeight: '100vh'
+                }}
+                onClick={() => {
+                  setIsWasteDialogOpen(false)
+                  setWasteForm({
+                    productId: "",
+                    productName: "",
+                    quantity: "",
+                    reason: "damaged" as "damaged" | "expired" | "lost" | "other",
+                    description: "",
+                    warehouseName: "Main Warehouse"
+                  })
+                }}
+              />
+              
+              {/* Content Container */}
+              <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-8 pb-8 overflow-y-auto pointer-events-none">
+                {/* Content Card - Centered */}
+                <div className="relative z-10 w-full max-w-2xl mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto">
+                  {/* Header with Close Button */}
+                  <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold">Record Waste Entry</h2>
+                      <p className="text-sm text-muted-foreground mt-1">Select product from warehouse stock</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsWasteDialogOpen(false)
+                        setWasteForm({
+                          productId: "",
+                          productName: "",
+                          quantity: "",
+                          reason: "damaged" as "damaged" | "expired" | "lost" | "other",
+                          description: "",
+                          warehouseName: "Main Warehouse"
+                        })
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-6">
+                    <form onSubmit={handleWasteSubmit} className="space-y-4">
+                <div>
+                  <Label>Product from Warehouse Stock *</Label>
+                  <Select
+                    value={wasteForm.productId}
+                    onValueChange={(value) => {
+                      const stockItem = warehouseStock.find((ws: any) => ws.productId === value)
+                      if (stockItem) {
+                        setWasteForm({
+                          ...wasteForm, 
+                          productId: value, 
+                          productName: stockItem.productName,
+                          quantity: stockItem.availableStock > 0 ? "1" : ""
+                        })
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product from warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouseStock
+                        .filter((ws: any) => ws.availableStock > 0)
+                        .map((stock: any) => (
+                          <SelectItem key={stock.productId} value={stock.productId}>
+                            {stock.productName} (Available: {stock.availableStock})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {wasteForm.productId && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Available stock: {warehouseStock.find((ws: any) => ws.productId === wasteForm.productId)?.availableStock || 0}
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Quantity *</Label>
+                    <Input
+                      type="number"
+                      value={wasteForm.quantity}
+                      onChange={(e) => setWasteForm({...wasteForm, quantity: e.target.value})}
+                      required
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Reason *</Label>
+                    <Select
+                      value={wasteForm.reason}
+                      onValueChange={(value: any) => setWasteForm({...wasteForm, reason: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="damaged">Damaged</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                        <SelectItem value="lost">Lost</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea
+                    value={wasteForm.description}
+                    onChange={(e) => setWasteForm({...wasteForm, description: e.target.value})}
+                  />
+                </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => {
+                          setIsWasteDialogOpen(false)
+                          setWasteForm({
+                            productId: "",
+                            productName: "",
+                            quantity: "",
+                            reason: "damaged" as "damaged" | "expired" | "lost" | "other",
+                            description: "",
+                            warehouseName: "Main Warehouse"
+                          })
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white">
+                          Record Waste
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </main>
       </div>

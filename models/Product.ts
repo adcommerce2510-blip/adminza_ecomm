@@ -118,7 +118,27 @@ const ProductSchema: Schema = new Schema({
   tags: [{
     type: String,
     trim: true
-  }]
+  }],
+  supplier: {
+    name: { type: String, trim: true },
+    contact: { type: String, trim: true },
+    email: { type: String, trim: true },
+    phone: { type: String, trim: true }
+  },
+  supplierDeliveryType: {
+    type: String,
+    enum: ['to_warehouse', 'direct_to_customer'],
+    default: 'to_warehouse'
+  },
+  purchasePrice: {
+    type: Number,
+    min: 0
+  },
+  reorderLevel: {
+    type: Number,
+    default: 10,
+    min: 0
+  }
 }, {
   timestamps: true
 })
