@@ -10131,7 +10131,7 @@ export function DashboardPage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Select product from warehouse" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="!z-[10000]">
                       {warehouseStock
                         .filter((ws: any) => ws.availableStock > 0)
                         .map((stock: any) => (
@@ -10167,7 +10167,7 @@ export function DashboardPage() {
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="!z-[10000]">
                         <SelectItem value="damaged">Damaged</SelectItem>
                         <SelectItem value="expired">Expired</SelectItem>
                         <SelectItem value="lost">Lost</SelectItem>
