@@ -158,6 +158,52 @@ div[data-radix-dialog-content]:has(.add-inventory-modal) {
 }
 
 .inventory-dialog-scroll::-webkit-scrollbar-track:vertical {
+  
+}
+
+/* Custom scrollbar for GRN Generate Dialog - Always Visible */
+.grn-dialog-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 #f1f5f9 !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar {
+  width: 12px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: #f1f5f9 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar:vertical {
+  width: 12px !important;
+  display: block !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 6px !important;
+  display: block !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 6px !important;
+  border: 2px solid #f1f5f9 !important;
+  display: block !important;
+  min-height: 30px !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+.grn-dialog-scroll::-webkit-scrollbar-corner {
   background: #f1f5f9 !important;
 }
 
@@ -1521,4 +1567,50 @@ form img,
   overflow: hidden !important;
   object-fit: cover !important;
   display: block !important;
+}
+
+/* Custom scrollbar for Service Description text box - Always Visible */
+.service-description-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e0 #f1f5f9 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.service-description-scroll::-webkit-scrollbar {
+  width: 8px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: #f1f5f9 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.service-description-scroll::-webkit-scrollbar:vertical {
+  width: 8px !important;
+  display: block !important;
+}
+
+.service-description-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 4px !important;
+  display: block !important;
+}
+
+.service-description-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e0 !important;
+  border-radius: 4px !important;
+  border: 1px solid #f1f5f9 !important;
+  display: block !important;
+  min-height: 20px !important;
+}
+
+.service-description-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+.service-description-scroll::-webkit-scrollbar-corner {
+  background: #f1f5f9 !important;
 }

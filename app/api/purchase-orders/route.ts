@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
       return sum + (item.quantity * item.unitPrice)
     }, 0)
     
+    const poType = body.poType || 'standard'
+    const initialStatus = poType === 'reference' ? 'PO_REFERENCE' : 'PO_CREATED'
+    
+    // Calculate total ordered quantity
+    const totalOrderedQuantity = body.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+    
     const purchaseOrder = new PurchaseOrder({
       poNumber,
       supplierName: body.supplierName,
@@ -88,7 +94,11 @@ export async function POST(request: NextRequest) {
       customerId: body.customerId,
       customerName: body.customerName,
       expectedDate: body.expectedDate,
-      status: 'pending',
+      poType,
+      status: initialStatus,
+      receivedQuantity: 0,
+      pendingQuantity: totalOrderedQuantity,
+      grnLinks: [],
       notes: body.notes || '',
       createdBy: body.createdBy
     })

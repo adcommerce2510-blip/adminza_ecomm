@@ -51,16 +51,30 @@ const PurchaseOrderSchema = new mongoose.Schema({
   expectedDate: {
     type: Date
   },
+  poType: {
+    type: String,
+    enum: ['standard', 'reference'],
+    default: 'standard'
+  },
   status: {
     type: String,
-    enum: ['pending', 'received', 'reached', 'cancelled'],
-    default: 'pending'
+    enum: ['PO_CREATED', 'PO_PARTIALLY_RECEIVED', 'PO_CLOSED', 'PO_REFERENCE', 'pending', 'received', 'reached', 'cancelled'],
+    default: 'PO_CREATED'
   },
   receivedQuantity: {
     type: Number,
     default: 0,
     min: 0
   },
+  pendingQuantity: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  grnLinks: [{
+    type: String,
+    ref: 'GRN'
+  }],
   notes: {
     type: String,
     default: ''

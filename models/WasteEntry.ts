@@ -38,6 +38,20 @@ const WasteEntrySchema = new mongoose.Schema({
   },
   recordedBy: {
     type: String
+  },
+  grnBatchId: {
+    type: String,
+    ref: 'GRN'
+  },
+  adjustmentType: {
+    type: String,
+    enum: ['from_grn', 'post_grn'],
+    default: 'from_grn'
+  },
+  status: {
+    type: String,
+    enum: ['WASTED', 'ADJUSTED'],
+    default: 'WASTED'
   }
 }, {
   timestamps: true

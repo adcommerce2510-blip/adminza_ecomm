@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useDashboardLogout } from "@/components/dashboard-auth"
+import { RetopUpModal } from "@/components/retop-up-modal"
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -46,9 +48,10 @@ import {
   Lock,
   LogOut,
   X,
+  ArrowRight,
+  ArrowLeft,
   Copy,
   RefreshCw,
-  ArrowLeft,
   CheckCircle2 as CheckCircle,
   Clock,
   UserCircle
@@ -114,6 +117,30 @@ const deleteProduct = async (id: string) => {
 const deleteService = async (id: string) => {
   const response = await fetch(`/api/services/${id}`, {
     method: 'DELETE',
+  })
+  const data = await response.json()
+  return data
+}
+
+const updateProduct = async (id: string, productData: any) => {
+  const response = await fetch(`/api/products/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(productData),
+  })
+  const data = await response.json()
+  return data
+}
+
+const updateService = async (id: string, serviceData: any) => {
+  const response = await fetch(`/api/services/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(serviceData),
   })
   const data = await response.json()
   return data
@@ -187,6 +214,12 @@ const fetchWarehouseStock = async () => {
 
 const fetchWasteEntries = async () => {
   const response = await fetch('/api/waste')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchInwardEntries = async () => {
+  const response = await fetch('/api/inward')
   const data = await response.json()
   return data.success ? data.data : []
 }
@@ -651,6 +684,18 @@ export function DashboardPage() {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false)
+  const [isViewProductDialogOpen, setIsViewProductDialogOpen] = useState(false)
+  const [isEditServiceDialogOpen, setIsEditServiceDialogOpen] = useState(false)
+  const [isViewServiceDialogOpen, setIsViewServiceDialogOpen] = useState(false)
+  const [viewingProduct, setViewingProduct] = useState<any>(null)
+  const [viewingService, setViewingService] = useState<any>(null)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
+  const [editingService, setEditingService] = useState<any>(null)
+  const [viewProductPage, setViewProductPage] = useState(1)
+  const [editProductPage, setEditProductPage] = useState(1)
+  const [viewServicePage, setViewServicePage] = useState(1)
+  const [editServicePage, setEditServicePage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadingExcel, setUploadingExcel] = useState(false)
@@ -686,6 +731,18 @@ export function DashboardPage() {
     mainUse: "",
     description: ""
   })
+  const [categoriesPage, setCategoriesPage] = useState(1)
+  const [subCategoriesPage, setSubCategoriesPage] = useState(1)
+  const [level2CategoriesPage, setLevel2CategoriesPage] = useState(1)
+  const categoriesPerPage = 5
+  const subCategoriesPerPage = 5
+  const level2CategoriesPerPage = 5
+  const [productsPage, setProductsPage] = useState(1)
+  const [servicesPage, setServicesPage] = useState(1)
+  const [allItemsPage, setAllItemsPage] = useState(1)
+  const productsPerPage = 5
+  const servicesPerPage = 5
+  const allItemsPerPage = 5
   const [customers, setCustomers] = useState<any[]>([])
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
@@ -701,6 +758,12 @@ export function DashboardPage() {
     country: "India"
   })
   const [customerSearchTerm, setCustomerSearchTerm] = useState("")
+  const [blockCustomerPage, setBlockCustomerPage] = useState(1)
+  const [editCustomerPage, setEditCustomerPage] = useState(1)
+  const [supplierPage, setSupplierPage] = useState(1)
+  const blockCustomerPerPage = 5
+  const editCustomerPerPage = 5
+  const supplierPerPage = 5
   const [eshopInventory, setEshopInventory] = useState<any[]>([])
   const [isEshopDialogOpen, setIsEshopDialogOpen] = useState(false)
   const [editingEshopItem, setEditingEshopItem] = useState<any>(null)
@@ -730,6 +793,13 @@ export function DashboardPage() {
   const [retopUpCustomerId, setRetopUpCustomerId] = useState<string>("")
   const [retopUpCustomerName, setRetopUpCustomerName] = useState<string>("")
   const [retopUpNotes, setRetopUpNotes] = useState<string>("")
+  const [retopUpPage, setRetopUpPage] = useState(1)
+  const retopUpPerPage = 4
+  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
+  const [addProductDialogPage, setAddProductDialogPage] = useState(1)
+  const addProductDialogPerPage = 3
+  const [customerProductsPage, setCustomerProductsPage] = useState<Record<string, number>>({})
+  const customerProductsPerPage = 5
   const [isEditInventoryDialogOpen, setIsEditInventoryDialogOpen] = useState(false)
   const [editingInventoryItem, setEditingInventoryItem] = useState<any>(null)
   const [editInventoryForm, setEditInventoryForm] = useState({
@@ -770,6 +840,7 @@ export function DashboardPage() {
   const [generatingReport, setGeneratingReport] = useState(false)
   const [isViewProductDetailsDialogOpen, setIsViewProductDetailsDialogOpen] = useState(false)
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
+  const viewProductModalRef = useRef<HTMLDivElement>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [openOrderDropdownId, setOpenOrderDropdownId] = useState<string | null>(null)
   const [isEditOrderDialogOpen, setIsEditOrderDialogOpen] = useState(false)
@@ -797,6 +868,9 @@ export function DashboardPage() {
   const [customerProducts, setCustomerProducts] = useState<any[]>([])
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null)
   const [isRetopUpMode, setIsRetopUpMode] = useState(false)
+  const [currentCustomerPage, setCurrentCustomerPage] = useState(1)
+  const customersPerPage = 5
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   // Edit inventory item dialog state (My Customers)
   const [isEshopEditOpen, setIsEshopEditOpen] = useState(false)
   const [eshopEditForm, setEshopEditForm] = useState<{ id: string; productName: string; quantity: number; price: number; notes?: string }>({ id: "", productName: "", quantity: 1, price: 0, notes: "" })
@@ -807,7 +881,12 @@ export function DashboardPage() {
   const [currentPOPage, setCurrentPOPage] = useState(1)
   const poPerPage = 5
   const [warehouseStock, setWarehouseStock] = useState<any[]>([])
+  const [currentWarehouseStockPage, setCurrentWarehouseStockPage] = useState(1)
+  const warehouseStockPerPage = 5
   const [wasteEntries, setWasteEntries] = useState<any[]>([])
+  const [isViewStockDialogOpen, setIsViewStockDialogOpen] = useState(false)
+  const [viewingStock, setViewingStock] = useState<any>(null)
+  const [viewStockDialogPage, setViewStockDialogPage] = useState(1)
   const [isPODialogOpen, setIsPODialogOpen] = useState(false)
   const [isGRNDialogOpen, setIsGRNDialogOpen] = useState(false)
   const [isWasteDialogOpen, setIsWasteDialogOpen] = useState(false)
@@ -817,6 +896,7 @@ export function DashboardPage() {
     supplierName: "",
     items: [] as any[],
     deliveryType: "to_warehouse" as "to_warehouse" | "direct_to_customer",
+    poType: "standard" as "standard" | "reference",
     customerId: "",
     customerName: "",
     expectedDate: "",
@@ -826,6 +906,10 @@ export function DashboardPage() {
     poNumber: "",
     receivedQuantity: "",
     warehouseName: "Main Warehouse",
+    grnType: "GRN_CREATED" as "GRN_CREATED" | "DIRECT_GRN",
+    supplierName: "",
+    location: {},
+    notes: "",
     items: [] as Array<{
       productId: string
       productName: string
@@ -833,8 +917,11 @@ export function DashboardPage() {
       receivedQuantity: number
       damagedQuantity: number
       lostQuantity: number
+      unitPrice: number
     }>
   })
+  const [isDirectGRN, setIsDirectGRN] = useState(false)
+  const [isGRNTypeDialogOpen, setIsGRNTypeDialogOpen] = useState(false)
   const [wasteForm, setWasteForm] = useState({
     productId: "",
     productName: "",
@@ -844,6 +931,66 @@ export function DashboardPage() {
     warehouseName: "Main Warehouse"
   })
   const [selectedPO, setSelectedPO] = useState<any>(null)
+  const [inwardEntries, setInwardEntries] = useState<any[]>([])
+  const [isInwardDialogOpen, setIsInwardDialogOpen] = useState(false)
+  const [isViewInwardDialogOpen, setIsViewInwardDialogOpen] = useState(false)
+  const [viewingInward, setViewingInward] = useState<any>(null)
+  const [isEditInwardDialogOpen, setIsEditInwardDialogOpen] = useState(false)
+  const [editingInward, setEditingInward] = useState<any>(null)
+  const [editInwardForm, setEditInwardForm] = useState({
+    supplierName: "",
+    receivedDate: "",
+    notes: "",
+    items: [] as Array<{
+      productId: string
+      productName: string
+      orderedQuantity: number
+      receivedQuantity: number
+      damagedQuantity: number
+      lostQuantity: number
+      acceptedQuantity: number
+      unitPrice: number
+    }>
+  })
+  const [isGenerateGRNFromInwardOpen, setIsGenerateGRNFromInwardOpen] = useState(false)
+  const [selectedInward, setSelectedInward] = useState<any>(null)
+  const [isSplitStock, setIsSplitStock] = useState(false)
+  const [customerAllocations, setCustomerAllocations] = useState<Array<{
+    customerId: string
+    customerName: string
+    sellingPrice: number
+    itemAllocations: Array<{
+      productId: string
+      customerQuantity: number
+    }>
+  }>>([])
+  const [expandedCustomerIndex, setExpandedCustomerIndex] = useState<number | null>(null)
+  const [grnFormPage, setGrnFormPage] = useState(1)
+  const [warehouses, setWarehouses] = useState<string[]>(["Main Warehouse", "Warehouse 2"])
+  const [isAddingWarehouse, setIsAddingWarehouse] = useState(false)
+  const [newWarehouseName, setNewWarehouseName] = useState("")
+  const [isWarehouseDropdownOpen, setIsWarehouseDropdownOpen] = useState(false)
+  const [isWarehouseDropdownOpen2, setIsWarehouseDropdownOpen2] = useState(false)
+  const [inwardForm, setInwardForm] = useState({
+    poNumber: "",
+    inwardType: "PO_LINKED" as "PO_LINKED" | "DIRECT_INWARD",
+    supplierName: "",
+    receivedDate: new Date().toISOString().split('T')[0],
+    items: [] as Array<{
+      productId: string
+      productName: string
+      orderedQuantity: number
+      receivedQuantity: number
+      damagedQuantity: number
+      lostQuantity: number
+      acceptedQuantity: number
+      unitPrice: number
+    }>,
+    notes: ""
+  })
+  const [isDirectInward, setIsDirectInward] = useState(false)
+  const [isInwardTypeDialogOpen, setIsInwardTypeDialogOpen] = useState(false)
+  const [inwardFormPage, setInwardFormPage] = useState(1)
 
   // Supplier Management States
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -957,6 +1104,35 @@ export function DashboardPage() {
     }
   }, [isGRNDialogOpen])
 
+  // Reset pagination when switching between category subsections
+  useEffect(() => {
+    if (activeSubSection === "categories") {
+      setCategoriesPage(1)
+    } else if (activeSubSection === "sub-categories") {
+      setSubCategoriesPage(1)
+    } else if (activeSubSection === "level2-categories") {
+      setLevel2CategoriesPage(1)
+    } else if (activeSubSection === "products") {
+      setProductsPage(1)
+    } else if (activeSubSection === "services") {
+      setServicesPage(1)
+    } else if (activeSubSection === "all-items") {
+      setAllItemsPage(1)
+    }
+  }, [activeSubSection])
+
+  // Reset pagination when search term or category filter changes
+  useEffect(() => {
+    if (activeSubSection === "products" || activeSubSection === "all-items") {
+      setProductsPage(1)
+      setAllItemsPage(1)
+    }
+    if (activeSubSection === "services" || activeSubSection === "all-items") {
+      setServicesPage(1)
+      setAllItemsPage(1)
+    }
+  }, [searchTerm, selectedCategory, activeSubSection])
+
   // Update overlay height when Re-top Up dialog is open and scroll dialog into view
   useEffect(() => {
     if (isEshopDialogOpen && editingCustomerId) {
@@ -1016,6 +1192,85 @@ export function DashboardPage() {
       }
     }
   }, [isEshopDialogOpen, editingCustomerId])
+
+  // Lock page scroll when View Product Details dialog is open
+  useEffect(() => {
+    if (isViewProductDetailsDialogOpen) {
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop
+      
+      const originalBodyOverflow = document.body.style.overflow
+      const originalBodyPosition = document.body.style.position
+      const originalBodyTop = document.body.style.top
+      const originalBodyLeft = document.body.style.left
+      const originalBodyRight = document.body.style.right
+      const originalBodyWidth = document.body.style.width
+      const originalHtmlOverflow = document.documentElement.style.overflow
+      
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.left = '0'
+      document.body.style.right = '0'
+      document.body.style.width = '100%'
+      document.documentElement.style.overflow = 'hidden'
+      
+      if (viewProductModalRef.current) {
+        viewProductModalRef.current.style.position = 'fixed'
+        viewProductModalRef.current.style.top = '0'
+        viewProductModalRef.current.style.left = '0'
+        viewProductModalRef.current.style.right = '0'
+        viewProductModalRef.current.style.bottom = '0'
+        viewProductModalRef.current.style.width = '100vw'
+        viewProductModalRef.current.style.height = '100vh'
+        viewProductModalRef.current.style.margin = '0'
+        viewProductModalRef.current.style.zIndex = '9999'
+      }
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow
+        document.body.style.position = originalBodyPosition
+        document.body.style.top = originalBodyTop
+        document.body.style.left = originalBodyLeft
+        document.body.style.right = originalBodyRight
+        document.body.style.width = originalBodyWidth
+        document.documentElement.style.overflow = originalHtmlOverflow
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isViewProductDetailsDialogOpen])
+
+  // Reset customer page when search term changes
+  useEffect(() => {
+    setCurrentCustomerPage(1)
+  }, [customerSearchTerm])
+
+  // Lock page scroll when View Stock dialog is open
+  useEffect(() => {
+    if (isViewStockDialogOpen) {
+      // Store current scroll position
+      const currentScrollPosition = window.scrollY || window.pageYOffset
+      
+      // Prevent body scroll while dialog is open
+      const originalOverflow = document.body.style.overflow
+      const originalPosition = document.body.style.position
+      const originalTop = document.body.style.top
+      const originalWidth = document.body.style.width
+      
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${currentScrollPosition}px`
+      document.body.style.width = '100%'
+      
+      // Cleanup: restore scroll position and remove listeners when dialog closes
+      return () => {
+        document.body.style.overflow = originalOverflow
+        document.body.style.position = originalPosition
+        document.body.style.top = originalTop
+        document.body.style.width = originalWidth
+        window.scrollTo(0, currentScrollPosition)
+      }
+    }
+  }, [isViewStockDialogOpen])
 
   // Update overlay height when Waste dialog is open
   useEffect(() => {
@@ -1115,7 +1370,7 @@ export function DashboardPage() {
       } else {
         setLoading(true)
       }
-      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData, purchaseOrdersData, warehouseStockData, wasteEntriesData, suppliersData] = await Promise.all([
+      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData, purchaseOrdersData, warehouseStockData, wasteEntriesData, suppliersData, inwardEntriesData] = await Promise.all([
         fetchProducts(),
         fetchServices(),
         fetchCategories(),
@@ -1130,7 +1385,8 @@ export function DashboardPage() {
         fetchPurchaseOrders(),
         fetchWarehouseStock(),
         fetchWasteEntries(),
-        fetch('/api/suppliers?isActive=true').then(res => res.json()).then(data => data.success ? data.data : []).catch(() => [])
+        fetch('/api/suppliers?isActive=true').then(res => res.json()).then(data => data.success ? data.data : []).catch(() => []),
+        fetchInwardEntries()
       ])
       setProducts(productsData)
       setServices(servicesData)
@@ -1147,6 +1403,7 @@ export function DashboardPage() {
       setWarehouseStock(warehouseStockData)
       setWasteEntries(wasteEntriesData)
       setSuppliers(suppliersData)
+      setInwardEntries(inwardEntriesData)
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -1159,6 +1416,23 @@ export function DashboardPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Close warehouse dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.warehouse-dropdown-container')) {
+        setIsWarehouseDropdownOpen(false)
+        setIsWarehouseDropdownOpen2(false)
+      }
+    }
+    if (isWarehouseDropdownOpen || isWarehouseDropdownOpen2) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isWarehouseDropdownOpen, isWarehouseDropdownOpen2])
 
   // Refresh function for Orders tab
   const refreshOrdersData = async () => {
@@ -1547,8 +1821,37 @@ export function DashboardPage() {
     setRetopUpCustomerId(item.customerId)
     setRetopUpCustomerName(item.customerName)
     setRetopUpNotes("") // Reset notes when opening dialog
+    setRetopUpPage(1) // Reset pagination
     setIsRetopUpDialogOpen(true)
     setOpenDropdownId(null) // Close dropdown
+  }
+
+  // Handle adding product to re-top up list
+  const handleAddProductToRetopUp = (product: any) => {
+    // Check if product already exists in the list
+    const existingProduct = customerProductsForRetopUp.find((p: any) => p.productId === product._id)
+    if (existingProduct) {
+      alert('Product already added to the list')
+      return
+    }
+
+    // Add product to the list
+    const newProduct = {
+      _id: `temp-${Date.now()}`,
+      productId: product._id,
+      productName: product.name,
+      quantity: 0,
+      price: product.offerPrice || product.price || 0,
+      quantityToAdd: 0,
+      invoicedQuantity: 0
+    }
+    
+    setCustomerProductsForRetopUp([...customerProductsForRetopUp, newProduct])
+    setIsAddProductDialogOpen(false)
+    
+    // Navigate to the last page if needed
+    const totalPages = Math.ceil((customerProductsForRetopUp.length + 1) / retopUpPerPage)
+    setRetopUpPage(totalPages)
   }
 
   // Handle Re-top up submit
@@ -1561,13 +1864,40 @@ export function DashboardPage() {
       
       for (const product of customerProductsForRetopUp) {
         if (product.quantityToAdd > 0) {
-          const previousQuantity = product.quantity
-          const newQuantity = product.quantity + product.quantityToAdd
+          const previousQuantity = product.quantity || 0
+          const newQuantity = previousQuantity + product.quantityToAdd
           
-          const result = await updateEshopInventory(product._id, {
-            quantity: newQuantity,
-            notes: `Re-topped up with ${product.quantityToAdd} units. ${product.notes || ""}`
-          })
+          let result: any
+          
+          // Check if product exists in customer inventory (has real _id, not temp)
+          if (product._id && !product._id.startsWith('temp-')) {
+            // Update existing inventory item
+            result = await updateEshopInventory(product._id, {
+              quantity: newQuantity,
+              notes: `Re-topped up with ${product.quantityToAdd} units. ${product.notes || ""}`
+            })
+          } else {
+            // Create new inventory item for this customer
+            const inventoryData = {
+              productId: product.productId,
+              productName: product.productName,
+              customerId: retopUpCustomerId,
+              customerName: retopUpCustomerName,
+              quantity: product.quantityToAdd,
+              price: product.price || 0,
+              notes: `Re-topped up with ${product.quantityToAdd} units. ${product.notes || ""}`,
+              lastUpdated: new Date().toISOString()
+            }
+            
+            const response = await fetch('/api/eshop-inventory', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(inventoryData),
+            })
+            result = await response.json()
+          }
           
           if (result.success) {
             updates.push(result.data)
@@ -1625,6 +1955,7 @@ export function DashboardPage() {
       setRetopUpCustomerId("")
       setRetopUpCustomerName("")
       setRetopUpNotes("")
+      setRetopUpPage(1)
     } catch (error) {
       console.error('Error re-topping up:', error)
       alert('Error re-topping up')
@@ -3128,43 +3459,22 @@ export function DashboardPage() {
       
       const result = await response.json()
       if (result.success) {
-        // If delivery type is to_warehouse, automatically update warehouse stock
-        if (poForm.deliveryType === 'to_warehouse') {
-          try {
-            for (const item of poForm.items) {
-              await fetch('/api/warehouse-stock', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  productId: item.productId,
-                  productName: item.productName,
-                  availableStock: item.quantity,
-                  quantityAdded: item.quantity,
-                  lastSupplier: poForm.supplierName,
-                  warehouseName: 'Main Warehouse'
-                })
-              })
-            }
-            // Refresh warehouse stock
-            const wsData = await fetchWarehouseStock()
-            setWarehouseStock(wsData)
-          } catch (error) {
-            console.error('Error updating warehouse stock:', error)
-          }
-        }
+        // Note: Warehouse stock is NOT updated here - it will be updated when GRN is created
+        // PO is just planning/documentation
         
         setPurchaseOrders([...purchaseOrders, result.data])
         setPOForm({
           supplierName: "",
           items: [],
           deliveryType: "to_warehouse",
+          poType: "standard",
           customerId: "",
           customerName: "",
           expectedDate: "",
           notes: ""
         })
         setIsPODialogOpen(false)
-        alert('Purchase order created successfully' + (poForm.deliveryType === 'to_warehouse' ? ' and warehouse stock updated' : ''))
+        alert(`Purchase order created successfully${poForm.poType === 'reference' ? ' (Reference PO - for audit only)' : ''}`)
       } else {
         alert('Error creating purchase order: ' + result.error)
       }
@@ -3234,23 +3544,243 @@ export function DashboardPage() {
     }
   }
 
-  // GRN Handler
-  const handleGRNSubmit = async (e: React.FormEvent) => {
+  // Inward Handler
+  const handleInwardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      if (!grnForm.poNumber || !selectedPO) {
-        alert('Please select a purchase order')
-        return
+      // For Direct Inward, validate items exist
+      if (isDirectInward) {
+        if (!inwardForm.items || inwardForm.items.length === 0) {
+          alert('Please add at least one item for Direct Inward')
+          return
+        }
+        if (!inwardForm.supplierName) {
+          alert('Please enter supplier name for Direct Inward')
+          return
+        }
+      } else {
+        // For PO-linked inward, validate PO
+        if (!inwardForm.poNumber || !selectedPO) {
+          alert('Please select a purchase order')
+          return
+        }
       }
 
       // Validate items
-      for (const item of grnForm.items) {
-        const acceptedQty = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
+      for (const item of inwardForm.items) {
+        const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
         if (acceptedQty < 0) {
           alert(`Invalid quantities for ${item.productName}. Accepted quantity cannot be negative.`)
           return
         }
-        if (item.receivedQuantity > item.orderedQuantity) {
+        if (!isDirectInward && item.receivedQuantity > item.orderedQuantity) {
+          alert(`Received quantity for ${item.productName} cannot exceed ordered quantity.`)
+          return
+        }
+      }
+      
+      const response = await fetch('/api/inward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poNumber: isDirectInward ? null : inwardForm.poNumber,
+          inwardType: isDirectInward ? 'DIRECT_INWARD' : 'PO_LINKED',
+          supplierName: isDirectInward ? inwardForm.supplierName : (selectedPO?.supplierName || ''),
+          receivedDate: inwardForm.receivedDate,
+          items: inwardForm.items.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName,
+            orderedQuantity: item.orderedQuantity || 0,
+            receivedQuantity: item.receivedQuantity,
+            damagedQuantity: item.damagedQuantity || 0,
+            lostQuantity: item.lostQuantity || 0,
+            acceptedQuantity: item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0),
+            unitPrice: item.unitPrice || 0
+          })),
+          notes: inwardForm.notes || ''
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data
+        const inwardData = await fetchInwardEntries()
+        setInwardEntries(inwardData)
+        setInwardForm({
+          poNumber: "",
+          inwardType: "PO_LINKED",
+          supplierName: "",
+          receivedDate: new Date().toISOString().split('T')[0],
+          items: [],
+          notes: ""
+        })
+        setSelectedPO(null)
+        setIsDirectInward(false)
+        setIsInwardDialogOpen(false)
+        setIsInwardTypeDialogOpen(false)
+        alert('Goods received successfully! Inward entry created.')
+      } else {
+        alert('Error creating inward entry: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error creating inward entry:', error)
+      alert('Error creating inward entry')
+    }
+  }
+
+  // Generate GRN from Inward Handler
+  const handleGenerateGRNFromInward = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!selectedInward) {
+        alert('No inward entry selected')
+        return
+      }
+
+      // Validate split allocation if enabled
+      if (isSplitStock) {
+        if (customerAllocations.length === 0) {
+          alert('Please add at least one customer for stock allocation')
+          return
+        }
+        
+        // Validate each customer
+        for (let i = 0; i < customerAllocations.length; i++) {
+          const customerAlloc = customerAllocations[i]
+          
+          if (!customerAlloc.customerId) {
+            alert(`Please select a customer for Customer ${i + 1}`)
+            return
+          }
+          
+          if (!customerAlloc.sellingPrice || customerAlloc.sellingPrice <= 0) {
+            alert(`Please enter a valid selling price for Customer ${i + 1}`)
+            return
+          }
+        }
+        
+        // Validate allocations for each item
+        for (const item of selectedInward.items) {
+          let totalCustomerQty = 0
+          
+          for (const customerAlloc of customerAllocations) {
+            const allocation = customerAlloc.itemAllocations.find(a => a.productId === item.productId)
+            const customerQty = allocation?.customerQuantity || 0
+            
+            if (customerQty < 0) {
+              alert(`Customer quantity for ${item.productName} cannot be negative`)
+              return
+            }
+            
+            totalCustomerQty += customerQty
+          }
+          
+          if (totalCustomerQty > item.acceptedQuantity) {
+            alert(`Total customer allocation for ${item.productName} (${totalCustomerQty}) cannot exceed accepted quantity (${item.acceptedQuantity})`)
+            return
+          }
+        }
+        
+        // Check if at least one item has customer allocation
+        const totalCustomerQty = customerAllocations.reduce((sum, ca) => {
+          return sum + ca.itemAllocations.reduce((itemSum, a) => itemSum + (a.customerQuantity || 0), 0)
+        }, 0)
+        if (totalCustomerQty === 0) {
+          alert('Please allocate at least some quantity to customer(s), or uncheck split stock option')
+          return
+        }
+      }
+
+      const response = await fetch(`/api/inward/${selectedInward._id}/generate-grn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          warehouseName: grnForm.warehouseName,
+          location: grnForm.location,
+          notes: grnForm.notes || '',
+          splitToCustomer: isSplitStock,
+          customerAllocations: isSplitStock ? customerAllocations.map(ca => ({
+            customerId: ca.customerId,
+            customerName: ca.customerName,
+            sellingPrice: ca.sellingPrice,
+            itemAllocations: ca.itemAllocations
+          })) : []
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data
+        const [inwardData, poData, wsData, wasteData, eshopData] = await Promise.all([
+          fetchInwardEntries(),
+          fetchPurchaseOrders(),
+          fetchWarehouseStock(),
+          fetchWasteEntries(),
+          fetchEshopInventory()
+        ])
+        setInwardEntries(inwardData)
+        setPurchaseOrders(poData)
+        setWarehouseStock(wsData)
+        setWasteEntries(wasteData)
+        setEshopInventory(eshopData)
+        setGRNForm({ 
+          poNumber: "", 
+          receivedQuantity: "", 
+          warehouseName: "Main Warehouse", 
+          grnType: "GRN_CREATED",
+          supplierName: "",
+          location: {},
+          notes: "",
+          items: [] 
+        })
+        setSelectedInward(null)
+        setIsSplitStock(false)
+        setCustomerAllocations([])
+        setGrnFormPage(1)
+        setIsGenerateGRNFromInwardOpen(false)
+        const message = isSplitStock 
+          ? `GRN generated successfully! Stock has been split between ${customerAllocations.length} customer(s) and warehouse.`
+          : 'GRN generated successfully! Goods have been moved to warehouse.'
+        alert(message)
+      } else {
+        alert('Error generating GRN: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error generating GRN from inward:', error)
+      alert('Error generating GRN from inward entry')
+    }
+  }
+
+  // GRN Handler
+  const handleGRNSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      // For Direct GRN, validate items exist
+      if (isDirectGRN) {
+        if (!grnForm.items || grnForm.items.length === 0) {
+          alert('Please add at least one item for Direct GRN')
+          return
+        }
+        if (!grnForm.supplierName) {
+          alert('Please enter supplier name for Direct GRN')
+          return
+        }
+      } else {
+        // For linked GRN, validate PO
+        if (!grnForm.poNumber || !selectedPO) {
+          alert('Please select a purchase order')
+          return
+        }
+      }
+
+      // Validate items
+      for (const item of grnForm.items) {
+        const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+        if (acceptedQty < 0) {
+          alert(`Invalid quantities for ${item.productName}. Accepted quantity cannot be negative.`)
+          return
+        }
+        if (!isDirectGRN && item.receivedQuantity > item.orderedQuantity) {
           alert(`Received quantity for ${item.productName} cannot exceed ordered quantity.`)
           return
         }
@@ -3260,15 +3790,20 @@ export function DashboardPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          poNumber: grnForm.poNumber,
+          poNumber: isDirectGRN ? null : grnForm.poNumber,
+          grnType: isDirectGRN ? 'DIRECT_GRN' : 'GRN_CREATED',
+          supplierName: isDirectGRN ? grnForm.supplierName : (selectedPO?.supplierName || ''),
           warehouseName: grnForm.warehouseName,
+          location: grnForm.location,
           items: grnForm.items.map((item: any) => ({
             productId: item.productId,
             productName: item.productName,
+            orderedQuantity: item.orderedQuantity || 0,
             receivedQuantity: item.receivedQuantity,
             damagedQuantity: item.damagedQuantity || 0,
             lostQuantity: item.lostQuantity || 0,
-            acceptedQuantity: item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+            acceptedQuantity: item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0),
+            unitPrice: item.unitPrice || 0
           }))
         })
       })
@@ -3286,8 +3821,18 @@ export function DashboardPage() {
         setWarehouseStock(wsData)
         setEshopInventory(eshopData)
         setWasteEntries(wasteData)
-        setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+        setGRNForm({ 
+          poNumber: "", 
+          receivedQuantity: "", 
+          warehouseName: "Main Warehouse", 
+          grnType: "GRN_CREATED",
+          supplierName: "",
+          location: {},
+          notes: "",
+          items: [] 
+        })
         setSelectedPO(null)
+        setIsDirectGRN(false)
         setIsGRNDialogOpen(false)
         alert('Goods received successfully! Stock has been added to warehouse.')
       } else {
@@ -3466,6 +4011,150 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting service:', error)
       alert('Error deleting service')
+    }
+  }
+
+  // Handle View Product
+  const handleViewProduct = (product: any) => {
+    setViewingProduct(product)
+    setIsViewProductDialogOpen(true)
+  }
+
+  // Handle Edit Product
+  const handleEditProduct = (product: any) => {
+    // Parse category string to get mainCategory, subCategory, level2Category
+    const categoryParts = product.category ? product.category.split('/') : []
+    setEditingProduct(product)
+    setProductForm({
+      name: product.name || "",
+      mainCategory: categoryParts[0] || "",
+      subCategory: categoryParts[1] || "",
+      level2Category: categoryParts[2] || "",
+      price: product.price?.toString() || "",
+      mrp: product.mrp?.toString() || "",
+      offerPrice: product.offerPrice?.toString() || "",
+      gstPercentage: product.gstPercentage?.toString() || "",
+      stock: product.stock?.toString() || "",
+      description: product.description || "",
+      hslCode: product.hslCode || "",
+      images: product.images || []
+    })
+    setIsEditProductDialogOpen(true)
+  }
+
+  // Handle Update Product
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProduct) return
+    
+    try {
+      // Build hierarchical category string using "/" format
+      let categoryString = productForm.mainCategory
+      if (productForm.subCategory) {
+        categoryString += `/${productForm.subCategory}`
+      }
+      if (productForm.level2Category) {
+        categoryString += `/${productForm.level2Category}`
+      }
+
+      // Calculate discount and final price
+      const mrp = parseFloat(productForm.mrp) || 0
+      const offerPrice = parseFloat(productForm.offerPrice) || 0
+      const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+      const discount = mrp - offerPrice
+      const gstAmount = (offerPrice * gstPercentage) / 100
+      const finalPrice = offerPrice + gstAmount
+
+      const result = await updateProduct(editingProduct._id, {
+        ...productForm,
+        category: categoryString,
+        price: finalPrice,
+        mrp: mrp,
+        offerPrice: offerPrice,
+        gstPercentage: gstPercentage,
+        discount: discount,
+        finalPrice: finalPrice,
+        stock: parseInt(productForm.stock),
+        vendor: "Admin"
+      })
+      
+      if (result.success) {
+        const updatedProducts = await fetchProducts()
+        setProducts(updatedProducts)
+        setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
+        setEditingProduct(null)
+        setIsEditProductDialogOpen(false)
+        alert('Product updated successfully!')
+      } else {
+        alert('Error updating product: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error updating product:', error)
+      alert('Error updating product')
+    }
+  }
+
+  // Handle View Service
+  const handleViewService = (service: any) => {
+    setViewingService(service)
+    setIsViewServiceDialogOpen(true)
+  }
+
+  // Handle Edit Service
+  const handleEditService = (service: any) => {
+    // Parse category string to get mainCategory, subCategory, level2Category
+    const categoryParts = service.category ? service.category.split('/') : []
+    setEditingService(service)
+    setServiceForm({
+      name: service.name || "",
+      mainCategory: categoryParts[0] || "",
+      subCategory: categoryParts[1] || "",
+      level2Category: categoryParts[2] || "",
+      price: service.price?.toString() || "",
+      duration: service.duration || "",
+      description: service.description || "",
+      location: service.location || "",
+      images: service.images || []
+    })
+    setIsEditServiceDialogOpen(true)
+  }
+
+  // Handle Update Service
+  const handleUpdateService = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingService) return
+    
+    try {
+      // Build hierarchical category string using "/" format
+      let categoryString = serviceForm.mainCategory
+      if (serviceForm.subCategory) {
+        categoryString += `/${serviceForm.subCategory}`
+      }
+      if (serviceForm.level2Category) {
+        categoryString += `/${serviceForm.level2Category}`
+      }
+
+      const result = await updateService(editingService._id, {
+        ...serviceForm,
+        category: categoryString,
+        price: parseFloat(serviceForm.price),
+        vendor: "Admin",
+        images: serviceForm.images || []
+      })
+      
+      if (result.success) {
+        const updatedServices = await fetchServices()
+        setServices(updatedServices)
+        setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
+        setEditingService(null)
+        setIsEditServiceDialogOpen(false)
+        alert('Service updated successfully!')
+      } else {
+        alert('Error updating service: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error updating service:', error)
+      alert('Error updating service')
     }
   }
 
@@ -3703,7 +4392,7 @@ export function DashboardPage() {
                   }}
                 >
                   <Users className="h-3 w-3 mr-2" />
-                  My Customers
+                  Stock with Customer
                 </Button>
                 <Button 
                   variant={activeSubSection === "block-unblock-customer" ? "default" : "ghost"} 
@@ -3711,6 +4400,7 @@ export function DashboardPage() {
                   onClick={() => {
                     setActiveSection("customer-management")
                     setActiveSubSection("block-unblock-customer")
+                    setBlockCustomerPage(1)
                   }}
                 >
                   <Users className="h-3 w-3 mr-2" />
@@ -3722,6 +4412,7 @@ export function DashboardPage() {
                   onClick={() => {
                     setActiveSection("customer-management")
                     setActiveSubSection("edit-customer-details")
+                    setEditCustomerPage(1)
                   }}
                 >
                   <Edit className="h-3 w-3 mr-2" />
@@ -3733,6 +4424,7 @@ export function DashboardPage() {
                   onClick={() => {
                     setActiveSection("customer-management")
                     setActiveSubSection("supplier-management")
+                    setSupplierPage(1)
                   }}
                 >
                   <Package className="h-3 w-3 mr-2" />
@@ -3789,6 +4481,17 @@ export function DashboardPage() {
                 >
                   <Package className="h-3 w-3 mr-2" />
                   Warehouse Stock
+                </Button>
+                <Button 
+                  variant={activeSubSection === "inward" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("inward")
+                  }}
+                >
+                  <Package className="h-3 w-3 mr-2" />
+                  Inward
                 </Button>
                 <Button 
                   variant={activeSubSection === "waste-management" ? "default" : "ghost"} 
@@ -4068,202 +4771,621 @@ export function DashboardPage() {
                                 Add Service
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Add New Service</DialogTitle>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                                <DialogTitle className="text-2xl font-bold flex items-center gap-2">Add New Service</DialogTitle>
                               </DialogHeader>
-                              <form onSubmit={handleServiceSubmit} className="space-y-4">
-                                <div>
-                                  <Label htmlFor="service-name">Service Name</Label>
-                                  <Input
-                                    id="service-name"
-                                    placeholder="Enter service name"
-                                    value={serviceForm.name}
-                                    onChange={(e) => setServiceForm({...serviceForm, name: e.target.value})}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="service-main-category">Main Category</Label>
-                                  <Select value={serviceForm.mainCategory} onValueChange={(value) => {
-                                    setServiceForm({
-                                      ...serviceForm, 
-                                      mainCategory: value,
-                                      subCategory: "",
-                                      level2Category: ""
-                                    })
-                                  }}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select main category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {serviceCategories.map((category) => (
-                                        <SelectItem key={category} value={category}>{category}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                
-                                {serviceForm.mainCategory && getSubCategoriesForMainCategory(serviceForm.mainCategory).length > 0 && (
-                                  <div>
-                                    <Label htmlFor="service-sub-category">Sub Category</Label>
-                                    <Select value={serviceForm.subCategory} onValueChange={(value) => {
-                                      setServiceForm({
-                                        ...serviceForm, 
-                                        subCategory: value,
-                                        level2Category: ""
-                                      })
-                                    }}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select sub category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {getSubCategoriesForMainCategory(serviceForm.mainCategory).map((subCategory) => (
-                                          <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                                
-                                {serviceForm.mainCategory && serviceForm.subCategory && getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).length > 0 && (
-                                  <div>
-                                    <Label htmlFor="service-level2-category">Level 2 Sub Category</Label>
-                                    <Select value={serviceForm.level2Category} onValueChange={(value) => {
-                                      setServiceForm({...serviceForm, level2Category: value})
-                                    }}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select level 2 sub category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).map((level2Category) => (
-                                          <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label htmlFor="service-price">Price (₹)</Label>
-                                    <Input
-                                      id="service-price"
-                                      type="number"
-                                      placeholder="0"
-                                      value={serviceForm.price}
-                                      onChange={(e) => setServiceForm({...serviceForm, price: e.target.value})}
-                                      required
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="service-duration">Duration</Label>
-                                    <Input
-                                      id="service-duration"
-                                      placeholder="e.g., 2 hours, 1 day"
-                                      value={serviceForm.duration}
-                                      onChange={(e) => setServiceForm({...serviceForm, duration: e.target.value})}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-                                <div>
-                                  <Label htmlFor="service-location">Location</Label>
-                                  <Input
-                                    id="service-location"
-                                    placeholder="Enter service location"
-                                    value={serviceForm.location}
-                                    onChange={(e) => setServiceForm({...serviceForm, location: e.target.value})}
-                                    required
-                                  />
-                                </div>
-                                
-                                {/* Image Upload Section */}
-                                <div>
-                                  <Label htmlFor="service-images">Images</Label>
-                                  <div className="mb-2">
-                                    <Button 
-                                      type="button" 
-                                      variant="outline" 
-                                      className="w-full"
-                                      onClick={() => document.getElementById('service-file-upload')?.click()}
-                                    >
-                                      <Upload className="h-4 w-4 mr-2" />
-                                      {uploading ? "Uploading..." : "Upload Image"}
-                                    </Button>
-                                    <Input
-                                      id="service-file-upload"
-                                      type="file"
-                                      multiple
-                                      accept="image/*"
-                                      className="sr-only"
-                                      onChange={async (e) => {
-                                        const files = e.target.files
-                                        if (files) {
-                                          const urls = []
-                                          for (let i = 0; i < files.length; i++) {
-                                            const url = await handleImageUpload(files[i], 'services')
-                                            if (url) urls.push(url)
-                                          }
-                                          setServiceForm({...serviceForm, images: [...serviceForm.images, ...urls]})
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                  {serviceForm.images.length > 0 && (
-                                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
-                                      <div className="space-y-2">
-                                        {serviceForm.images.map((image, index) => {
-                                          const fileName = image.split('/').pop() || `Image ${index + 1}`
-                                          return (
-                                            <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
-                                              <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
-                                              <Button
-                                                type="button"
-                                                variant="destructive"
-                                                size="sm"
-                                                className="ml-2 h-6 w-6 rounded-full p-0"
-                                                onClick={() => setServiceForm({...serviceForm, images: serviceForm.images.filter((_, i) => i !== index)})}
-                                              >
-                                                <X className="h-3 w-3" />
-                                              </Button>
-                                            </div>
-                                          )
-                                        })}
+                              <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                                <form onSubmit={handleServiceSubmit} className="h-full">
+                                  <div className="grid grid-cols-10 gap-4">
+                                    {/* Left Side - Basic Information */}
+                                    <div className="col-span-4 space-y-4">
+                                      <div>
+                                        <Label htmlFor="service-name">Service Name</Label>
+                                        <Input
+                                          id="service-name"
+                                          placeholder="Enter service name"
+                                          value={serviceForm.name}
+                                          onChange={(e) => setServiceForm({...serviceForm, name: e.target.value})}
+                                          required
+                                          className="mt-1"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="service-main-category">Main Category</Label>
+                                        <Select value={serviceForm.mainCategory} onValueChange={(value) => {
+                                          setServiceForm({
+                                            ...serviceForm, 
+                                            mainCategory: value,
+                                            subCategory: "",
+                                            level2Category: ""
+                                          })
+                                        }}>
+                                          <SelectTrigger className="mt-1">
+                                            <SelectValue placeholder="Select main category" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {serviceCategories.map((category) => (
+                                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      
+                                      {serviceForm.mainCategory && getSubCategoriesForMainCategory(serviceForm.mainCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="service-sub-category">Sub Category</Label>
+                                          <Select value={serviceForm.subCategory} onValueChange={(value) => {
+                                            setServiceForm({
+                                              ...serviceForm, 
+                                              subCategory: value,
+                                              level2Category: ""
+                                            })
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getSubCategoriesForMainCategory(serviceForm.mainCategory).map((subCategory) => (
+                                                <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                      
+                                      {serviceForm.mainCategory && serviceForm.subCategory && getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="service-level2-category">Level 2 Sub Category</Label>
+                                          <Select value={serviceForm.level2Category} onValueChange={(value) => {
+                                            setServiceForm({...serviceForm, level2Category: value})
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select level 2 sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).map((level2Category) => (
+                                                <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                      <div>
+                                        <Label htmlFor="service-location">Location</Label>
+                                        <Input
+                                          id="service-location"
+                                          placeholder="Enter service location"
+                                          value={serviceForm.location}
+                                          onChange={(e) => setServiceForm({...serviceForm, location: e.target.value})}
+                                          required
+                                          className="mt-1"
+                                        />
                                       </div>
                                     </div>
-                                  )}
-                                </div>
 
-                                <div>
-                                  <Label htmlFor="service-description">Description</Label>
-                                  <Textarea
-                                    id="service-description"
-                                    placeholder="Enter service description"
-                                    value={serviceForm.description}
-                                    onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
-                                    required
-                                    rows={3}
-                                    className="resize-none"
-                                    style={{ maxHeight: '120px', overflowY: 'auto' }}
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {serviceForm.description.length}/5000 characters
-                                  </p>
-                                </div>
-                                <div className="flex justify-end space-x-2">
-                                  <Button type="button" variant="outline" onClick={() => {
-                                    setIsServiceDialogOpen(false)
-                                    setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
-                                  }}>
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                                    Add Service
-                                  </Button>
-                                </div>
-                              </form>
+                                    {/* Right Side - Pricing & Details */}
+                                    <div className="col-span-6 space-y-4">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <Label htmlFor="service-price">Price (₹)</Label>
+                                          <Input
+                                            id="service-price"
+                                            type="number"
+                                            placeholder="0"
+                                            value={serviceForm.price}
+                                            onChange={(e) => setServiceForm({...serviceForm, price: e.target.value})}
+                                            required
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="service-duration">Duration</Label>
+                                          <Input
+                                            id="service-duration"
+                                            placeholder="e.g., 2 hours, 1 day"
+                                            value={serviceForm.duration}
+                                            onChange={(e) => setServiceForm({...serviceForm, duration: e.target.value})}
+                                            required
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Image Upload Section */}
+                                      <div>
+                                        <Label htmlFor="service-images">Images</Label>
+                                        <div className="mb-2 mt-1">
+                                          <Button 
+                                            type="button" 
+                                            variant="outline" 
+                                            className="w-full"
+                                            onClick={() => document.getElementById('service-file-upload')?.click()}
+                                          >
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            {uploading ? "Uploading..." : "Upload Image"}
+                                          </Button>
+                                          <Input
+                                            id="service-file-upload"
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            className="sr-only"
+                                            onChange={async (e) => {
+                                              const files = e.target.files
+                                              if (files) {
+                                                const urls = []
+                                                for (let i = 0; i < files.length; i++) {
+                                                  const url = await handleImageUpload(files[i], 'services')
+                                                  if (url) urls.push(url)
+                                                }
+                                                setServiceForm({...serviceForm, images: [...serviceForm.images, ...urls]})
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {serviceForm.images.length > 0 && (
+                                          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
+                                            <div className="space-y-2">
+                                              {serviceForm.images.map((image, index) => {
+                                                const fileName = image.split('/').pop() || `Image ${index + 1}`
+                                                return (
+                                                  <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                                    <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
+                                                    <Button
+                                                      type="button"
+                                                      variant="destructive"
+                                                      size="sm"
+                                                      className="ml-2 h-6 w-6 rounded-full p-0"
+                                                      onClick={() => setServiceForm({...serviceForm, images: serviceForm.images.filter((_, i) => i !== index)})}
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </Button>
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor="service-description">Description</Label>
+                                        <Textarea
+                                          id="service-description"
+                                          placeholder="Enter service description"
+                                          value={serviceForm.description}
+                                          onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
+                                          required
+                                          rows={4}
+                                          className="resize-none mt-1"
+                                          style={{ maxHeight: '120px', overflowY: 'auto' }}
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {serviceForm.description.length}/5000 characters
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {/* Footer */}
+                                    <div className="col-span-10 flex justify-end space-x-2 pt-4 border-t mt-4">
+                                      <Button type="button" variant="outline" onClick={() => {
+                                        setIsServiceDialogOpen(false)
+                                        setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
+                                      }}>
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                                        Add Service
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </form>
+                              </div>
                             </DialogContent>
                           </Dialog>
+
+                          {/* View Service Dialog */}
+                          <Dialog open={isViewServiceDialogOpen} onOpenChange={(open) => {
+                            setIsViewServiceDialogOpen(open)
+                            if (!open) {
+                              setViewServicePage(1)
+                            }
+                          }}>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-4 pb-3 border-b bg-white">
+                                <DialogTitle className="text-xl font-bold flex items-center gap-2">View Service</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 p-4 bg-gray-50/50" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'calc(90vh - 120px)' }}>
+                                {viewingService && (
+                                  <>
+                                    {viewServicePage === 1 ? (
+                                      <div className="grid grid-cols-10 gap-3" style={{ flex: '0 0 auto' }}>
+                                        {/* Left Side - Basic Information */}
+                                        <div className="col-span-4 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Basic Information</h3>
+                                            <div className="space-y-3">
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Service Name</Label>
+                                                <p className="text-sm mt-1">{viewingService.name}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Category</Label>
+                                                <p className="text-sm mt-1">{viewingService.category}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Location</Label>
+                                                <p className="text-sm mt-1">{viewingService.location || 'N/A'}</p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {/* Right Side - Pricing Information */}
+                                        <div className="col-span-6 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Pricing Information</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Price</Label>
+                                                <p className="text-sm mt-1">₹{viewingService.price?.toLocaleString() || 0}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Duration</Label>
+                                                <p className="text-sm mt-1">{viewingService.duration || 'N/A'}</p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-10 gap-3" style={{ flex: '0 0 auto', overflow: 'hidden', maxHeight: 'calc(90vh - 200px)' }}>
+                                        {/* Left Side - Images */}
+                                        <div className="col-span-4" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                          {viewingService.images && viewingService.images.length > 0 ? (
+                                            <div className="bg-white p-4 rounded-lg border">
+                                              <h3 className="text-base font-semibold mb-2">Images</h3>
+                                              <div className="mt-8">
+                                                {viewingService.images.map((img: string, idx: number) => (
+                                                  <div key={idx} className="flex justify-center">
+                                                    <img 
+                                                      src={img} 
+                                                      alt={`${viewingService.name} ${idx + 1}`} 
+                                                      className="w-full max-w-xs h-auto object-contain rounded border border-gray-200" 
+                                                      style={{ maxHeight: '300px' }}
+                                                    />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="bg-white p-4 rounded-lg border">
+                                              <h3 className="text-base font-semibold mb-2">Images</h3>
+                                              <p className="text-sm text-muted-foreground">No images available</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {/* Right Side - Description */}
+                                        <div className="col-span-6" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+                                          <div className="bg-white p-4 rounded-lg border" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: '100%', height: 'fit-content' }}>
+                                            <h3 className="text-base font-semibold mb-2" style={{ flexShrink: 0, marginBottom: '8px' }}>Description</h3>
+                                            <div className="border border-gray-300 rounded-md bg-gray-50" style={{ height: '220px', maxHeight: '220px', minHeight: '220px', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box', width: '100%', position: 'relative' }}>
+                                              <div className="service-description-scroll" style={{ height: '100%', width: '100%', overflowY: 'auto', overflowX: 'hidden', padding: '12px', boxSizing: 'border-box', WebkitOverflowScrolling: 'touch' }}>
+                                                <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ margin: 0, padding: 0, display: 'block', width: '100%', maxWidth: '100%', wordBreak: 'break-word', overflowWrap: 'break-word', boxSizing: 'border-box' }}>
+                                                  {viewingService.description || 'No description available'}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Pagination Controls */}
+                                    <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setViewServicePage(1)}
+                                        disabled={viewServicePage === 1}
+                                      >
+                                        <ArrowLeft className="h-4 w-4 mr-1" />
+                                        Page 1
+                                      </Button>
+                                      <div className="text-sm text-muted-foreground">
+                                        Page {viewServicePage} of 2
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setViewServicePage(2)}
+                                        disabled={viewServicePage === 2}
+                                      >
+                                        Page 2
+                                        <ArrowRight className="h-4 w-4 ml-1" />
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
+                          {/* Edit Service Dialog */}
+                          <Dialog open={isEditServiceDialogOpen} onOpenChange={(open) => {
+                            setIsEditServiceDialogOpen(open)
+                            if (!open) {
+                              setEditServicePage(1)
+                            }
+                          }}>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-4 pb-3 border-b bg-white">
+                                <DialogTitle className="text-xl font-bold flex items-center gap-2">Edit Service</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 p-4 bg-gray-50/50" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'calc(90vh - 120px)' }}>
+                                <form onSubmit={handleUpdateService} className="h-full" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+                                  <>
+                                    {editServicePage === 1 ? (
+                                      <div className="grid grid-cols-10 gap-3" style={{ flex: '0 0 auto' }}>
+                                        {/* Left Side - Basic Information */}
+                                        <div className="col-span-4 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Basic Information</h3>
+                                            <div className="space-y-3">
+                                      <div>
+                                        <Label htmlFor="edit-service-name">Service Name</Label>
+                                        <Input
+                                          id="edit-service-name"
+                                          placeholder="Enter service name"
+                                          value={serviceForm.name}
+                                          onChange={(e) => setServiceForm({...serviceForm, name: e.target.value})}
+                                          required
+                                          className="mt-1"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="edit-service-main-category">Main Category</Label>
+                                        <Select value={serviceForm.mainCategory} onValueChange={(value) => {
+                                          setServiceForm({
+                                            ...serviceForm, 
+                                            mainCategory: value,
+                                            subCategory: "",
+                                            level2Category: ""
+                                          })
+                                        }}>
+                                          <SelectTrigger className="mt-1">
+                                            <SelectValue placeholder="Select main category" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {serviceCategories.map((category) => (
+                                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      
+                                      {serviceForm.mainCategory && getSubCategoriesForMainCategory(serviceForm.mainCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="edit-service-sub-category">Sub Category</Label>
+                                          <Select value={serviceForm.subCategory} onValueChange={(value) => {
+                                            setServiceForm({
+                                              ...serviceForm, 
+                                              subCategory: value,
+                                              level2Category: ""
+                                            })
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getSubCategoriesForMainCategory(serviceForm.mainCategory).map((subCategory) => (
+                                                <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                      
+                                      {serviceForm.mainCategory && serviceForm.subCategory && getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="edit-service-level2-category">Level 2 Sub Category</Label>
+                                          <Select value={serviceForm.level2Category} onValueChange={(value) => {
+                                            setServiceForm({...serviceForm, level2Category: value})
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select level 2 sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getLevel2CategoriesForSubCategory(serviceForm.mainCategory, serviceForm.subCategory).map((level2Category) => (
+                                                <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                              <div>
+                                                <Label htmlFor="edit-service-location">Location</Label>
+                                                <Input
+                                                  id="edit-service-location"
+                                                  placeholder="Enter service location"
+                                                  value={serviceForm.location}
+                                                  onChange={(e) => setServiceForm({...serviceForm, location: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Right Side - Pricing Information */}
+                                        <div className="col-span-6 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Pricing Information</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                <Label htmlFor="edit-service-price">Price (₹)</Label>
+                                                <Input
+                                                  id="edit-service-price"
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={serviceForm.price}
+                                                  onChange={(e) => setServiceForm({...serviceForm, price: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label htmlFor="edit-service-duration">Duration</Label>
+                                                <Input
+                                                  id="edit-service-duration"
+                                                  placeholder="e.g., 2 hours, 1 day"
+                                                  value={serviceForm.duration}
+                                                  onChange={(e) => setServiceForm({...serviceForm, duration: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-10 gap-3" style={{ flex: '0 0 auto', overflow: 'hidden', maxHeight: 'calc(90vh - 200px)' }}>
+                                        {/* Left Side - Images */}
+                                        <div className="col-span-4" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Images</h3>
+                                            <div className="mb-2 mt-8">
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                className="w-full"
+                                                onClick={() => document.getElementById('edit-service-file-upload')?.click()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                {uploading ? "Uploading..." : "Upload Image"}
+                                              </Button>
+                                              <Input
+                                                id="edit-service-file-upload"
+                                                type="file"
+                                                multiple
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={async (e) => {
+                                                  const files = Array.from(e.target.files || [])
+                                                  if (files.length > 0) {
+                                                    setUploading(true)
+                                                    try {
+                                                      const uploadPromises = files.map(file => handleImageUpload(file, 'services'))
+                                                      const uploadedUrls = await Promise.all(uploadPromises)
+                                                      setServiceForm({...serviceForm, images: [...serviceForm.images, ...uploadedUrls]})
+                                                    } catch (error) {
+                                                      console.error('Error uploading images:', error)
+                                                    } finally {
+                                                      setUploading(false)
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                            </div>
+                                            {serviceForm.images.length > 0 ? (
+                                              <div className="space-y-3">
+                                                {serviceForm.images.map((img: string, idx: number) => (
+                                                  <div key={idx} className="flex justify-center relative">
+                                                    <img 
+                                                      src={img} 
+                                                      alt={`Service ${idx + 1}`} 
+                                                      className="w-full max-w-xs h-auto object-contain rounded border border-gray-200" 
+                                                      style={{ maxHeight: '300px' }}
+                                                    />
+                                                    <Button
+                                                      type="button"
+                                                      variant="destructive"
+                                                      size="sm"
+                                                      className="absolute top-1 right-1"
+                                                      onClick={() => {
+                                                        setServiceForm({...serviceForm, images: serviceForm.images.filter((_, i) => i !== idx)})
+                                                      }}
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </Button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-sm text-muted-foreground mt-4">No images available</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* Right Side - Description */}
+                                        <div className="col-span-6" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+                                          <div className="bg-white p-4 rounded-lg border" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: '100%', height: 'fit-content' }}>
+                                            <h3 className="text-base font-semibold mb-2" style={{ flexShrink: 0, marginBottom: '8px' }}>Description</h3>
+                                            <div className="border border-gray-300 rounded-md bg-gray-50" style={{ height: '220px', maxHeight: '220px', minHeight: '220px', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box', width: '100%', position: 'relative' }}>
+                                              <div className="service-description-scroll" style={{ height: '100%', width: '100%', overflowY: 'auto', overflowX: 'hidden', padding: '12px', boxSizing: 'border-box', WebkitOverflowScrolling: 'touch' }}>
+                                                <Textarea
+                                                  id="edit-service-description"
+                                                  placeholder="Enter service description"
+                                                  value={serviceForm.description}
+                                                  onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
+                                                  required
+                                                  className="resize-none border-0 bg-transparent p-0 text-sm whitespace-pre-wrap leading-relaxed"
+                                                  style={{ width: '100%', maxWidth: '100%', minHeight: 'auto', height: 'auto', margin: 0, padding: 0, wordBreak: 'break-word', overflowWrap: 'break-word', display: 'block', boxSizing: 'border-box' }}
+                                                />
+                                              </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1" style={{ flexShrink: 0, marginTop: '8px' }}>
+                                              {serviceForm.description.length}/5000 characters
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Pagination Controls */}
+                                    <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setEditServicePage(1)}
+                                        disabled={editServicePage === 1}
+                                      >
+                                        <ArrowLeft className="h-4 w-4 mr-1" />
+                                        Page 1
+                                      </Button>
+                                      <div className="text-sm text-muted-foreground">
+                                        Page {editServicePage} of 2
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setEditServicePage(2)}
+                                        disabled={editServicePage === 2}
+                                      >
+                                        Page 2
+                                        <ArrowRight className="h-4 w-4 ml-1" />
+                                      </Button>
+                                    </div>
+                                    {/* Footer */}
+                                    <div className="flex justify-end space-x-2 pt-3 border-t mt-3">
+                                      <Button type="button" variant="outline" onClick={() => {
+                                        setIsEditServiceDialogOpen(false)
+                                        setEditingService(null)
+                                        setEditServicePage(1)
+                                        setServiceForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", duration: "", description: "", location: "", images: [] })
+                                      }}>
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                                        Update Service
+                                      </Button>
+                                    </div>
+                                  </>
+                                </form>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                             <Input
@@ -4308,45 +5430,92 @@ export function DashboardPage() {
                               Loading services...
                             </TableCell>
                           </TableRow>
-                        ) : services.map((service: any) => (
-                          <TableRow key={service._id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{service.name}</div>
-                                <div className="text-sm text-muted-foreground">{service.vendor}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{service.category}</TableCell>
-                            <TableCell>₹{service.price.toLocaleString()}</TableCell>
-                            <TableCell>{service.duration}</TableCell>
-                            <TableCell>{service.location}</TableCell>
-                            <TableCell>{service.orders}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                                {service.rating}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={service.status === "Active" ? "default" : "destructive"}>
-                                {service.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service._id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        ) : (
+                          (() => {
+                            const startIndex = (servicesPage - 1) * servicesPerPage
+                            const endIndex = startIndex + servicesPerPage
+                            const paginatedServices = services.slice(startIndex, endIndex)
+                            const totalPages = Math.ceil(services.length / servicesPerPage)
+                            
+                            return (
+                              <>
+                                {paginatedServices.map((service: any) => (
+                                  <TableRow key={service._id}>
+                                    <TableCell>
+                                      <div>
+                                        <div className="font-medium">{service.name}</div>
+                                        <div className="text-sm text-muted-foreground">{service.vendor}</div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{service.category}</TableCell>
+                                    <TableCell>₹{service.price.toLocaleString()}</TableCell>
+                                    <TableCell>{service.duration}</TableCell>
+                                    <TableCell>{service.location}</TableCell>
+                                    <TableCell>{service.orders}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center">
+                                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+                                        {service.rating}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={service.status === "Active" ? "default" : "destructive"}>
+                                        {service.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm" onClick={() => handleViewService(service)}>
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleEditService(service)}>
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service._id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {totalPages > 1 && (
+                                  <TableRow>
+                                    <TableCell colSpan={9} className="py-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-muted-foreground">
+                                          Showing {startIndex + 1} to {Math.min(endIndex, services.length)} of {services.length} entries
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setServicesPage(prev => Math.max(1, prev - 1))}
+                                            disabled={servicesPage === 1}
+                                          >
+                                            <ArrowLeft className="h-4 w-4 mr-1" />
+                                            Previous
+                                          </Button>
+                                          <div className="text-sm text-muted-foreground">
+                                            Page {servicesPage} of {totalPages}
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setServicesPage(prev => Math.min(totalPages, prev + 1))}
+                                            disabled={servicesPage === totalPages}
+                                          >
+                                            Next
+                                            <ArrowRight className="h-4 w-4 ml-1" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            )
+                          })()
+                        )}
                       </TableBody>
                     </Table>
                     </div>
@@ -4385,264 +5554,750 @@ export function DashboardPage() {
                                 Add Product
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Add New Product</DialogTitle>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                                <DialogTitle className="text-2xl font-bold flex items-center gap-2">Add New Product</DialogTitle>
                               </DialogHeader>
-                              <div className="max-h-[80vh] overflow-y-auto">
-                                <form onSubmit={handleProductSubmit} className="space-y-4">
-                                <div>
-                                  <Label htmlFor="product-name">Product Name</Label>
-                                  <Input
-                                    id="product-name"
-                                    placeholder="Enter product name"
-                                    value={productForm.name}
-                                    onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="product-main-category">Main Category</Label>
-                                  <Select value={productForm.mainCategory} onValueChange={(value) => {
-                                    setProductForm({
-                                      ...productForm, 
-                                      mainCategory: value,
-                                      subCategory: "",
-                                      level2Category: ""
-                                    })
-                                  }}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select main category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {productCategories.map((category) => (
-                                        <SelectItem key={category} value={category}>{category}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                
-                                {productForm.mainCategory && getSubCategoriesForMainCategory(productForm.mainCategory).length > 0 && (
-                                  <div>
-                                    <Label htmlFor="product-sub-category">Sub Category</Label>
-                                    <Select value={productForm.subCategory} onValueChange={(value) => {
-                                      setProductForm({
-                                        ...productForm, 
-                                        subCategory: value,
-                                        level2Category: ""
-                                      })
-                                    }}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select sub category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {getSubCategoriesForMainCategory(productForm.mainCategory).map((subCategory) => (
-                                          <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                                
-                                {productForm.mainCategory && productForm.subCategory && getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).length > 0 && (
-                                  <div>
-                                    <Label htmlFor="product-level2-category">Level 2 Sub Category</Label>
-                                    <Select value={productForm.level2Category} onValueChange={(value) => {
-                                      setProductForm({...productForm, level2Category: value})
-                                    }}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select level 2 sub category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).map((level2Category) => (
-                                          <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <Label htmlFor="product-mrp">MRP (₹)</Label>
-                                    <Input
-                                      id="product-mrp"
-                                      type="number"
-                                      placeholder="0"
-                                      min="0"
-                                      step="0.01"
-                                      value={productForm.mrp}
-                                      onChange={(e) => {
-                                        const mrp = parseFloat(e.target.value) || 0
-                                        const offerPrice = parseFloat(productForm.offerPrice) || 0
-                                        const discount = mrp - offerPrice
-                                        setProductForm({...productForm, mrp: e.target.value})
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="product-offer-price">Offer Price (₹)</Label>
-                                    <Input
-                                      id="product-offer-price"
-                                      type="number"
-                                      placeholder="0"
-                                      min="0"
-                                      step="0.01"
-                                      value={productForm.offerPrice}
-                                      onChange={(e) => {
-                                        const offerPrice = parseFloat(e.target.value) || 0
-                                        const mrp = parseFloat(productForm.mrp) || 0
-                                        const discount = mrp - offerPrice
-                                        setProductForm({...productForm, offerPrice: e.target.value})
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="product-gst">GST (%)</Label>
-                                    <Input
-                                      id="product-gst"
-                                      type="number"
-                                      placeholder="0"
-                                      min="0"
-                                      max="100"
-                                      step="0.01"
-                                      value={productForm.gstPercentage}
-                                      onChange={(e) => setProductForm({...productForm, gstPercentage: e.target.value})}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-                                {/* Calculated Values Display */}
-                                {(productForm.mrp || productForm.offerPrice || productForm.gstPercentage) && (
-                                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                                <form onSubmit={handleProductSubmit} className="h-full">
+                                  <div className="grid grid-cols-10 gap-4">
+                                    {/* Left Side - Basic Information */}
+                                    <div className="col-span-4 space-y-4">
                                       <div>
-                                        <span className="text-muted-foreground">Discount: </span>
-                                        <span className="font-semibold text-green-600">
-                                          ₹{((parseFloat(productForm.mrp) || 0) - (parseFloat(productForm.offerPrice) || 0)).toFixed(2)}
-                                        </span>
+                                        <Label htmlFor="product-name">Product Name</Label>
+                                        <Input
+                                          id="product-name"
+                                          placeholder="Enter product name"
+                                          value={productForm.name}
+                                          onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                                          required
+                                          className="mt-1"
+                                        />
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Final Price (Offer + GST): </span>
-                                        <span className="font-semibold text-blue-600">
-                                          ₹{(() => {
-                                            const offerPrice = parseFloat(productForm.offerPrice) || 0
-                                            const gstPercentage = parseFloat(productForm.gstPercentage) || 0
-                                            const gstAmount = (offerPrice * gstPercentage) / 100
-                                            return (offerPrice + gstAmount).toFixed(2)
-                                          })()}
-                                        </span>
+                                        <Label htmlFor="product-main-category">Main Category</Label>
+                                        <Select value={productForm.mainCategory} onValueChange={(value) => {
+                                          setProductForm({
+                                            ...productForm, 
+                                            mainCategory: value,
+                                            subCategory: "",
+                                            level2Category: ""
+                                          })
+                                        }}>
+                                          <SelectTrigger className="mt-1">
+                                            <SelectValue placeholder="Select main category" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {productCategories.map((category) => (
+                                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      
+                                      {productForm.mainCategory && getSubCategoriesForMainCategory(productForm.mainCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="product-sub-category">Sub Category</Label>
+                                          <Select value={productForm.subCategory} onValueChange={(value) => {
+                                            setProductForm({
+                                              ...productForm, 
+                                              subCategory: value,
+                                              level2Category: ""
+                                            })
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getSubCategoriesForMainCategory(productForm.mainCategory).map((subCategory) => (
+                                                <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                      
+                                      {productForm.mainCategory && productForm.subCategory && getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).length > 0 && (
+                                        <div>
+                                          <Label htmlFor="product-level2-category">Level 2 Sub Category</Label>
+                                          <Select value={productForm.level2Category} onValueChange={(value) => {
+                                            setProductForm({...productForm, level2Category: value})
+                                          }}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Select level 2 sub category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).map((level2Category) => (
+                                                <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                      <div>
+                                        <Label htmlFor="product-stock">Stock Quantity</Label>
+                                        <Input
+                                          id="product-stock"
+                                          type="number"
+                                          placeholder="0"
+                                          value={productForm.stock}
+                                          onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                                          required
+                                          className="mt-1"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="product-hsl-code">HSL Code</Label>
+                                        <Input
+                                          id="product-hsl-code"
+                                          placeholder="Enter HSL Code"
+                                          value={productForm.hslCode}
+                                          onChange={(e) => setProductForm({...productForm, hslCode: e.target.value})}
+                                          className="mt-1"
+                                        />
                                       </div>
                                     </div>
-                                  </div>
-                                )}
-                                  <div>
-                                    <Label htmlFor="product-stock">Stock Quantity</Label>
-                                    <Input
-                                      id="product-stock"
-                                      type="number"
-                                      placeholder="0"
-                                      value={productForm.stock}
-                                      onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
-                                      required
-                                    />
-                                </div>
-                                <div>
-                                  <Label htmlFor="product-description">Description</Label>
-                                  <Textarea
-                                    id="product-description"
-                                    placeholder="Enter product description"
-                                    value={productForm.description}
-                                    onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                                    required
-                                    rows={3}
-                                    className="resize-none"
-                                    style={{ maxHeight: '120px', overflowY: 'auto' }}
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {productForm.description.length}/5000 characters
-                                  </p>
-                                </div>
-                                <div>
-                                  <Label htmlFor="product-hsl-code">HSL Code</Label>
-                                  <Input
-                                    id="product-hsl-code"
-                                    placeholder="Enter HSL Code"
-                                    value={productForm.hslCode}
-                                    onChange={(e) => setProductForm({...productForm, hslCode: e.target.value})}
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="product-images">Images</Label>
-                                  <div className="mb-2">
-                                    <Button 
-                                      type="button" 
-                                      variant="outline" 
-                                      className="w-full"
-                                      onClick={() => document.getElementById('file-upload')?.click()}
-                                    >
-                                      <Upload className="h-4 w-4 mr-2" />
-                                      {uploading ? "Uploading..." : "Upload Image"}
-                                    </Button>
-                                    <Input
-                                      id="file-upload"
-                                      type="file"
-                                      multiple
-                                      accept="image/*"
-                                      className="sr-only"
-                                      onChange={async (e) => {
-                                        const files = e.target.files
-                                        if (files) {
-                                          const urls = []
-                                          for (let i = 0; i < files.length; i++) {
-                                            const url = await handleImageUpload(files[i], 'products')
-                                            if (url) urls.push(url)
-                                          }
-                                          setProductForm({...productForm, images: [...productForm.images, ...urls]})
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                  {productForm.images.length > 0 && (
-                                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
-                                      <div className="space-y-2">
-                                        {productForm.images.map((image, index) => {
-                                          const fileName = image.split('/').pop() || `Image ${index + 1}`
-                                          return (
-                                            <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
-                                              <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
-                                              <Button
-                                                type="button"
-                                                variant="destructive"
-                                                size="sm"
-                                                className="ml-2 h-6 w-6 rounded-full p-0"
-                                                onClick={() => setProductForm({...productForm, images: productForm.images.filter((_, i) => i !== index)})}
-                                              >
-                                                <X className="h-3 w-3" />
-                                              </Button>
+
+                                    {/* Right Side - Pricing & Details */}
+                                    <div className="col-span-6 space-y-4">
+                                      <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                          <Label htmlFor="product-mrp">MRP (₹)</Label>
+                                          <Input
+                                            id="product-mrp"
+                                            type="number"
+                                            placeholder="0"
+                                            min="0"
+                                            step="0.01"
+                                            value={productForm.mrp}
+                                            onChange={(e) => {
+                                              const mrp = parseFloat(e.target.value) || 0
+                                              const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                              const discount = mrp - offerPrice
+                                              setProductForm({...productForm, mrp: e.target.value})
+                                            }}
+                                            required
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="product-offer-price">Offer Price (₹)</Label>
+                                          <Input
+                                            id="product-offer-price"
+                                            type="number"
+                                            placeholder="0"
+                                            min="0"
+                                            step="0.01"
+                                            value={productForm.offerPrice}
+                                            onChange={(e) => {
+                                              const offerPrice = parseFloat(e.target.value) || 0
+                                              const mrp = parseFloat(productForm.mrp) || 0
+                                              const discount = mrp - offerPrice
+                                              setProductForm({...productForm, offerPrice: e.target.value})
+                                            }}
+                                            required
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="product-gst">GST (%)</Label>
+                                          <Input
+                                            id="product-gst"
+                                            type="number"
+                                            placeholder="0"
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            value={productForm.gstPercentage}
+                                            onChange={(e) => setProductForm({...productForm, gstPercentage: e.target.value})}
+                                            required
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                      </div>
+                                      {/* Calculated Values Display */}
+                                      {(productForm.mrp || productForm.offerPrice || productForm.gstPercentage) && (
+                                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                          <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                              <span className="text-muted-foreground">Discount: </span>
+                                              <span className="font-semibold text-green-600">
+                                                ₹{((parseFloat(productForm.mrp) || 0) - (parseFloat(productForm.offerPrice) || 0)).toFixed(2)}
+                                              </span>
                                             </div>
-                                          )
-                                        })}
+                                            <div>
+                                              <span className="text-muted-foreground">Final Price (Offer + GST): </span>
+                                              <span className="font-semibold text-blue-600">
+                                                ₹{(() => {
+                                                  const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                                  const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+                                                  const gstAmount = (offerPrice * gstPercentage) / 100
+                                                  return (offerPrice + gstAmount).toFixed(2)
+                                                })()}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div>
+                                        <Label htmlFor="product-description">Description</Label>
+                                        <Textarea
+                                          id="product-description"
+                                          placeholder="Enter product description"
+                                          value={productForm.description}
+                                          onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+                                          required
+                                          rows={4}
+                                          className="resize-none mt-1"
+                                          style={{ maxHeight: '120px', overflowY: 'auto' }}
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {productForm.description.length}/5000 characters
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="product-images">Images</Label>
+                                        <div className="mb-2 mt-1">
+                                          <Button 
+                                            type="button" 
+                                            variant="outline" 
+                                            className="w-full"
+                                            onClick={() => document.getElementById('file-upload')?.click()}
+                                          >
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            {uploading ? "Uploading..." : "Upload Image"}
+                                          </Button>
+                                          <Input
+                                            id="file-upload"
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            className="sr-only"
+                                            onChange={async (e) => {
+                                              const files = e.target.files
+                                              if (files) {
+                                                const urls = []
+                                                for (let i = 0; i < files.length; i++) {
+                                                  const url = await handleImageUpload(files[i], 'products')
+                                                  if (url) urls.push(url)
+                                                }
+                                                setProductForm({...productForm, images: [...productForm.images, ...urls]})
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {productForm.images.length > 0 && (
+                                          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 max-h-[150px] overflow-y-auto">
+                                            <div className="space-y-2">
+                                              {productForm.images.map((image, index) => {
+                                                const fileName = image.split('/').pop() || `Image ${index + 1}`
+                                                return (
+                                                  <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                                    <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
+                                                    <Button
+                                                      type="button"
+                                                      variant="destructive"
+                                                      size="sm"
+                                                      className="ml-2 h-6 w-6 rounded-full p-0"
+                                                      onClick={() => setProductForm({...productForm, images: productForm.images.filter((_, i) => i !== index)})}
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </Button>
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="flex justify-end space-x-2">
-                                  <Button type="button" variant="outline" onClick={() => {
-                                    setIsProductDialogOpen(false)
-                                    setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
-                                  }}>
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                                    Add Product
-                                  </Button>
-                                </div>
-                              </form>
+                                  </div>
+                                  {/* Footer */}
+                                  <div className="col-span-10 flex justify-end space-x-2 pt-4 border-t mt-4">
+                                    <Button type="button" variant="outline" onClick={() => {
+                                      setIsProductDialogOpen(false)
+                                      setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
+                                    }}>
+                                      Cancel
+                                    </Button>
+                                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                                      Add Product
+                                    </Button>
+                                  </div>
+                                </form>
                               </div>
                             </DialogContent>
                           </Dialog>
+                          
+                          {/* View Product Dialog */}
+                          <Dialog open={isViewProductDialogOpen} onOpenChange={(open) => {
+                            setIsViewProductDialogOpen(open)
+                            if (!open) {
+                              setViewProductPage(1)
+                            }
+                          }}>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                                <DialogTitle className="text-2xl font-bold flex items-center gap-2">View Product</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                                {viewingProduct && (
+                                  <>
+                                    {viewProductPage === 1 ? (
+                                      <div className="grid grid-cols-10 gap-4">
+                                        {/* Left Side - Basic Information */}
+                                        <div className="col-span-4 space-y-4">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-3">Basic Information</h3>
+                                            <div className="space-y-3">
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Product Name</Label>
+                                                <p className="text-sm mt-1">{viewingProduct.name}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Category</Label>
+                                                <p className="text-sm mt-1">{viewingProduct.category}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Stock Quantity</Label>
+                                                <p className="text-sm mt-1">{viewingProduct.stock}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">HSL Code</Label>
+                                                <p className="text-sm mt-1">{viewingProduct.hslCode || 'N/A'}</p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {/* Right Side - Pricing & Details */}
+                                        <div className="col-span-6 space-y-4">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-3">Pricing Information</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">MRP</Label>
+                                                <p className="text-sm mt-1">₹{(viewingProduct.mrp || viewingProduct.price || 0).toLocaleString()}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Offer Price</Label>
+                                                <p className="text-sm mt-1">₹{(viewingProduct.offerPrice || viewingProduct.price || 0).toLocaleString()}</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">GST (%)</Label>
+                                                <p className="text-sm mt-1">{viewingProduct.gstPercentage || 0}%</p>
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Final Price</Label>
+                                                <p className="text-sm mt-1">₹{(viewingProduct.finalPrice || viewingProduct.price || 0).toLocaleString()}</p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-10 gap-4">
+                                        {/* Left Side - Images */}
+                                        <div className="col-span-4 space-y-4">
+                                          {viewingProduct.images && viewingProduct.images.length > 0 ? (
+                                            <div className="bg-white p-4 rounded-lg border">
+                                              <h3 className="text-base font-semibold mb-3">Images</h3>
+                                              <div className="space-y-3 mt-8">
+                                                {viewingProduct.images.map((img: string, idx: number) => (
+                                                  <div key={idx} className="flex justify-center">
+                                                    <img 
+                                                      src={img} 
+                                                      alt={`${viewingProduct.name} ${idx + 1}`} 
+                                                      className="w-full max-w-xs h-auto object-contain rounded border border-gray-200" 
+                                                      style={{ maxHeight: '300px' }}
+                                                    />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="bg-white p-4 rounded-lg border">
+                                              <h3 className="text-base font-semibold mb-3">Images</h3>
+                                              <p className="text-sm text-muted-foreground">No images available</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {/* Right Side - Description */}
+                                        <div className="col-span-6 space-y-4">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-3">Description</h3>
+                                            <div className="border border-gray-300 rounded-md p-3 bg-gray-50" style={{ height: '96px', overflowY: 'auto' }}>
+                                              <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ lineHeight: '1.5' }}>
+                                                {viewingProduct.description || 'No description'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Pagination Controls */}
+                                    <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setViewProductPage(1)}
+                                        disabled={viewProductPage === 1}
+                                      >
+                                        <ArrowLeft className="h-4 w-4 mr-1" />
+                                        Page 1
+                                      </Button>
+                                      <div className="text-sm text-muted-foreground">
+                                        Page {viewProductPage} of 2
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setViewProductPage(2)}
+                                        disabled={viewProductPage === 2}
+                                      >
+                                        Page 2
+                                        <ArrowRight className="h-4 w-4 ml-1" />
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
+                          {/* Edit Product Dialog */}
+                          <Dialog open={isEditProductDialogOpen} onOpenChange={(open) => {
+                            setIsEditProductDialogOpen(open)
+                            if (!open) {
+                              setEditProductPage(1)
+                            }
+                          }}>
+                            <DialogContent className="p-0" style={{ width: '90vw', maxWidth: '1400px', height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <DialogHeader className="flex-shrink-0 px-6 pt-4 pb-3 border-b bg-white">
+                                <DialogTitle className="text-xl font-bold flex items-center gap-2">Edit Product</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50">
+                                <form onSubmit={handleUpdateProduct} className="h-full">
+                                  <>
+                                    {editProductPage === 1 ? (
+                                      <div className="grid grid-cols-10 gap-3">
+                                        {/* Left Side - Basic Information */}
+                                        <div className="col-span-4 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Basic Information</h3>
+                                            <div className="space-y-3">
+                                              <div>
+                                                <Label htmlFor="edit-product-name">Product Name</Label>
+                                                <Input
+                                                  id="edit-product-name"
+                                                  placeholder="Enter product name"
+                                                  value={productForm.name}
+                                                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label htmlFor="edit-product-main-category">Main Category</Label>
+                                                <Select value={productForm.mainCategory} onValueChange={(value) => {
+                                                  setProductForm({
+                                                    ...productForm, 
+                                                    mainCategory: value,
+                                                    subCategory: "",
+                                                    level2Category: ""
+                                                  })
+                                                }}>
+                                                  <SelectTrigger className="mt-1">
+                                                    <SelectValue placeholder="Select main category" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {productCategories.map((category) => (
+                                                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              
+                                              {productForm.mainCategory && getSubCategoriesForMainCategory(productForm.mainCategory).length > 0 && (
+                                                <div>
+                                                  <Label htmlFor="edit-product-sub-category">Sub Category</Label>
+                                                  <Select value={productForm.subCategory} onValueChange={(value) => {
+                                                    setProductForm({
+                                                      ...productForm, 
+                                                      subCategory: value,
+                                                      level2Category: ""
+                                                    })
+                                                  }}>
+                                                    <SelectTrigger className="mt-1">
+                                                      <SelectValue placeholder="Select sub category" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {getSubCategoriesForMainCategory(productForm.mainCategory).map((subCategory) => (
+                                                        <SelectItem key={subCategory} value={subCategory}>{subCategory}</SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                              )}
+                                              
+                                              {productForm.mainCategory && productForm.subCategory && getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).length > 0 && (
+                                                <div>
+                                                  <Label htmlFor="edit-product-level2-category">Level 2 Sub Category</Label>
+                                                  <Select value={productForm.level2Category} onValueChange={(value) => {
+                                                    setProductForm({...productForm, level2Category: value})
+                                                  }}>
+                                                    <SelectTrigger className="mt-1">
+                                                      <SelectValue placeholder="Select level 2 sub category" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {getLevel2CategoriesForSubCategory(productForm.mainCategory, productForm.subCategory).map((level2Category) => (
+                                                        <SelectItem key={level2Category} value={level2Category}>{level2Category}</SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                              )}
+                                              <div>
+                                                <Label htmlFor="edit-product-stock">Stock Quantity</Label>
+                                                <Input
+                                                  id="edit-product-stock"
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={productForm.stock}
+                                                  onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label htmlFor="edit-product-hsl-code">HSL Code</Label>
+                                                <Input
+                                                  id="edit-product-hsl-code"
+                                                  placeholder="Enter HSL Code"
+                                                  value={productForm.hslCode}
+                                                  onChange={(e) => setProductForm({...productForm, hslCode: e.target.value})}
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Right Side - Pricing Information */}
+                                        <div className="col-span-6 space-y-3">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-2">Pricing Information</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                <Label htmlFor="edit-product-mrp">MRP (₹)</Label>
+                                                <Input
+                                                  id="edit-product-mrp"
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={productForm.mrp}
+                                                  onChange={(e) => setProductForm({...productForm, mrp: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label htmlFor="edit-product-offer-price">Offer Price (₹)</Label>
+                                                <Input
+                                                  id="edit-product-offer-price"
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={productForm.offerPrice}
+                                                  onChange={(e) => setProductForm({...productForm, offerPrice: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label htmlFor="edit-product-gst">GST (%)</Label>
+                                                <Input
+                                                  id="edit-product-gst"
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={productForm.gstPercentage}
+                                                  onChange={(e) => setProductForm({...productForm, gstPercentage: e.target.value})}
+                                                  required
+                                                  className="mt-1"
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label className="text-sm font-medium text-gray-600">Final Price</Label>
+                                                <p className="text-sm mt-1">
+                                                  ₹{(() => {
+                                                    const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                                    const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+                                                    const gstAmount = (offerPrice * gstPercentage) / 100
+                                                    return (offerPrice + gstAmount).toFixed(2)
+                                                  })()}
+                                                </p>
+                                              </div>
+                                            </div>
+                                            {/* Calculated Values Display */}
+                                            {(productForm.mrp || productForm.offerPrice || productForm.gstPercentage) && (
+                                              <div className="bg-gray-50 p-4 rounded-lg space-y-2 mt-4">
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                  <div>
+                                                    <span className="text-muted-foreground">Discount: </span>
+                                                    <span className="font-semibold text-green-600">
+                                                      ₹{((parseFloat(productForm.mrp) || 0) - (parseFloat(productForm.offerPrice) || 0)).toFixed(2)}
+                                                    </span>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-foreground">Final Price (Offer + GST): </span>
+                                                    <span className="font-semibold text-blue-600">
+                                                      ₹{(() => {
+                                                        const offerPrice = parseFloat(productForm.offerPrice) || 0
+                                                        const gstPercentage = parseFloat(productForm.gstPercentage) || 0
+                                                        const gstAmount = (offerPrice * gstPercentage) / 100
+                                                        return (offerPrice + gstAmount).toFixed(2)
+                                                      })()}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-10 gap-4">
+                                        {/* Left Side - Images */}
+                                        <div className="col-span-4 space-y-4">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-3">Images</h3>
+                                            <div className="mb-2 mt-8">
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                className="w-full"
+                                                onClick={() => document.getElementById('edit-product-file-upload')?.click()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                {uploading ? "Uploading..." : "Upload Image"}
+                                              </Button>
+                                              <Input
+                                                id="edit-product-file-upload"
+                                                type="file"
+                                                multiple
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={async (e) => {
+                                                  const files = Array.from(e.target.files || [])
+                                                  if (files.length > 0) {
+                                                    setUploading(true)
+                                                    try {
+                                                      const uploadPromises = files.map(file => handleImageUpload(file, 'products'))
+                                                      const uploadedUrls = await Promise.all(uploadPromises)
+                                                      setProductForm({...productForm, images: [...productForm.images, ...uploadedUrls]})
+                                                    } catch (error) {
+                                                      console.error('Error uploading images:', error)
+                                                    } finally {
+                                                      setUploading(false)
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                            </div>
+                                            {productForm.images.length > 0 ? (
+                                              <div className="space-y-3">
+                                                {productForm.images.map((img: string, idx: number) => (
+                                                  <div key={idx} className="flex justify-center relative">
+                                                    <img 
+                                                      src={img} 
+                                                      alt={`Product ${idx + 1}`} 
+                                                      className="w-full max-w-xs h-auto object-contain rounded border border-gray-200" 
+                                                      style={{ maxHeight: '300px' }}
+                                                    />
+                                                    <Button
+                                                      type="button"
+                                                      variant="destructive"
+                                                      size="sm"
+                                                      className="absolute top-1 right-1"
+                                                      onClick={() => {
+                                                        setProductForm({...productForm, images: productForm.images.filter((_, i) => i !== idx)})
+                                                      }}
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </Button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-sm text-muted-foreground mt-4">No images available</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* Right Side - Description */}
+                                        <div className="col-span-6 space-y-4">
+                                          <div className="bg-white p-4 rounded-lg border">
+                                            <h3 className="text-base font-semibold mb-3">Description</h3>
+                                            <div className="border border-gray-300 rounded-md p-3 bg-gray-50" style={{ height: '96px', overflowY: 'auto' }}>
+                                              <Textarea
+                                                id="edit-product-description"
+                                                placeholder="Enter product description"
+                                                value={productForm.description}
+                                                onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+                                                required
+                                                className="resize-none border-0 bg-transparent p-0 text-sm whitespace-pre-wrap leading-relaxed"
+                                                style={{ lineHeight: '1.5', minHeight: '96px', height: 'auto' }}
+                                              />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              {productForm.description.length}/5000 characters
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Pagination Controls */}
+                                    <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setEditProductPage(1)}
+                                        disabled={editProductPage === 1}
+                                      >
+                                        <ArrowLeft className="h-4 w-4 mr-1" />
+                                        Page 1
+                                      </Button>
+                                      <div className="text-sm text-muted-foreground">
+                                        Page {editProductPage} of 2
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setEditProductPage(2)}
+                                        disabled={editProductPage === 2}
+                                      >
+                                        Page 2
+                                        <ArrowRight className="h-4 w-4 ml-1" />
+                                      </Button>
+                                    </div>
+                                    {/* Footer */}
+                                    <div className="flex justify-end space-x-2 pt-3 border-t mt-3">
+                                      <Button type="button" variant="outline" onClick={() => {
+                                        setIsEditProductDialogOpen(false)
+                                        setEditingProduct(null)
+                                        setEditProductPage(1)
+                                        setProductForm({ name: "", mainCategory: "", subCategory: "", level2Category: "", price: "", mrp: "", offerPrice: "", gstPercentage: "", stock: "", description: "", hslCode: "", images: [] })
+                                      }}>
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                                        Update Product
+                                      </Button>
+                                    </div>
+                                  </>
+                                </form>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                             <Input
@@ -4689,53 +6344,99 @@ export function DashboardPage() {
                               Loading products...
                             </TableCell>
                           </TableRow>
-                        ) : products
-                          .filter((product: any) => 
-                            product.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                            (selectedCategory === "all" || product.category === selectedCategory)
-                          )
-                          .map((product: any) => (
-                          <TableRow key={product._id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{product.name}</div>
-                                <div className="text-sm text-muted-foreground">{product.vendor}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{product.category}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">₹{(product.mrp || product.price || 0).toLocaleString()}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm font-medium">₹{(product.offerPrice || product.price || 0).toLocaleString()}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm font-semibold text-green-600">
-                                ₹{((product.mrp || product.price || 0) - (product.offerPrice || product.price || 0)).toLocaleString()}
-                              </div>
-                            </TableCell>
-                            <TableCell>{product.stock}</TableCell>
-                            <TableCell>{product.orders}</TableCell>
-                            <TableCell>
-                              <Badge variant={product.status === "Active" ? "default" : "destructive"}>
-                                {product.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product._id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        ) : (
+                          (() => {
+                            const filteredProducts = products.filter((product: any) => 
+                              product.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                              (selectedCategory === "all" || product.category === selectedCategory)
+                            )
+                            const startIndex = (productsPage - 1) * productsPerPage
+                            const endIndex = startIndex + productsPerPage
+                            const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
+                            const totalPages = Math.ceil(filteredProducts.length / productsPerPage)
+                            
+                            return (
+                              <>
+                                {paginatedProducts.map((product: any) => (
+                                  <TableRow key={product._id}>
+                                    <TableCell>
+                                      <div>
+                                        <div className="font-medium">{product.name}</div>
+                                        <div className="text-sm text-muted-foreground">{product.vendor}</div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{product.category}</TableCell>
+                                    <TableCell>
+                                      <div className="text-sm">₹{(product.mrp || product.price || 0).toLocaleString()}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="text-sm font-medium">₹{(product.offerPrice || product.price || 0).toLocaleString()}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="text-sm font-semibold text-green-600">
+                                        ₹{((product.mrp || product.price || 0) - (product.offerPrice || product.price || 0)).toLocaleString()}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{product.stock}</TableCell>
+                                    <TableCell>{product.orders}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={product.status === "Active" ? "default" : "destructive"}>
+                                        {product.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm" onClick={() => handleViewProduct(product)}>
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product._id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {totalPages > 1 && (
+                                  <TableRow>
+                                    <TableCell colSpan={9} className="py-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-muted-foreground">
+                                          Showing {startIndex + 1} to {Math.min(endIndex, filteredProducts.length)} of {filteredProducts.length} entries
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setProductsPage(prev => Math.max(1, prev - 1))}
+                                            disabled={productsPage === 1}
+                                          >
+                                            <ArrowLeft className="h-4 w-4 mr-1" />
+                                            Previous
+                                          </Button>
+                                          <div className="text-sm text-muted-foreground">
+                                            Page {productsPage} of {totalPages}
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setProductsPage(prev => Math.min(totalPages, prev + 1))}
+                                            disabled={productsPage === totalPages}
+                                          >
+                                            Next
+                                            <ArrowRight className="h-4 w-4 ml-1" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            )
+                          })()
+                        )}
                       </TableBody>
                     </Table>
                     </div>
@@ -4798,99 +6499,122 @@ export function DashboardPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          <>
-                            {/* Products */}
-                            {products
+                          (() => {
+                            // Combine and filter products and services
+                            const filteredProducts = products
                               .filter((product: any) => 
                                 product.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
                                 (selectedCategory === "all" || product.category === selectedCategory)
                               )
-                              .map((product: any) => (
-                              <TableRow key={`product-${product._id}`}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{product.name}</div>
-                                    <div className="text-sm text-muted-foreground">{product.vendor}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">Product</Badge>
-                                </TableCell>
-                                <TableCell>{product.category}</TableCell>
-                                <TableCell>₹{product.price.toLocaleString()}</TableCell>
-                                <TableCell>
-                                  <div className="text-sm">
-                                    <div>Stock: {product.stock}</div>
-                                    <div>Orders: {product.orders}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={product.status === "Active" ? "default" : "destructive"}>
-                                    {product.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                            {/* Services */}
-                            {services
+                              .map((product: any) => ({ ...product, type: 'product' }))
+                            
+                            const filteredServices = services
                               .filter((service: any) => 
                                 service.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
                                 (selectedCategory === "all" || service.category === selectedCategory)
                               )
-                              .map((service: any) => (
-                              <TableRow key={`service-${service._id}`}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{service.name}</div>
-                                    <div className="text-sm text-muted-foreground">{service.vendor}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary">Service</Badge>
-                                </TableCell>
-                                <TableCell>{service.category}</TableCell>
-                                <TableCell>₹{service.price.toLocaleString()}</TableCell>
-                                <TableCell>
-                                  <div className="text-sm">
-                                    <div>Duration: {service.duration}</div>
-                                    <div>Location: {service.location}</div>
-                                    <div>Orders: {service.orders}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={service.status === "Active" ? "default" : "destructive"}>
-                                    {service.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </>
+                              .map((service: any) => ({ ...service, type: 'service' }))
+                            
+                            const allItems = [...filteredProducts, ...filteredServices]
+                            const startIndex = (allItemsPage - 1) * allItemsPerPage
+                            const endIndex = startIndex + allItemsPerPage
+                            const paginatedItems = allItems.slice(startIndex, endIndex)
+                            const totalPages = Math.ceil(allItems.length / allItemsPerPage)
+                            
+                            return (
+                              <>
+                                {paginatedItems.map((item: any) => (
+                                  <TableRow key={`${item.type}-${item._id}`}>
+                                    <TableCell>
+                                      <div>
+                                        <div className="font-medium">{item.name}</div>
+                                        <div className="text-sm text-muted-foreground">{item.vendor}</div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {item.type === 'product' ? (
+                                        <Badge variant="outline">Product</Badge>
+                                      ) : (
+                                        <Badge variant="secondary">Service</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{item.category}</TableCell>
+                                    <TableCell>₹{item.price.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                      {item.type === 'product' ? (
+                                        <div className="text-sm">
+                                          <div>Stock: {item.stock}</div>
+                                          <div>Orders: {item.orders}</div>
+                                        </div>
+                                      ) : (
+                                        <div className="text-sm">
+                                          <div>Duration: {item.duration}</div>
+                                          <div>Location: {item.location}</div>
+                                          <div>Orders: {item.orders}</div>
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={item.status === "Active" ? "default" : "destructive"}>
+                                        {item.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm">
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm">
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => item.type === 'product' ? handleDeleteProduct(item._id) : handleDeleteService(item._id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {totalPages > 1 && (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="py-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-muted-foreground">
+                                          Showing {startIndex + 1} to {Math.min(endIndex, allItems.length)} of {allItems.length} entries
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setAllItemsPage(prev => Math.max(1, prev - 1))}
+                                            disabled={allItemsPage === 1}
+                                          >
+                                            <ArrowLeft className="h-4 w-4 mr-1" />
+                                            Previous
+                                          </Button>
+                                          <div className="text-sm text-muted-foreground">
+                                            Page {allItemsPage} of {totalPages}
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setAllItemsPage(prev => Math.min(totalPages, prev + 1))}
+                                            disabled={allItemsPage === totalPages}
+                                          >
+                                            Next
+                                            <ArrowRight className="h-4 w-4 ml-1" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            )
+                          })()
                         )}
                       </TableBody>
                     </Table>
@@ -5161,33 +6885,78 @@ export function DashboardPage() {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            categories.map((category: any) => (
-                              <TableRow key={category._id}>
-                                <TableCell>
-                                  <div className="font-medium">{category.name}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={category.mainUse === "product" ? "default" : "secondary"}>
-                                    {category.mainUse === "product" ? "Product" : "Service"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
-                                    {new Date(category.createdAt).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteCategory(category._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                            (() => {
+                              const startIndex = (categoriesPage - 1) * categoriesPerPage
+                              const endIndex = startIndex + categoriesPerPage
+                              const paginatedCategories = categories.slice(startIndex, endIndex)
+                              const totalPages = Math.ceil(categories.length / categoriesPerPage)
+                              
+                              return (
+                                <>
+                                  {paginatedCategories.map((category: any) => (
+                                    <TableRow key={category._id}>
+                                      <TableCell>
+                                        <div className="font-medium">{category.name}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={category.mainUse === "product" ? "default" : "secondary"}>
+                                          {category.mainUse === "product" ? "Product" : "Service"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="text-sm text-muted-foreground">
+                                          {new Date(category.createdAt).toLocaleDateString()}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex space-x-2">
+                                          <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" onClick={() => deleteCategory(category._id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  {totalPages > 1 && (
+                                    <TableRow>
+                                      <TableCell colSpan={4} className="py-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="text-sm text-muted-foreground">
+                                            Showing {startIndex + 1} to {Math.min(endIndex, categories.length)} of {categories.length} entries
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setCategoriesPage(prev => Math.max(1, prev - 1))}
+                                              disabled={categoriesPage === 1}
+                                            >
+                                              <ArrowLeft className="h-4 w-4 mr-1" />
+                                              Previous
+                                            </Button>
+                                            <div className="text-sm text-muted-foreground">
+                                              Page {categoriesPage} of {totalPages}
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setCategoriesPage(prev => Math.min(totalPages, prev + 1))}
+                                              disabled={categoriesPage === totalPages}
+                                            >
+                                              Next
+                                              <ArrowRight className="h-4 w-4 ml-1" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              )
+                            })()
                           )}
                         </TableBody>
                       </Table>
@@ -5222,36 +6991,81 @@ export function DashboardPage() {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            subCategories.map((subCategory: any) => (
-                              <TableRow key={subCategory._id}>
-                                <TableCell>
-                                  <div className="font-medium">{subCategory.name}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{subCategory.mainCategory}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={subCategory.mainUse === "product" ? "default" : "secondary"}>
-                                    {subCategory.mainUse === "product" ? "Product" : "Service"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
-                                    {new Date(subCategory.createdAt).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditSubCategory(subCategory)}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteSubCategory(subCategory._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                            (() => {
+                              const startIndex = (subCategoriesPage - 1) * subCategoriesPerPage
+                              const endIndex = startIndex + subCategoriesPerPage
+                              const paginatedSubCategories = subCategories.slice(startIndex, endIndex)
+                              const totalPages = Math.ceil(subCategories.length / subCategoriesPerPage)
+                              
+                              return (
+                                <>
+                                  {paginatedSubCategories.map((subCategory: any) => (
+                                    <TableRow key={subCategory._id}>
+                                      <TableCell>
+                                        <div className="font-medium">{subCategory.name}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="font-medium">{subCategory.mainCategory}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={subCategory.mainUse === "product" ? "default" : "secondary"}>
+                                          {subCategory.mainUse === "product" ? "Product" : "Service"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="text-sm text-muted-foreground">
+                                          {new Date(subCategory.createdAt).toLocaleDateString()}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex space-x-2">
+                                          <Button variant="ghost" size="sm" onClick={() => handleEditSubCategory(subCategory)}>
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" onClick={() => deleteSubCategory(subCategory._id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  {totalPages > 1 && (
+                                    <TableRow>
+                                      <TableCell colSpan={5} className="py-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="text-sm text-muted-foreground">
+                                            Showing {startIndex + 1} to {Math.min(endIndex, subCategories.length)} of {subCategories.length} entries
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setSubCategoriesPage(prev => Math.max(1, prev - 1))}
+                                              disabled={subCategoriesPage === 1}
+                                            >
+                                              <ArrowLeft className="h-4 w-4 mr-1" />
+                                              Previous
+                                            </Button>
+                                            <div className="text-sm text-muted-foreground">
+                                              Page {subCategoriesPage} of {totalPages}
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setSubCategoriesPage(prev => Math.min(totalPages, prev + 1))}
+                                              disabled={subCategoriesPage === totalPages}
+                                            >
+                                              Next
+                                              <ArrowRight className="h-4 w-4 ml-1" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              )
+                            })()
                           )}
                         </TableBody>
                       </Table>
@@ -5287,39 +7101,84 @@ export function DashboardPage() {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            level2Categories.map((level2Category: any) => (
-                              <TableRow key={level2Category._id}>
-                                <TableCell>
-                                  <div className="font-medium">{level2Category.name}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{level2Category.mainCategory}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{level2Category.subCategory}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={level2Category.mainUse === "product" ? "default" : "secondary"}>
-                                    {level2Category.mainUse === "product" ? "Product" : "Service"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
-                                    {new Date(level2Category.createdAt).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditLevel2Category(level2Category)}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteLevel2Category(level2Category._id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                            (() => {
+                              const startIndex = (level2CategoriesPage - 1) * level2CategoriesPerPage
+                              const endIndex = startIndex + level2CategoriesPerPage
+                              const paginatedLevel2Categories = level2Categories.slice(startIndex, endIndex)
+                              const totalPages = Math.ceil(level2Categories.length / level2CategoriesPerPage)
+                              
+                              return (
+                                <>
+                                  {paginatedLevel2Categories.map((level2Category: any) => (
+                                    <TableRow key={level2Category._id}>
+                                      <TableCell>
+                                        <div className="font-medium">{level2Category.name}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="font-medium">{level2Category.mainCategory}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="font-medium">{level2Category.subCategory}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={level2Category.mainUse === "product" ? "default" : "secondary"}>
+                                          {level2Category.mainUse === "product" ? "Product" : "Service"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="text-sm text-muted-foreground">
+                                          {new Date(level2Category.createdAt).toLocaleDateString()}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex space-x-2">
+                                          <Button variant="ghost" size="sm" onClick={() => handleEditLevel2Category(level2Category)}>
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" onClick={() => deleteLevel2Category(level2Category._id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  {totalPages > 1 && (
+                                    <TableRow>
+                                      <TableCell colSpan={6} className="py-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="text-sm text-muted-foreground">
+                                            Showing {startIndex + 1} to {Math.min(endIndex, level2Categories.length)} of {level2Categories.length} entries
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setLevel2CategoriesPage(prev => Math.max(1, prev - 1))}
+                                              disabled={level2CategoriesPage === 1}
+                                            >
+                                              <ArrowLeft className="h-4 w-4 mr-1" />
+                                              Previous
+                                            </Button>
+                                            <div className="text-sm text-muted-foreground">
+                                              Page {level2CategoriesPage} of {totalPages}
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setLevel2CategoriesPage(prev => Math.min(totalPages, prev + 1))}
+                                              disabled={level2CategoriesPage === totalPages}
+                                            >
+                                              Next
+                                              <ArrowRight className="h-4 w-4 ml-1" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              )
+                            })()
                           )}
                         </TableBody>
                       </Table>
@@ -5346,16 +7205,22 @@ export function DashboardPage() {
               {/* My Customers Tab - Shows E-Shop Inventory */}
               {activeSubSection === "my-customers" && (
                 <div className="space-y-4 overflow-visible">
-                  <div className="flex items-center justify-between space-x-2">
-                    <div className="relative flex-1 max-w-md">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        placeholder="Search customers..."
-                        value={customerSearchTerm}
-                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
+                  {!selectedCustomerId ? (
+                    <>
+                      {/* Customer List View with Pagination */}
+                      <div className="flex items-center justify-between space-x-2">
+                        <div className="relative flex-1 max-w-md">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                          <Input
+                            placeholder="Search customers..."
+                            value={customerSearchTerm}
+                            onChange={(e) => {
+                              setCustomerSearchTerm(e.target.value)
+                              setCurrentCustomerPage(1)
+                            }}
+                            className="pl-10"
+                          />
+                        </div>
                     {/* Edit Inventory Dialog */}
                     <Dialog open={isEshopEditOpen} onOpenChange={setIsEshopEditOpen}>
                       <DialogContent className="max-w-lg w-[90vw]">
@@ -5746,27 +7611,276 @@ export function DashboardPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ) : (
-                    <>
-                      {/* Group inventory by customer */}
-                      {Object.entries(
-                        eshopInventory
-                          .filter((item: any) => 
-                            item.customerName.toLowerCase().includes(customerSearchTerm.toLowerCase())
-                          )
-                          .reduce((acc: any, item: any) => {
-                            if (!acc[item.customerId]) {
-                              acc[item.customerId] = {
-                                customerName: item.customerName,
-                                customerId: item.customerId,
-                                products: []
-                              }
+                  ) : (() => {
+                    // Group inventory by customer
+                    const customersMap = eshopInventory
+                      .filter((item: any) => 
+                        item.customerName.toLowerCase().includes(customerSearchTerm.toLowerCase())
+                      )
+                      .reduce((acc: any, item: any) => {
+                        if (!acc[item.customerId]) {
+                          acc[item.customerId] = {
+                            customerName: item.customerName,
+                            customerId: item.customerId,
+                            products: [],
+                            lastUpdated: item.lastUpdated
+                          }
+                        }
+                        acc[item.customerId].products.push(item)
+                        // Update lastUpdated to the most recent product update
+                        if (new Date(item.lastUpdated) > new Date(acc[item.customerId].lastUpdated)) {
+                          acc[item.customerId].lastUpdated = item.lastUpdated
+                        }
+                        return acc
+                      }, {})
+
+                    const customersList = Object.entries(customersMap).map(([customerId, customerData]: [string, any]) => ({
+                      customerId,
+                      ...customerData
+                    }))
+
+                    // Pagination logic
+                    const totalCustomers = customersList.length
+                    const totalPages = Math.ceil(totalCustomers / customersPerPage)
+                    const startIndex = (currentCustomerPage - 1) * customersPerPage
+                    const endIndex = startIndex + customersPerPage
+                    const currentCustomers = customersList.slice(startIndex, endIndex)
+
+                    return (
+                      <>
+                        <Card className="shadow-lg border-0 overflow-hidden">
+                          <CardContent className="p-0">
+                            <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4" />
+                                      Customer Name
+                                    </div>
+                                  </TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4" />
+                                      Contact Details
+                                    </div>
+                                  </TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>
+                                    <div className="flex items-center gap-2">
+                                      <Package className="h-4 w-4" />
+                                      Products
+                                    </div>
+                                  </TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="h-4 w-4" />
+                                      Last Updated
+                                    </div>
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                                <TableBody>
+                                  {currentCustomers.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={4} className="text-center py-12">
+                                        <div className="flex flex-col items-center gap-3">
+                                          <div className="p-4 bg-gray-100 rounded-full">
+                                            <User className="h-8 w-8 text-gray-400" />
+                                          </div>
+                                          <p className="text-lg font-medium text-gray-600">No customers found</p>
+                                          <p className="text-sm text-gray-500">Try adjusting your search criteria</p>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    currentCustomers.map((customerData: any, index: number) => {
+                                      const customer = customers.find((c: any) => c._id === customerData.customerId)
+                                      return (
+                                        <TableRow 
+                                          key={customerData.customerId}
+                                          className="bg-gray-50 hover:bg-gray-100 transition-all duration-200 cursor-pointer border-b border-gray-200 group"
+                                          onClick={() => setSelectedCustomerId(customerData.customerId)}
+                                        >
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center gap-3">
+                                              <div className="p-2 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-lg">
+                                                <User className="h-5 w-5 text-indigo-600" />
+                                              </div>
+                                              <div>
+                                                <div className="font-bold text-gray-900">
+                                                  {customerData.customerName}
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-0.5">
+                                                  Customer ID: {customerData.customerId.slice(-8)}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          
+                                          <TableCell className="py-4">
+                                            <div className="space-y-1.5">
+                                              {customer?.email && (
+                                                <div className="flex items-center gap-2">
+                                                  <Mail className="h-3.5 w-3.5 text-blue-600" />
+                                                  <span className="text-sm text-gray-700">{customer.email}</span>
+                                                </div>
+                                              )}
+                                              {customer?.phone && (
+                                                <div className="flex items-center gap-2">
+                                                  <Phone className="h-3.5 w-3.5 text-green-600" />
+                                                  <span className="text-sm text-gray-700">{customer.phone}</span>
+                                                </div>
+                                              )}
+                                              {customer?.city && (
+                                                <div className="flex items-center gap-2">
+                                                  <MapPin className="h-3.5 w-3.5 text-purple-600" />
+                                                  <span className="text-sm text-gray-700">
+                                                    {customer.city}{customer.state ? `, ${customer.state}` : ''}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {!customer?.email && !customer?.phone && !customer?.city && (
+                                                <span className="text-sm text-gray-400 italic">No details available</span>
+                                              )}
+                                            </div>
+                                          </TableCell>
+                                          
+                                          <TableCell className="py-4">
+                                            <Badge 
+                                              variant="default" 
+                                              className="bg-blue-600 hover:bg-blue-700 text-white border-0 px-3 py-1.5 text-sm font-medium"
+                                            >
+                                              <Package className="h-3.5 w-3.5 mr-1.5" />
+                                              {customerData.products.length} {customerData.products.length === 1 ? 'Product' : 'Products'}
+                                            </Badge>
+                                          </TableCell>
+                                          
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                              <div className="flex items-center gap-2">
+                                                <Calendar className="h-4 w-4 text-indigo-600" />
+                                                <span className="text-sm text-gray-700">
+                                                  {new Date(customerData.lastUpdated).toLocaleDateString('en-US', {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                  })}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-1 text-indigo-600">
+                                                <span className="text-xs font-medium">View Details</span>
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-blue-50">
+                            <CardContent className="py-4">
+                              <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      Showing <span className="font-bold text-indigo-600">{startIndex + 1}</span> to <span className="font-bold text-indigo-600">{Math.min(endIndex, totalCustomers)}</span> of <span className="font-bold text-indigo-600">{totalCustomers}</span> customers
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentCustomerPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentCustomerPage === 1}
+                                    className="border-gray-300 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                                  >
+                                    <ArrowLeft className="h-4 w-4 mr-1" />
+                                    Previous
+                                  </Button>
+                                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                      <Button
+                                        key={page}
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setCurrentCustomerPage(page)}
+                                        className={`min-w-[40px] h-9 transition-all duration-200 ${
+                                          currentCustomerPage === page 
+                                            ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md hover:from-indigo-700 hover:to-blue-700 font-bold scale-105" 
+                                            : "hover:bg-indigo-50 hover:text-indigo-700 text-gray-700"
+                                        }`}
+                                      >
+                                        {page}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentCustomerPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentCustomerPage === totalPages}
+                                    className="border-gray-300 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                                  >
+                                    Next
+                                    <ArrowRight className="h-4 w-4 ml-1" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </>
+                    )
+                  })()}
+                </>
+              ) : (
+                <>
+                  {/* Detailed Customer View */}
+                  {(() => {
+                    const customerData = Object.entries(
+                      eshopInventory
+                        .filter((item: any) => item.customerId === selectedCustomerId)
+                        .reduce((acc: any, item: any) => {
+                          if (!acc[item.customerId]) {
+                            acc[item.customerId] = {
+                              customerName: item.customerName,
+                              customerId: item.customerId,
+                              products: []
                             }
-                            acc[item.customerId].products.push(item)
-                            return acc
-                          }, {})
-                      ).map(([customerId, customerData]: [string, any]) => (
-                        <Card key={customerId}>
+                          }
+                          acc[item.customerId].products.push(item)
+                          return acc
+                        }, {})
+                    )[0]?.[1] as any
+
+                    if (!customerData) return null
+
+                    return (
+                      <>
+                        <div className="flex items-center gap-4 mb-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setSelectedCustomerId(null)}
+                            className="flex items-center gap-2"
+                          >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Customers
+                          </Button>
+                        </div>
+
+                        <Card>
                           <CardHeader>
                             <div className="flex items-center justify-between">
                               <div>
@@ -5782,7 +7896,6 @@ export function DashboardPage() {
                                 <Button
                                   variant="outline"
                                   onClick={() => {
-                                    // Call the existing handleRetopUp function
                                     const firstProduct = customerData.products[0];
                                     handleRetopUp(firstProduct);
                                   }}
@@ -5800,7 +7913,7 @@ export function DashboardPage() {
                                       price: item.price || 0
                                     }));
                                     const queryParams = new URLSearchParams({
-                                      customerId: customerId,
+                                      customerId: selectedCustomerId || '',
                                       items: JSON.stringify(items)
                                     });
                                     window.open(`/dashboard/invoice?${queryParams.toString()}`, '_blank');
@@ -5827,99 +7940,150 @@ export function DashboardPage() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {customerData.products.map((item: any) => {
-                                  const invoicedQty = item.invoicedQuantity || 0;
-                                  const remainingQty = item.quantity - invoicedQty;
+                                {(() => {
+                                  const currentPage = customerProductsPage[customerData.customerId] || 1
+                                  const startIndex = (currentPage - 1) * customerProductsPerPage
+                                  const endIndex = startIndex + customerProductsPerPage
+                                  const paginatedProducts = customerData.products.slice(startIndex, endIndex)
+                                  const totalPages = Math.ceil(customerData.products.length / customerProductsPerPage)
+                                  
                                   return (
-                                    <TableRow 
-                                      key={item._id}
-                                      className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
-                                    >
-                                      <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
-                                        <div className="flex items-center gap-2">
-                                          <Package className="h-4 w-4 text-blue-500" />
-                                          {item.productName}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="py-4">
-                                        <Badge variant={remainingQty < 10 ? "destructive" : "default"} className={remainingQty >= 10 ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}>
-                                          {remainingQty >= 10 && <CheckCircle className="h-3 w-3 mr-1" />}
-                                          {remainingQty} units
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell className="py-4">
-                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
-                                          <FileText className="h-3 w-3 mr-1" />
-                                          {invoicedQty} units
-                                        </Badge>
-                                      </TableCell>
-                                    <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                      <div className="flex items-center gap-2 text-sm">
-                                        <Calendar className="h-4 w-4 text-indigo-500" />
-                                        {new Date(item.lastUpdated).toLocaleDateString()}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
-                                      <div className="text-sm max-w-xs truncate">
-                                        {item.notes || "-"}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="relative">
-                                      <div className="relative">
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            toggleDropdown(item._id)
-                                          }}
-                                        >
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                        
-                                        {openDropdownId === item._id && (
-                                          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999]">
-                                            <div className="py-1">
-                                              <button
+                                    <>
+                                      {paginatedProducts.map((item: any) => {
+                                        const invoicedQty = item.invoicedQuantity || 0;
+                                        const remainingQty = item.quantity - invoicedQty;
+                                        return (
+                                          <TableRow 
+                                            key={item._id}
+                                            className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                          >
+                                            <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                              <div className="flex items-center gap-2">
+                                                <Package className="h-4 w-4 text-blue-500" />
+                                                {item.productName}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                              <Badge variant={remainingQty < 10 ? "destructive" : "default"} className={remainingQty >= 10 ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}>
+                                                {remainingQty >= 10 && <CheckCircle className="h-3 w-3 mr-1" />}
+                                                {remainingQty} units
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
+                                                <FileText className="h-3 w-3 mr-1" />
+                                                {invoicedQty} units
+                                              </Badge>
+                                            </TableCell>
+                                          <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                            <div className="flex items-center gap-2 text-sm">
+                                              <Calendar className="h-4 w-4 text-indigo-500" />
+                                              {new Date(item.lastUpdated).toLocaleDateString()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                            <div className="text-sm max-w-xs truncate">
+                                              {item.notes || "-"}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="relative">
+                                            <div className="relative">
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
                                                 onClick={(e) => {
                                                   e.stopPropagation()
-                                                  handleViewProductDetails(item)
+                                                  toggleDropdown(item._id)
                                                 }}
-                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                                               >
-                                                <Eye className="h-4 w-4 mr-2" />
-                                                View
-                                              </button>
-                                              <button
-                                                onClick={() => openEshopEditDialog(item)}
-                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                              >
-                                                <Edit className="h-4 w-4 mr-2" />
-                                                Edit
-                                              </button>
-                                              <button
-                                                onClick={() => handleDeleteInventoryItem(item)}
-                                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
-                                              >
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete
-                                              </button>
+                                                <MoreVertical className="h-4 w-4" />
+                                              </Button>
+                                              
+                                              {openDropdownId === item._id && (
+                                                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999]">
+                                                  <div className="py-1">
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleViewProductDetails(item)
+                                                      }}
+                                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                                    >
+                                                      <Eye className="h-4 w-4 mr-2" />
+                                                      View
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleDeleteInventoryItem(item)}
+                                                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
+                                                    >
+                                                      <Trash2 className="h-4 w-4 mr-2" />
+                                                      Delete
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                  );
-                                })}
+                                          </TableCell>
+                                        </TableRow>
+                                        );
+                                      })}
+                                      {totalPages > 1 && (
+                                        <TableRow>
+                                          <TableCell colSpan={6} className="py-4">
+                                            <div className="flex items-center justify-between">
+                                              <div className="text-sm text-muted-foreground">
+                                                Showing {startIndex + 1} to {Math.min(endIndex, customerData.products.length)} of {customerData.products.length} entries
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    setCustomerProductsPage({
+                                                      ...customerProductsPage,
+                                                      [customerData.customerId]: Math.max(1, currentPage - 1)
+                                                    })
+                                                  }}
+                                                  disabled={currentPage === 1}
+                                                >
+                                                  <ArrowLeft className="h-4 w-4 mr-1" />
+                                                  Previous
+                                                </Button>
+                                                <div className="text-sm text-muted-foreground">
+                                                  Page {currentPage} of {totalPages}
+                                                </div>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    setCustomerProductsPage({
+                                                      ...customerProductsPage,
+                                                      [customerData.customerId]: Math.min(totalPages, currentPage + 1)
+                                                    })
+                                                  }}
+                                                  disabled={currentPage === totalPages}
+                                                >
+                                                  Next
+                                                  <ArrowRight className="h-4 w-4 ml-1" />
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      )}
+                                    </>
+                                  )
+                                })()}
                               </TableBody>
                             </Table>
                             </div>
                           </CardContent>
                         </Card>
-                      ))}
-                    </>
-                  )}
+                      </>
+                    )
+                  })()}
+                </>
+              )}
                 </div>
               )}
 
@@ -6050,86 +8214,132 @@ export function DashboardPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          customers
+                        ) : (() => {
+                          const filteredCustomers = customers
                             .filter((customer: any) => 
                               customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                               customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                               customer.phone.includes(customerSearchTerm)
                             )
-                            .map((customer: any, index: number) => (
-                              <TableRow 
-                                key={customer._id}
-                                className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
-                                style={{ animationDelay: `${index * 50}ms` }}
-                              >
-                                <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
-                                  <div className="flex items-center gap-2">
-                                    <User className="h-4 w-4 text-indigo-500" />
-                                    {customer.name}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Mail className="h-4 w-4 text-blue-500" />
-                                    {customer.email}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Phone className="h-4 w-4 text-green-500" />
-                                    {customer.phone}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
-                                  <div className="flex items-center gap-2 text-sm max-w-xs truncate">
-                                    <MapPin className="h-4 w-4 text-orange-500" />
-                                    {customer.address ? `${customer.address}, ${customer.city || ''}` : '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Calendar className="h-4 w-4 text-indigo-500" />
-                                    {new Date(customer.createdAt).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Clock className="h-4 w-4 text-purple-500" />
-                                    {customer.lastLogin ? new Date(customer.lastLogin).toLocaleString() : 'Never'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <Badge 
-                                    variant={customer.isBlocked ? "destructive" : "default"}
-                                    className={!customer.isBlocked ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
-                                  >
-                                    {!customer.isBlocked && <CheckCircle className="h-3 w-3 mr-1" />}
-                                    {customer.isBlocked ? "Blocked" : "Active"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handleDeleteCustomer(customer._id)} className="text-red-600">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                        )}
+                            .sort((a: any, b: any) => {
+                              const dateA = new Date(a.createdAt || a.lastLogin || 0).getTime()
+                              const dateB = new Date(b.createdAt || b.lastLogin || 0).getTime()
+                              return dateB - dateA // Latest first
+                            })
+                          const totalPages = Math.ceil(filteredCustomers.length / editCustomerPerPage)
+                          const startIndex = (editCustomerPage - 1) * editCustomerPerPage
+                          const endIndex = startIndex + editCustomerPerPage
+                          const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex)
+                          
+                          return (
+                            <>
+                              {paginatedCustomers.map((customer: any, index: number) => (
+                                <TableRow 
+                                  key={customer._id}
+                                  className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                  style={{ animationDelay: `${index * 50}ms` }}
+                                >
+                                  <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4 text-indigo-500" />
+                                      {customer.name}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Mail className="h-4 w-4 text-blue-500" />
+                                      {customer.email}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Phone className="h-4 w-4 text-green-500" />
+                                      {customer.phone}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                    <div className="flex items-center gap-2 text-sm max-w-xs truncate">
+                                      <MapPin className="h-4 w-4 text-orange-500" />
+                                      {customer.address ? `${customer.address}, ${customer.city || ''}` : '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Calendar className="h-4 w-4 text-indigo-500" />
+                                      {new Date(customer.createdAt).toLocaleDateString()}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Clock className="h-4 w-4 text-purple-500" />
+                                      {customer.lastLogin ? new Date(customer.lastLogin).toLocaleString() : 'Never'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-4">
+                                    <Badge 
+                                      variant={customer.isBlocked ? "destructive" : "default"}
+                                      className={!customer.isBlocked ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
+                                    >
+                                      {!customer.isBlocked && <CheckCircle className="h-3 w-3 mr-1" />}
+                                      {customer.isBlocked ? "Blocked" : "Active"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="py-4">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDeleteCustomer(customer._id)} className="text-red-600">
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {totalPages > 1 && (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="py-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-muted-foreground">
+                                        Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} entries
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setEditCustomerPage(Math.max(1, editCustomerPage - 1))}
+                                          disabled={editCustomerPage === 1}
+                                        >
+                                          Previous
+                                        </Button>
+                                        <div className="text-sm text-muted-foreground">
+                                          Page {editCustomerPage} of {totalPages}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setEditCustomerPage(Math.min(totalPages, editCustomerPage + 1))}
+                                          disabled={editCustomerPage === totalPages}
+                                        >
+                                          Next
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )
+                        })()}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -6192,113 +8402,159 @@ export function DashboardPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          suppliers.map((supplier: any, index: number) => (
-                            <TableRow 
-                              key={supplier._id}
-                              className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
-                              style={{ animationDelay: `${index * 50}ms` }}
-                            >
-                              <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <User className="h-4 w-4 text-indigo-500" />
-                                  {supplier.name}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <UserCircle className="h-4 w-4 text-blue-500" />
-                                  {supplier.contact || '-'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <Mail className="h-4 w-4 text-blue-500" />
-                                  {supplier.email || '-'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <Phone className="h-4 w-4 text-green-500" />
-                                  {supplier.phone || '-'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-orange-500" />
-                                  {supplier.city || '-'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-purple-500" />
-                                  {supplier.gstNumber || '-'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-4">
-                                <Badge 
-                                  variant={supplier.isActive ? "default" : "secondary"}
-                                  className={supplier.isActive ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : "bg-gray-100 text-gray-700 border-gray-200"}
+                        ) : (() => {
+                          const sortedSuppliers = [...suppliers].sort((a: any, b: any) => {
+                            const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime()
+                            const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime()
+                            return dateB - dateA // Latest first
+                          })
+                          const totalPages = Math.ceil(sortedSuppliers.length / supplierPerPage)
+                          const startIndex = (supplierPage - 1) * supplierPerPage
+                          const endIndex = startIndex + supplierPerPage
+                          const paginatedSuppliers = sortedSuppliers.slice(startIndex, endIndex)
+                          
+                          return (
+                            <>
+                              {paginatedSuppliers.map((supplier: any, index: number) => (
+                                <TableRow 
+                                  key={supplier._id}
+                                  className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                  style={{ animationDelay: `${index * 50}ms` }}
                                 >
-                                  {supplier.isActive && <CheckCircle className="h-3 w-3 mr-1" />}
-                                  {supplier.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={() => {
-                                      setEditingSupplier(supplier)
-                                      setSupplierForm({
-                                        name: supplier.name,
-                                        contact: supplier.contact || "",
-                                        email: supplier.email || "",
-                                        phone: supplier.phone || "",
-                                        address: supplier.address || "",
-                                        city: supplier.city || "",
-                                        state: supplier.state || "",
-                                        pincode: supplier.pincode || "",
-                                        gstNumber: supplier.gstNumber || "",
-                                        notes: supplier.notes || "",
-                                        isActive: supplier.isActive !== undefined ? supplier.isActive : true
-                                      })
-                                      setIsSupplierDialogOpen(true)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={async () => {
-                                      if (confirm(`Are you sure you want to delete ${supplier.name}?`)) {
-                                        try {
-                                          const response = await fetch(`/api/suppliers/${supplier._id}`, {
-                                            method: 'DELETE'
+                                  <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4 text-indigo-500" />
+                                      {supplier.name}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <UserCircle className="h-4 w-4 text-blue-500" />
+                                      {supplier.contact || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <Mail className="h-4 w-4 text-blue-500" />
+                                      {supplier.email || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <Phone className="h-4 w-4 text-green-500" />
+                                      {supplier.phone || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-orange-500" />
+                                      {supplier.city || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-purple-500" />
+                                      {supplier.gstNumber || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-4">
+                                    <Badge 
+                                      variant={supplier.isActive ? "default" : "secondary"}
+                                      className={supplier.isActive ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : "bg-gray-100 text-gray-700 border-gray-200"}
+                                    >
+                                      {supplier.isActive && <CheckCircle className="h-3 w-3 mr-1" />}
+                                      {supplier.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex space-x-2">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => {
+                                          setEditingSupplier(supplier)
+                                          setSupplierForm({
+                                            name: supplier.name,
+                                            contact: supplier.contact || "",
+                                            email: supplier.email || "",
+                                            phone: supplier.phone || "",
+                                            address: supplier.address || "",
+                                            city: supplier.city || "",
+                                            state: supplier.state || "",
+                                            pincode: supplier.pincode || "",
+                                            gstNumber: supplier.gstNumber || "",
+                                            notes: supplier.notes || "",
+                                            isActive: supplier.isActive !== undefined ? supplier.isActive : true
                                           })
-                                          const result = await response.json()
-                                          if (result.success) {
-                                            setSuppliers(suppliers.filter((s: any) => s._id !== supplier._id))
-                                            alert('Supplier deleted successfully')
-                                          } else {
-                                            alert('Error deleting supplier: ' + result.error)
+                                          setIsSupplierDialogOpen(true)
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={async () => {
+                                          if (confirm(`Are you sure you want to delete ${supplier.name}?`)) {
+                                            try {
+                                              const response = await fetch(`/api/suppliers/${supplier._id}`, {
+                                                method: 'DELETE'
+                                              })
+                                              const result = await response.json()
+                                              if (result.success) {
+                                                setSuppliers(suppliers.filter((s: any) => s._id !== supplier._id))
+                                                alert('Supplier deleted successfully')
+                                              } else {
+                                                alert('Error deleting supplier: ' + result.error)
+                                              }
+                                            } catch (error) {
+                                              console.error('Error deleting supplier:', error)
+                                              alert('Error deleting supplier')
+                                            }
                                           }
-                                        } catch (error) {
-                                          console.error('Error deleting supplier:', error)
-                                          alert('Error deleting supplier')
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                        )}
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {totalPages > 1 && (
+                                  <TableRow>
+                                    <TableCell colSpan={8} className="py-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-muted-foreground">
+                                          Showing {startIndex + 1} to {Math.min(endIndex, sortedSuppliers.length)} of {sortedSuppliers.length} entries
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSupplierPage(Math.max(1, supplierPage - 1))}
+                                            disabled={supplierPage === 1}
+                                          >
+                                            Previous
+                                          </Button>
+                                          <div className="text-sm text-muted-foreground">
+                                            Page {supplierPage} of {totalPages}
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSupplierPage(Math.min(totalPages, supplierPage + 1))}
+                                            disabled={supplierPage === totalPages}
+                                          >
+                                            Next
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            )
+                          })()}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -6472,50 +8728,96 @@ export function DashboardPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          customers
+                        ) : (() => {
+                          const filteredCustomers = customers
                             .filter((customer: any) => 
                               customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                               customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                               customer.phone.includes(customerSearchTerm) ||
                               customer.username?.toLowerCase().includes(customerSearchTerm.toLowerCase())
                             )
-                            .map((customer: any) => (
-                              <TableRow key={customer._id}>
-                                <TableCell>
-                                  <div className="font-medium">{customer.name}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{customer.email}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">{customer.phone}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm font-mono">{customer.username}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={customer.status === 'blocked' ? "destructive" : "default"}>
-                                    {customer.status === 'blocked' ? "Blocked" : "Active"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-muted-foreground">
-                                    {customer.lastLogin ? new Date(customer.lastLogin).toLocaleString() : 'Never'}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant={customer.status === 'blocked' ? "default" : "destructive"}
-                                    size="sm"
-                                    onClick={() => handleToggleCustomerStatus(customer)}
-                                  >
-                                    {customer.status === 'blocked' ? 'Unblock' : 'Block'}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                        )}
+                            .sort((a: any, b: any) => {
+                              const dateA = new Date(a.createdAt || a.lastLogin || 0).getTime()
+                              const dateB = new Date(b.createdAt || b.lastLogin || 0).getTime()
+                              return dateB - dateA // Latest first
+                            })
+                          const totalPages = Math.ceil(filteredCustomers.length / blockCustomerPerPage)
+                          const startIndex = (blockCustomerPage - 1) * blockCustomerPerPage
+                          const endIndex = startIndex + blockCustomerPerPage
+                          const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex)
+                          
+                          return (
+                            <>
+                              {paginatedCustomers.map((customer: any) => (
+                                <TableRow key={customer._id}>
+                                  <TableCell>
+                                    <div className="font-medium">{customer.name}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm">{customer.email}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm">{customer.phone}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm font-mono">{customer.username}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={customer.status === 'blocked' ? "destructive" : "default"}>
+                                      {customer.status === 'blocked' ? "Blocked" : "Active"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm text-muted-foreground">
+                                      {customer.lastLogin ? new Date(customer.lastLogin).toLocaleString() : 'Never'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant={customer.status === 'blocked' ? "default" : "destructive"}
+                                      size="sm"
+                                      onClick={() => handleToggleCustomerStatus(customer)}
+                                    >
+                                      {customer.status === 'blocked' ? 'Unblock' : 'Block'}
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {totalPages > 1 && (
+                                <TableRow>
+                                  <TableCell colSpan={7} className="py-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-sm text-muted-foreground">
+                                        Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} entries
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setBlockCustomerPage(Math.max(1, blockCustomerPage - 1))}
+                                          disabled={blockCustomerPage === 1}
+                                        >
+                                          Previous
+                                        </Button>
+                                        <div className="text-sm text-muted-foreground">
+                                          Page {blockCustomerPage} of {totalPages}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setBlockCustomerPage(Math.min(totalPages, blockCustomerPage + 1))}
+                                          disabled={blockCustomerPage === totalPages}
+                                        >
+                                          Next
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )
+                        })()}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -6544,6 +8846,7 @@ export function DashboardPage() {
                             supplierName: "",
                             items: [{ productId: "", productName: "", quantity: 1, unitPrice: 0 }],
                             deliveryType: "to_warehouse",
+                            poType: "standard",
                             customerId: "",
                             customerName: "",
                             expectedDate: "",
@@ -6691,21 +8994,45 @@ export function DashboardPage() {
                                       </SelectContent>
                                     </Select>
                                   ) : (
-                                    <Badge 
-                                      variant={po.status === 'received' ? 'default' : po.status === 'cancelled' ? 'destructive' : 'secondary'}
-                                      className={
-                                        po.status === 'received' 
-                                          ? 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm' 
-                                          : po.status === 'cancelled'
-                                          ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
-                                          : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
-                                      }
-                                    >
-                                      {po.status === 'received' && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
-                                      {po.status === 'pending' && <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div>}
-                                      {po.status === 'cancelled' && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
-                                      {po.status}
-                                    </Badge>
+                                    <div className="flex flex-col gap-1">
+                                      <Badge 
+                                        variant={
+                                          po.status === 'PO_CLOSED' || po.status === 'received' 
+                                            ? 'default' 
+                                            : po.status === 'PO_REFERENCE'
+                                            ? 'outline'
+                                            : po.status === 'cancelled' 
+                                            ? 'destructive' 
+                                            : 'secondary'
+                                        }
+                                        className={
+                                          po.status === 'PO_CLOSED' || po.status === 'received'
+                                            ? 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm' 
+                                            : po.status === 'PO_PARTIALLY_RECEIVED'
+                                            ? 'bg-blue-500 hover:bg-blue-600 text-white border-0 shadow-sm'
+                                            : po.status === 'PO_REFERENCE'
+                                            ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300 shadow-sm'
+                                            : po.status === 'cancelled'
+                                            ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
+                                            : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                        }
+                                      >
+                                        {po.status === 'PO_CLOSED' || po.status === 'received' ? <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div> : null}
+                                        {po.status === 'PO_PARTIALLY_RECEIVED' ? <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div> : null}
+                                        {po.status === 'PO_CREATED' || po.status === 'pending' ? <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div> : null}
+                                        {po.status === 'PO_REFERENCE' ? <FileText className="h-3 w-3 mr-1" /> : null}
+                                        {po.status === 'PO_CREATED' ? 'Created' : 
+                                         po.status === 'PO_PARTIALLY_RECEIVED' ? 'Partially Received' :
+                                         po.status === 'PO_CLOSED' ? 'Closed' :
+                                         po.status === 'PO_REFERENCE' ? 'Reference' :
+                                         po.status}
+                                      </Badge>
+                                      {(po.status === 'PO_PARTIALLY_RECEIVED' || po.status === 'PO_CREATED') && po.receivedQuantity !== undefined && po.pendingQuantity !== undefined && (
+                                        <div className="text-xs text-muted-foreground">
+                                          {po.receivedQuantity || 0}/{po.receivedQuantity + po.pendingQuantity} received
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </TableCell>
                                 <TableCell className="py-4">
@@ -6715,19 +9042,46 @@ export function DashboardPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell className="py-4">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setViewingPO(po)
-                                      setIsViewPODialogOpen(true)
-                                    }}
-                                    className="hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-md transition-all duration-200 border-2 group/btn"
-                                  >
-                                    <Eye className="h-4 w-4 mr-1.5 group-hover/btn:scale-110 transition-transform" />
-                                    View
-                                  </Button>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setViewingPO(po)
+                                        setIsViewPODialogOpen(true)
+                                      }}
+                                      className="hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // TODO: Implement edit functionality
+                                        alert('Edit functionality coming soon')
+                                      }}
+                                      className="hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (confirm(`Are you sure you want to delete PO ${po.poNumber}?`)) {
+                                          // TODO: Implement delete functionality
+                                          alert('Delete functionality coming soon')
+                                        }
+                                      }}
+                                      className="hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                                   )
@@ -6787,242 +9141,425 @@ export function DashboardPage() {
               {/* Warehouse Stock Tab */}
               {activeSubSection === "warehouse-stock" && (
             <div className="space-y-6">
-                  {/* Pending Requests Section - Table 1 */}
+                  {/* Current Warehouse Stock Section - Table 1 (Moved to Top) */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Pending Purchase Order Requests</CardTitle>
-                      <CardDescription>Accept purchase orders to receive goods from supplier. Once accepted, goods will be added to warehouse stock below.</CardDescription>
+                      <div className="flex items-center justify-between">
+              <div>
+                          <CardTitle>Current Warehouse Stock</CardTitle>
+                          <CardDescription>Accepted and received stock in warehouse. This shows actual physical stock available.</CardDescription>
+              </div>
+                        <Button
+                          onClick={() => {
+                            setIsGRNTypeDialogOpen(true)
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create GRN
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {(() => {
-                        const pendingPOs = purchaseOrders.filter((po: any) => 
-                          po.status === 'pending' && po.deliveryType === 'to_warehouse'
-                        )
+                        // Sort by latest first (by lastReceivedDate or createdAt)
+                        const sortedStock = [...warehouseStock].sort((a: any, b: any) => {
+                          const dateA = a.lastReceivedDate ? new Date(a.lastReceivedDate).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0)
+                          const dateB = b.lastReceivedDate ? new Date(b.lastReceivedDate).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0)
+                          return dateB - dateA // Descending order (newest first)
+                        })
+                        
+                        // Pagination
+                        const totalPages = Math.ceil(sortedStock.length / warehouseStockPerPage)
+                        const startIndex = (currentWarehouseStockPage - 1) * warehouseStockPerPage
+                        const endIndex = startIndex + warehouseStockPerPage
+                        const paginatedStock = sortedStock.slice(startIndex, endIndex)
                         
                         return (
-                          <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>PO Number</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Supplier</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Products</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Quantity</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Expected Date</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Created Date</TableHead>
-                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {loading ? (
-                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                                    <TableCell colSpan={7} className="text-center py-8">
-                                      <div className="flex items-center justify-center gap-2">
-                                        <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                                        <span className="text-gray-600">Loading...</span>
-              </div>
-                                    </TableCell>
+                          <>
+                            <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Website Stock</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Warehouse Stock</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Difference</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Supplier</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Received</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Received</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                                   </TableRow>
-                                ) : pendingPOs.length === 0 ? (
-                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                                    <TableCell colSpan={7} className="text-center py-12">
-                                      <div className="flex flex-col items-center text-muted-foreground">
-                                        <FileText className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
-                                        <p className="text-lg font-medium">No pending purchase order requests</p>
-                                        <p className="text-sm mt-1">All purchase orders have been accepted</p>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  pendingPOs.map((po: any, index: number) => {
-                                    const totalQuantity = po.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
-                                    return (
-                                      <TableRow 
-                                        key={po._id}
-                                        className="bg-white hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                </TableHeader>
+                                <TableBody>
+                                  {loading ? (
+                                    <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                      <TableCell colSpan={8} className="text-center py-8">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                          <span className="text-gray-600">Loading...</span>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : sortedStock.length === 0 ? (
+                                    <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                      <TableCell colSpan={8} className="text-center py-12">
+                                        <div className="flex flex-col items-center text-muted-foreground">
+                                          <Package className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
+                                          <p className="text-lg font-medium">No warehouse stock found</p>
+                                          <p className="text-sm mt-1">Stock will appear here once goods are received</p>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    paginatedStock.map((stock: any, index: number) => {
+                                      const difference = (stock.adminStock || 0) - stock.availableStock
+                                      return (
+                                        <TableRow 
+                                          key={stock._id}
+                                          className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                        >
+                                          <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                            <div className="flex items-center gap-2">
+                                              <Package className="h-4 w-4 text-blue-500" />
+                                              {stock.productName}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 transition-colors">
+                                              {stock.adminStock || 0}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <Badge 
+                                              variant={stock.availableStock < 10 ? "destructive" : "default"}
+                                              className={
+                                                stock.availableStock < 10
+                                                  ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
+                                                  : 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm'
+                                              }
+                                            >
+                                              {stock.availableStock < 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                              {stock.availableStock >= 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
+                                              {stock.availableStock}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <Badge 
+                                              variant={difference !== 0 ? "secondary" : "outline"}
+                                              className={
+                                                difference > 0
+                                                  ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                                  : difference < 0
+                                                  ? 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 shadow-sm'
+                                                  : 'bg-gray-50 text-gray-600 border-gray-200'
+                                              }
+                                            >
+                                              {difference > 0 ? `+${difference}` : difference}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center gap-2 text-sm text-slate-700 group-hover:text-slate-900 transition-colors">
+                                              <User className="h-4 w-4 text-indigo-500" />
+                                              {stock.lastSupplier || '-'}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
+                                              {stock.totalReceivedFromSupplier || 0}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                              <Calendar className="h-4 w-4 text-blue-500" />
+                                              {stock.lastReceivedDate ? new Date(stock.lastReceivedDate).toLocaleDateString() : '-'}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setViewingStock(stock)
+                                                  setIsViewStockDialogOpen(true)
+                                                }}
+                                                className="hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  if (confirm(`Are you sure you want to delete stock entry for ${stock.productName}?`)) {
+                                                    // TODO: Implement delete functionality
+                                                    alert('Delete functionality coming soon')
+                                                  }
+                                                }}
+                                                className="hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            
+                            {/* Pagination Controls */}
+                            {sortedStock.length > 0 && totalPages > 1 && (
+                              <div className="flex items-center justify-between mt-4">
+                                <div className="text-sm text-gray-600">
+                                  Showing {startIndex + 1} to {Math.min(endIndex, sortedStock.length)} of {sortedStock.length} products
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentWarehouseStockPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentWarehouseStockPage === 1}
+                                  >
+                                    <ArrowLeft className="h-4 w-4 mr-1" />
+                                    Previous
+                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                      <Button
+                                        key={page}
+                                        variant={currentWarehouseStockPage === page ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setCurrentWarehouseStockPage(page)}
+                                        className={currentWarehouseStockPage === page ? "bg-blue-600 text-white" : ""}
                                       >
-                                        <TableCell className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors py-4">
-                                          <div className="flex items-center gap-2">
-                                            <Package className="h-4 w-4 text-blue-500" />
-                                            {po.poNumber}
-                                          </div>
-                                        </TableCell>
-                                        <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
-                                          <div className="flex items-center gap-2">
-                                            <User className="h-4 w-4 text-indigo-500" />
-                                            {po.supplierName}
-                                          </div>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                          <div className="space-y-1">
-                                            {po.items.map((item: any, idx: number) => (
-                                              <Badge key={idx} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 mr-1 mb-1">
-                                                <ShoppingCart className="h-3 w-3 mr-1" />
-                                                {item.productName} - {item.quantity}
-                                              </Badge>
-                                            ))}
-                                          </div>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors">
-                                            {totalQuantity} units
-                                          </Badge>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                          <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-                                            <Calendar className="h-4 w-4 text-blue-500" />
-                                            {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '-'}
-                                          </div>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                          <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-                                            <Calendar className="h-4 w-4 text-indigo-500" />
-                                            {new Date(po.createdAt).toLocaleDateString()}
-                                          </div>
-                                        </TableCell>
-                                        <TableCell className="py-4">
-                                          <Button
-                                            variant="default"
-                                            size="sm"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              setSelectedPO(po)
-                                              // Initialize GRN form with all PO items
-                                              setGRNForm({
-                                                poNumber: po.poNumber,
-                                                receivedQuantity: totalQuantity.toString(),
-                                                warehouseName: "Main Warehouse",
-                                                items: po.items.map((item: any) => ({
-                                                  productId: item.productId,
-                                                  productName: item.productName,
-                                                  orderedQuantity: item.quantity,
-                                                  receivedQuantity: item.quantity, // Default: all received
-                                                  damagedQuantity: 0,
-                                                  lostQuantity: 0
-                                                }))
-                                              })
-                                              setIsGRNDialogOpen(true)
-                                            }}
-                                            className="bg-green-600 hover:bg-green-700 hover:shadow-md text-white transition-all duration-200 group/btn"
-                                          >
-                                            <Package className="h-4 w-4 mr-1.5 group-hover/btn:scale-110 transition-transform" />
-                                            Accept & Receive
-                                          </Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    )
-                                  })
-                                )}
-                              </TableBody>
-                            </Table>
-                          </div>
+                                        {page}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentWarehouseStockPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentWarehouseStockPage === totalPages}
+                                  >
+                                    Next
+                                    <ArrowRight className="h-4 w-4 ml-1" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )
                       })()}
                     </CardContent>
                   </Card>
+                </div>
+              )}
 
-                  {/* Current Warehouse Stock Section - Table 2 */}
+              {/* Inward Tab */}
+              {activeSubSection === "inward" && (
+                <div className="space-y-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Current Warehouse Stock</CardTitle>
-                      <CardDescription>Accepted and received stock in warehouse. This shows actual physical stock available.</CardDescription>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Goods Inward</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            onClick={() => {
+                              setIsInwardTypeDialogOpen(true)
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Receive Goods
+                          </Button>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
                         <Table>
                           <TableHeader>
                             <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Admin Stock</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Warehouse Stock</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Difference</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Supplier</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Received</TableHead>
-                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Last Received</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Inward Number</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>PO Number</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Supplier</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Products</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Received Qty</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Damaged</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Lost</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Received Date</TableHead>
+                              <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {loading ? (
                               <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                                <TableCell colSpan={7} className="text-center py-8">
+                                <TableCell colSpan={10} className="text-center py-8">
                                   <div className="flex items-center justify-center gap-2">
                                     <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                                     <span className="text-gray-600">Loading...</span>
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ) : warehouseStock.length === 0 ? (
+                            ) : inwardEntries.length === 0 ? (
                               <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                                <TableCell colSpan={7} className="text-center py-12">
+                                <TableCell colSpan={10} className="text-center py-12">
                                   <div className="flex flex-col items-center text-muted-foreground">
-                                    <Package className="h-16 w-16 mb-4 opacity-30 text-blue-400" />
-                                    <p className="text-lg font-medium">No warehouse stock found</p>
-                                    <p className="text-sm mt-1">Stock will appear here once goods are received</p>
+                                    <Package className="h-16 w-16 mb-4 opacity-30 text-green-400" />
+                                    <p className="text-lg font-medium">No inward entries found</p>
+                                    <p className="text-sm mt-1">Receive goods to create inward entries</p>
                                   </div>
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              warehouseStock.map((stock: any, index: number) => {
-                                const difference = (stock.adminStock || 0) - stock.availableStock
+                              inwardEntries.map((inward: any, index: number) => {
+                                const totalReceived = inward.items.reduce((sum: number, item: any) => sum + item.receivedQuantity, 0)
+                                const totalDamaged = inward.items.reduce((sum: number, item: any) => sum + item.damagedQuantity, 0)
+                                const totalLost = inward.items.reduce((sum: number, item: any) => sum + item.lostQuantity, 0)
                                 return (
                                   <TableRow 
-                                    key={stock._id}
-                                    className="bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                    key={inward._id}
+                                    className="bg-white hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
                                   >
-                                    <TableCell className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors py-4">
+                                    <TableCell className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors py-4">
                                       <div className="flex items-center gap-2">
-                                        <Package className="h-4 w-4 text-blue-500" />
-                                        {stock.productName}
+                                        <Package className="h-4 w-4 text-green-500" />
+                                        {inward.inwardNumber}
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-4">
-                                      <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 transition-colors">
-                                        {stock.adminStock || 0}
-                                      </Badge>
+                                      {inward.poNumber ? (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                          {inward.poNumber}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-gray-400 text-sm">Direct Inward</span>
+                                      )}
                                     </TableCell>
-                                    <TableCell className="py-4">
-                                      <Badge 
-                                        variant={stock.availableStock < 10 ? "destructive" : "default"}
-                                        className={
-                                          stock.availableStock < 10
-                                            ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
-                                            : 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm'
-                                        }
-                                      >
-                                        {stock.availableStock < 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
-                                        {stock.availableStock >= 10 && <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>}
-                                        {stock.availableStock}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                      <Badge 
-                                        variant={difference !== 0 ? "secondary" : "outline"}
-                                        className={
-                                          difference > 0
-                                            ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
-                                            : difference < 0
-                                            ? 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 shadow-sm'
-                                            : 'bg-gray-50 text-gray-600 border-gray-200'
-                                        }
-                                      >
-                                        {difference > 0 ? `+${difference}` : difference}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                      <div className="flex items-center gap-2 text-sm text-slate-700 group-hover:text-slate-900 transition-colors">
+                                    <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
+                                      <div className="flex items-center gap-2">
                                         <User className="h-4 w-4 text-indigo-500" />
-                                        {stock.lastSupplier || '-'}
+                                        {inward.supplierName}
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-4">
-                                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 transition-colors">
-                                        {stock.totalReceivedFromSupplier || 0}
+                                      <div className="space-y-1">
+                                        {inward.items.slice(0, 2).map((item: any, idx: number) => (
+                                          <Badge key={idx} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 mr-1 mb-1">
+                                            {item.productName} - {item.receivedQuantity}
+                                          </Badge>
+                                        ))}
+                                        {inward.items.length > 2 && (
+                                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                            +{inward.items.length - 2} more
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        {totalReceived} units
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      {totalDamaged > 0 ? (
+                                        <Badge variant="destructive" className="bg-orange-500 hover:bg-orange-600 text-white border-0">
+                                          {totalDamaged} units
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-gray-400 text-sm">-</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      {totalLost > 0 ? (
+                                        <Badge variant="destructive" className="bg-yellow-500 hover:bg-yellow-600 text-white border-0">
+                                          {totalLost} units
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-gray-400 text-sm">-</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <Badge 
+                                        variant="outline"
+                                        className={
+                                          inward.status === 'PENDING_GRN'
+                                            ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300'
+                                            : 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300'
+                                        }
+                                      >
+                                        {inward.status === 'PENDING_GRN' ? 'Pending GRN' : 'GRN Created'}
                                       </Badge>
                                     </TableCell>
                                     <TableCell className="py-4">
                                       <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
                                         <Calendar className="h-4 w-4 text-blue-500" />
-                                        {stock.lastReceivedDate ? new Date(stock.lastReceivedDate).toLocaleDateString() : '-'}
+                                        {new Date(inward.receivedDate).toLocaleDateString()}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setViewingInward(inward)
+                                            setIsViewInwardDialogOpen(true)
+                                          }}
+                                          className="hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setEditingInward(inward)
+                                            setEditInwardForm({
+                                              supplierName: inward.supplierName || "",
+                                              receivedDate: inward.receivedDate ? new Date(inward.receivedDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                                              notes: inward.notes || "",
+                                              items: inward.items.map((item: any) => ({
+                                                productId: item.productId || "",
+                                                productName: item.productName || "",
+                                                orderedQuantity: item.orderedQuantity || 0,
+                                                receivedQuantity: item.receivedQuantity || 0,
+                                                damagedQuantity: item.damagedQuantity || 0,
+                                                lostQuantity: item.lostQuantity || 0,
+                                                acceptedQuantity: item.acceptedQuantity || 0,
+                                                unitPrice: item.unitPrice || 0
+                                              }))
+                                            })
+                                            setIsEditInwardDialogOpen(true)
+                                          }}
+                                          className="hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (confirm(`Are you sure you want to delete inward entry ${inward.inwardNumber}?`)) {
+                                              // TODO: Implement delete functionality
+                                              alert('Delete functionality coming soon')
+                                            }
+                                          }}
+                                          className="hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
                                       </div>
                                     </TableCell>
                                   </TableRow>
@@ -7072,12 +9609,13 @@ export function DashboardPage() {
                             <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Reason</TableHead>
                             <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Description</TableHead>
                             <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
+                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {loading ? (
                             <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                              <TableCell colSpan={5} className="text-center py-8">
+                              <TableCell colSpan={6} className="text-center py-8">
                                 <div className="flex items-center justify-center gap-2">
                                   <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                                   <span className="text-gray-600">Loading...</span>
@@ -7086,7 +9624,7 @@ export function DashboardPage() {
                             </TableRow>
                           ) : wasteEntries.length === 0 ? (
                             <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                              <TableCell colSpan={5} className="text-center py-12">
+                              <TableCell colSpan={6} className="text-center py-12">
                                 <div className="flex flex-col items-center text-muted-foreground">
                                   <Trash2 className="h-16 w-16 mb-4 opacity-30 text-red-400" />
                                   <p className="text-lg font-medium">No waste entries found</p>
@@ -8233,37 +10771,80 @@ export function DashboardPage() {
                 </DialogContent>
               </Dialog>
 
-              {/* View Product Details Dialog */}
-              <Dialog open={isViewProductDetailsDialogOpen} onOpenChange={setIsViewProductDetailsDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <div className="flex items-center justify-between">
-                      <DialogTitle>
-                        {isEditMode ? 'Edit Product Details' : 'View All Product'} - {viewingProductDetails?.productName}
-                      </DialogTitle>
-                      <div className="flex space-x-2">
-                        {!isEditMode && (
-                          <Button onClick={handleEditModeToggle} variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </Button>
-                        )}
-                        {isEditMode && (
-                          <>
-                            <Button onClick={handleSaveChanges} size="sm">
-                              <FileText className="h-4 w-4 mr-2" />
-                              Save
-                            </Button>
-                            <Button onClick={handleCancelEdit} variant="outline" size="sm">
-                              Cancel
-                            </Button>
-                          </>
-                        )}
+              {/* View Product Details Dialog - Viewport Centered Modal */}
+              {isViewProductDetailsDialogOpen && viewingProductDetails && (() => {
+                const modalContent = (
+                  <div 
+                    ref={viewProductModalRef}
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: '100vw',
+                      height: '100vh',
+                      margin: 0,
+                      padding: '1rem',
+                      zIndex: 9999,
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden'
+                    }}
+                    onClick={() => setIsViewProductDetailsDialogOpen(false)}
+                  >
+                    {/* MODAL CARD */}
+                    <div 
+                      className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                      style={{
+                        position: 'relative',
+                        zIndex: 10000
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* HEADER */}
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 sm:p-6 rounded-t-2xl relative">
+                        <button
+                          onClick={() => setIsViewProductDetailsDialogOpen(false)}
+                          className="absolute top-2 right-2 sm:top-4 sm:right-4 text-white hover:text-gray-200 transition-colors p-1"
+                        >
+                          <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </button>
+                        <div className="pr-8 sm:pr-0">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-xl sm:text-2xl font-bold">
+                              {isEditMode ? 'Edit Product Details' : 'View All Product'} - {viewingProductDetails?.productName}
+                            </h2>
+                            <div className="flex space-x-2">
+                              {!isEditMode && (
+                                <Button onClick={handleEditModeToggle} variant="outline" size="sm" className="bg-white/20 hover:bg-white/30 border-white text-white">
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </Button>
+                              )}
+                              {isEditMode && (
+                                <>
+                                  <Button onClick={handleSaveChanges} size="sm" className="bg-white text-blue-600 hover:bg-gray-100">
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Save
+                                  </Button>
+                                  <Button onClick={handleCancelEdit} variant="outline" size="sm" className="bg-white/20 hover:bg-white/30 border-white text-white">
+                                    Cancel
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </DialogHeader>
-                  {viewingProductDetails && (
-                    <div className="space-y-6">
+
+                      {/* CONTENT AREA */}
+                      <div className="p-4 sm:p-6">
+                        <div className="space-y-6">
                       {/* Product Information */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -8425,283 +11006,48 @@ export function DashboardPage() {
                         )}
                       </div>
 
-                      <div className="flex justify-between">
-                        <Button 
-                          onClick={() => handleDeleteInventoryItem(viewingProductDetails)}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Item
-                        </Button>
-                        <Button onClick={() => setIsViewProductDetailsDialogOpen(false)}>
-                          Close
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
-              {/* Re-top up Full-Page Overlay */}
-              {isEshopDialogOpen && editingCustomerId && (
-                <>
-                  {/* Translucent Black Overlay - Full Document Height */}
-                  <div 
-                    data-overlay="retopup-view"
-                    className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
-                    style={{ 
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      width: '100%',
-                      position: 'fixed',
-                      minHeight: '100vh'
-                    }}
-                    onClick={() => {
-                      setIsEshopDialogOpen(false)
-                      setIsRetopUpMode(false)
-                      setCustomerProducts([])
-                      setEditingCustomerId(null)
-                    }}
-                  />
-                  
-                  {/* Content Container - Positioned in current viewport */}
-                  <div 
-                    className="fixed z-[9999] flex items-center justify-center pointer-events-none" 
-                    id="retopup-content-container"
-                    style={{
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      width: '100vw',
-                      height: '100vh'
-                    }}
-                  >
-                    {/* Content Card - Centered in Viewport */}
-                    <div className="relative z-10 w-full max-w-[98vw] mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto max-h-[90vh] overflow-y-auto" id="retopup-content-card">
-                      {/* Header with Close Button */}
-                      <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
-                        <div>
-                          <h2 className="text-2xl font-bold">
-                    {isRetopUpMode ? `Re-top up Stock for ${editingCustomer?.name}` : `Edit Products for ${editingCustomer?.name}`}
-                          </h2>
-                          <p className="text-sm text-muted-foreground mt-1">
-                    {isRetopUpMode 
-                      ? "Enter additional quantities to add to current stock (shown in quantity fields)"
-                      : "Manage products and quantities for this customer"
-                    }
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setIsEshopDialogOpen(false)
-                            setIsRetopUpMode(false)
-                            setCustomerProducts([])
-                            setEditingCustomerId(null)
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="p-6">
-                  <div className="space-y-6">
-                    {/* Add Product Button */}
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">Customer Products</h3>
-                      <Button onClick={handleAddProductToCustomer} className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Product
-                      </Button>
-                    </div>
-
-                    {/* Products Table */}
-                    <div className="overflow-x-auto">
-                      <Table className="min-w-[1200px]">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[200px]">Product Name</TableHead>
-                            <TableHead className="w-[120px]">Price (₹)</TableHead>
-                            <TableHead className="w-[120px]">Discount (₹)</TableHead>
-                            <TableHead className="w-[100px]">
-                              {isRetopUpMode ? "Add Qty" : "Quantity"}
-                            </TableHead>
-                            <TableHead className="w-[200px]">Notes</TableHead>
-                            <TableHead className="w-[100px]">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {customerProducts.map((product, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                {product.isNew ? (
-                                  <Select
-                                    value={product.productId || ""}
-                                    onValueChange={(value) => {
-                                      const updatedProducts = [...customerProducts]
-                                      updatedProducts[index] = { ...product, productId: value }
-                                      setCustomerProducts(updatedProducts)
-                                    }}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select Product" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {products.map((p) => (
-                                        <SelectItem key={p._id} value={p._id}>
-                                          {p.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span className="font-medium">{product.name}</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={product.price}
-                                  onChange={(e) => {
-                                    const updatedProducts = [...customerProducts]
-                                    updatedProducts[index] = { ...product, price: parseFloat(e.target.value) || 0 }
-                                    setCustomerProducts(updatedProducts)
-                                  }}
-                                  className="w-32"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-green-600 font-medium">
-                                  ₹{((product.price * 0.4)).toFixed(1)}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={product.quantity}
-                                  onChange={(e) => {
-                                    const updatedProducts = [...customerProducts]
-                                    updatedProducts[index] = { ...product, quantity: parseInt(e.target.value) || 0 }
-                                    setCustomerProducts(updatedProducts)
-                                  }}
-                                  className="w-24"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  value={product.notes || ""}
-                                  onChange={(e) => {
-                                    const updatedProducts = [...customerProducts]
-                                    updatedProducts[index] = { ...product, notes: e.target.value }
-                                    setCustomerProducts(updatedProducts)
-                                  }}
-                                  placeholder="Add notes..."
-                                  className="w-48"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleRemoveProductFromCustomer(index.toString())}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Summary Section */}
-                    {customerProducts.length > 0 && (() => {
-                      const subTotal = customerProducts.reduce((sum, product) => sum + (product.price * product.quantity), 0)
-                      const grandTotalDiscount = customerProducts.reduce((sum, product) => sum + ((product.price * 0.4) * product.quantity), 0)
-                      const taxAmount = customerProducts.reduce((sum, product) => sum + ((product.price * 0.18) * product.quantity), 0)
-                      const grandTotalPrice = subTotal + taxAmount
-                      const totalQuantity = customerProducts.reduce((sum, product) => sum + product.quantity, 0)
-
-                      return (
-                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium">Sub Total:</span>
-                            <div className="flex space-x-8">
-                              <span className="text-sm font-medium">₹{subTotal.toFixed(1)}</span>
-                              <span className="text-sm font-medium text-green-600">₹{grandTotalDiscount.toFixed(1)}</span>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium">Tax:</span>
-                            <div className="flex space-x-8">
-                              <span className="text-sm font-medium">₹{taxAmount.toFixed(1)}</span>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium">Discount:</span>
-                            <div className="flex space-x-8">
-                              <span className="text-sm font-medium">₹{grandTotalDiscount.toFixed(1)}</span>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center border-t pt-2">
-                            <span className="text-lg font-bold">Grand Total:</span>
-                            <div className="flex space-x-8">
-                              <span className="text-lg font-bold">₹{grandTotalPrice.toFixed(1)}</span>
-                              <span className="text-sm font-medium text-green-600">₹{grandTotalDiscount.toFixed(1)}</span>
-                              <span className="text-sm font-medium">{totalQuantity}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })()}
-
-                    {/* Action Buttons */}
-                          <div className="flex justify-between items-center pt-4 border-t">
+                          <div className="flex justify-between pt-4 border-t">
                             <Button 
-                              variant="outline"
-                              onClick={() => {
-                                setIsEshopDialogOpen(false)
-                                setIsRetopUpMode(false)
-                                setCustomerProducts([])
-                                setEditingCustomerId(null)
-                              }}
-                              className="flex items-center gap-2"
+                              onClick={() => handleDeleteInventoryItem(viewingProductDetails)}
+                              variant="destructive"
+                              size="sm"
                             >
-                              <ArrowLeft className="h-4 w-4" />
-                              Back to My Customers
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Item
                             </Button>
-                            <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setIsEshopDialogOpen(false)
-                          setIsRetopUpMode(false)
-                          setCustomerProducts([])
-                          setEditingCustomerId(null)
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleUpdateCustomerProducts}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {isRetopUpMode ? "Update Stock" : "Save Changes"}
-                      </Button>
-                    </div>
-                  </div>
+                            <Button onClick={() => setIsViewProductDetailsDialogOpen(false)}>
+                              Close
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </>
-              )}
+                )
+
+                if (typeof window !== 'undefined' && document.body) {
+                  return createPortal(modalContent, document.body)
+                }
+                return null
+              })()}
+
+              {/* Re-top Up Dialog - Separate Component */}
+              <RetopUpModal
+                isOpen={isEshopDialogOpen && !!editingCustomerId}
+                onClose={() => {
+                  setIsEshopDialogOpen(false)
+                  setIsRetopUpMode(false)
+                  setCustomerProducts([])
+                  setEditingCustomerId(null)
+                }}
+                customer={editingCustomer}
+                products={products}
+                customerProducts={customerProducts}
+                setCustomerProducts={setCustomerProducts}
+                isRetopUpMode={isRetopUpMode}
+                eshopInventory={eshopInventory}
+                onUpdate={handleUpdateCustomerProducts}
+              />
             </div>
           )}
 
@@ -9068,75 +11414,404 @@ export function DashboardPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Re-top Up Dialog */}
-          <Dialog open={isRetopUpDialogOpen} onOpenChange={setIsRetopUpDialogOpen}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Re-top Up Stock - {retopUpCustomerName}</DialogTitle>
-                <DialogDescription>
-                  Add additional stock to existing products
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleRetopUpSubmit} className="space-y-4">
+          {/* Re-top Up Dialog - Modern Full-Page Overlay */}
+          {isRetopUpDialogOpen && (
+            <>
+              {/* Translucent Black Overlay - Full Document Height */}
+              <div 
+                data-overlay="retopup-view"
+                className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                style={{ 
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  position: 'fixed',
+                  minHeight: '100vh'
+                }}
+                onClick={() => {
+                  setIsRetopUpDialogOpen(false)
+                  setRetopUpNotes("")
+                  setRetopUpPage(1)
+                }}
+              />
+              
+              {/* Content Container - Modern Centered */}
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+                {/* Content Card - Modern Design */}
+                <div className="relative z-10 w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-gray-200 pointer-events-auto max-h-[95vh] overflow-hidden flex flex-col">
+                  {/* Modern Header with Gradient */}
+                  <div className="sticky top-0 z-20 bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-3 flex items-center justify-between shadow-lg">
+                    <div className="text-white">
+                      <h2 className="text-lg font-bold flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Re-top Up Stock - {retopUpCustomerName}
+                      </h2>
+                      <p className="text-xs text-purple-100 mt-0.5">
+                        Add additional stock quantities to existing customer products. Enter the quantity to add for each product.
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsRetopUpDialogOpen(false)
+                        setRetopUpNotes("")
+                        setRetopUpPage(1)
+                      }}
+                      className="h-8 w-8 p-0 hover:bg-white/20 text-white hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Content - Scrollable */}
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50">
+                    <form onSubmit={handleRetopUpSubmit} className="space-y-3">
+                      {/* Products Table */}
+                      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="flex items-center justify-between p-2 border-b border-gray-200">
+                          <h3 className="font-semibold text-gray-700 text-sm">Products</h3>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setIsAddProductDialogOpen(true)
+                              setAddProductDialogPage(1)
+                            }}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                            size="sm"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Product
+                          </Button>
+                        </div>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Current Stock</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Quantity to Add</TableHead>
+                            <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100">
+                              <TableHead className="font-semibold text-gray-700 py-2 text-xs">Product Name</TableHead>
+                              <TableHead className="font-semibold text-gray-700 py-2 text-xs">Current Stock</TableHead>
+                              <TableHead className="font-semibold text-gray-700 py-2 text-xs">Unit Price</TableHead>
+                              <TableHead className="font-semibold text-gray-700 py-2 text-xs">Quantity to Add</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {customerProductsForRetopUp.map((product, index) => (
-                      <TableRow key={product._id}>
-                        <TableCell className="font-medium">{product.productName}</TableCell>
-                        <TableCell>{product.quantity - (product.invoicedQuantity || 0)} units</TableCell>
-                        <TableCell>₹{product.price?.toLocaleString() || 0}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={product.quantityToAdd || ""}
-                            onChange={(e) => {
-                              const updated = [...customerProductsForRetopUp]
-                              updated[index].quantityToAdd = parseInt(e.target.value) || 0
-                              setCustomerProductsForRetopUp(updated)
-                            }}
-                            min="0"
-                            className="w-24"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            {customerProductsForRetopUp.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center py-8">
+                                  <div className="flex flex-col items-center text-muted-foreground">
+                                    <Package className="h-12 w-12 mb-3 opacity-30 text-purple-400" />
+                                    <p className="text-base font-medium">No products available</p>
+                                    <p className="text-xs mt-1">Click "Add Product" to add products to this re-top up</p>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              (() => {
+                                const startIndex = (retopUpPage - 1) * retopUpPerPage
+                                const endIndex = startIndex + retopUpPerPage
+                                const paginatedProducts = customerProductsForRetopUp.slice(startIndex, endIndex)
+                                const totalPages = Math.ceil(customerProductsForRetopUp.length / retopUpPerPage)
+                                
+                                return (
+                                  <>
+                                    {paginatedProducts.map((product, pageIndex) => {
+                                      const actualIndex = startIndex + pageIndex
+                                      return (
+                                        <TableRow 
+                                          key={product._id || `product-${actualIndex}`}
+                                          className="hover:bg-purple-50/50 transition-colors"
+                                        >
+                                          <TableCell className="font-medium text-gray-900 py-2 text-sm">
+                                            <div className="flex items-center gap-1.5">
+                                              <Package className="h-3 w-3 text-purple-500" />
+                                              {product.productName}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-2">
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                              {product.quantity - (product.invoicedQuantity || 0)} units
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-2">
+                                            <span className="font-semibold text-gray-700 text-sm">
+                                              ₹{product.price?.toLocaleString('en-IN') || '0'}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="py-2">
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={product.quantityToAdd || ""}
+                                              onChange={(e) => {
+                                                const updated = [...customerProductsForRetopUp]
+                                                updated[actualIndex].quantityToAdd = parseInt(e.target.value) || 0
+                                                setCustomerProductsForRetopUp(updated)
+                                              }}
+                                              min="0"
+                                              className="w-28 h-8 text-sm border-2 focus:border-purple-500 focus:ring-purple-500"
+                                            />
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })}
+                                    {totalPages > 1 && (
+                                      <TableRow>
+                                        <TableCell colSpan={4} className="py-2">
+                                          <div className="flex items-center justify-between">
+                                            <div className="text-xs text-muted-foreground">
+                                              Showing {startIndex + 1} to {Math.min(endIndex, customerProductsForRetopUp.length)} of {customerProductsForRetopUp.length} entries
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setRetopUpPage(prev => Math.max(1, prev - 1))}
+                                                disabled={retopUpPage === 1}
+                                                className="h-7 text-xs px-2"
+                                              >
+                                                <ArrowLeft className="h-3 w-3 mr-1" />
+                                                Previous
+                                              </Button>
+                                              <div className="text-xs text-muted-foreground">
+                                                Page {retopUpPage} of {totalPages}
+                                              </div>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setRetopUpPage(prev => Math.min(totalPages, prev + 1))}
+                                                disabled={retopUpPage === totalPages}
+                                                className="h-7 text-xs px-2"
+                                              >
+                                                Next
+                                                <ArrowRight className="h-3 w-3 ml-1" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </>
+                                )
+                              })()
+                            )}
                   </TableBody>
                 </Table>
+                      </div>
+
                 {/* Notes Field */}
-                <div className="mt-4">
-                  <Label htmlFor="retopup-notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="retopup-notes"
-                    placeholder="Add any notes about this re-top up..."
-                    value={retopUpNotes}
-                    onChange={(e) => setRetopUpNotes(e.target.value)}
-                    rows={3}
-                    className="mt-2"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => {
+                      <div className="space-y-1.5">
+                        <Label htmlFor="retopup-notes" className="text-xs font-semibold text-gray-700">
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="retopup-notes"
+                          placeholder="Add any notes or comments about this re-top up transaction..."
+                          value={retopUpNotes}
+                          onChange={(e) => setRetopUpNotes(e.target.value)}
+                          rows={2}
+                          className="text-sm border-2 focus:border-purple-500 focus:ring-purple-500 resize-none"
+                        />
+                      </div>
+
+                      {/* Summary Card */}
+                      {customerProductsForRetopUp.some((p: any) => p.quantityToAdd > 0) && (
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200 p-3">
+                          <h3 className="font-semibold text-gray-800 mb-1.5 flex items-center gap-1.5 text-xs">
+                            <TrendingUp className="h-3 w-3 text-purple-600" />
+                            Update Summary
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs text-gray-600">Total Items to Update</p>
+                              <p className="text-lg font-bold text-purple-600">
+                                {customerProductsForRetopUp.filter((p: any) => p.quantityToAdd > 0).length}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Total Quantity to Add</p>
+                              <p className="text-lg font-bold text-purple-600">
+                                {customerProductsForRetopUp.reduce((sum: number, p: any) => sum + (p.quantityToAdd || 0), 0)} units
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Buttons */}
+                      <div className="flex justify-end gap-2 pt-1">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
                     setIsRetopUpDialogOpen(false)
                     setRetopUpNotes("")
-                  }}>
+                    setRetopUpPage(1)
+                          }}
+                          className="px-4 py-1.5 h-8 text-sm border-2 hover:bg-gray-50"
+                        >
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button 
+                          type="submit" 
+                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-1.5 h-8 text-sm shadow-lg hover:shadow-xl transition-all duration-200"
+                          disabled={!customerProductsForRetopUp.some((p: any) => p.quantityToAdd > 0)}
+                        >
+                          <Package className="h-3 w-3 mr-1.5" />
                     Update Stock
                   </Button>
                 </div>
               </form>
-            </DialogContent>
-          </Dialog>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Add Product Dialog for Re-top Up */}
+          {isAddProductDialogOpen && (
+            <>
+              {/* Overlay for Add Product Dialog */}
+              <div 
+                className="fixed bg-black/60 backdrop-blur-sm z-[10000]"
+                style={{ 
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: '100%',
+                  height: '100%',
+                  position: 'fixed'
+                }}
+                onClick={() => {
+                  setIsAddProductDialogOpen(false)
+                  setAddProductDialogPage(1)
+                }}
+              />
+              {/* Dialog Content */}
+              <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none">
+                <div className="relative z-10 w-full max-w-3xl bg-white rounded-lg shadow-2xl border border-gray-200 pointer-events-auto max-h-[80vh] overflow-hidden flex flex-col">
+                  <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
+                    <h2 className="text-xl font-bold">Add Product to Re-top Up</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select a product to add to the re-top up list
+                    </p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="space-y-4">
+                      {products.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No products available</p>
+                        </div>
+                      ) : (
+                        (() => {
+                          const startIndex = (addProductDialogPage - 1) * addProductDialogPerPage
+                          const endIndex = startIndex + addProductDialogPerPage
+                          const paginatedProducts = products.slice(startIndex, endIndex)
+                          const totalPages = Math.ceil(products.length / addProductDialogPerPage)
+                          
+                          return (
+                            <>
+                              <div className="space-y-2">
+                                {paginatedProducts.map((product: any) => {
+                                  const isAlreadyAdded = customerProductsForRetopUp.some((p: any) => p.productId === product._id)
+                                  return (
+                                    <div
+                                      key={product._id}
+                                      className={`flex items-center justify-between p-4 border rounded-lg ${
+                                        isAlreadyAdded 
+                                          ? 'bg-gray-50 border-gray-200 opacity-60' 
+                                          : 'bg-white border-gray-200 hover:border-purple-300 hover:bg-purple-50/50 cursor-pointer'
+                                      } transition-colors`}
+                                      onClick={() => !isAlreadyAdded && handleAddProductToRetopUp(product)}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Package className="h-5 w-5 text-purple-500" />
+                                        <div>
+                                          <div className="font-medium text-gray-900">{product.name}</div>
+                                          <div className="text-sm text-gray-500">
+                                            {product.category} • ₹{(product.offerPrice || product.price || 0).toLocaleString('en-IN')}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      {isAlreadyAdded ? (
+                                        <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                                          Already Added
+                                        </Badge>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleAddProductToRetopUp(product)
+                                          }}
+                                        >
+                                          <Plus className="h-4 w-4 mr-1" />
+                                          Add
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              {totalPages > 1 && (
+                                <div className="flex items-center justify-between pt-4 border-t">
+                                  <div className="text-sm text-muted-foreground">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, products.length)} of {products.length} entries
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setAddProductDialogPage(prev => Math.max(1, prev - 1))}
+                                      disabled={addProductDialogPage === 1}
+                                    >
+                                      <ArrowLeft className="h-4 w-4 mr-1" />
+                                      Previous
+                                    </Button>
+                                    <div className="text-sm text-muted-foreground">
+                                      Page {addProductDialogPage} of {totalPages}
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setAddProductDialogPage(prev => Math.min(totalPages, prev + 1))}
+                                      disabled={addProductDialogPage === totalPages}
+                                    >
+                                      Next
+                                      <ArrowRight className="h-4 w-4 ml-1" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 flex justify-end gap-2 p-6 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsAddProductDialogOpen(false)
+                        setAddProductDialogPage(1)
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Edit Inventory Dialog */}
           <Dialog open={isEditInventoryDialogOpen} onOpenChange={setIsEditInventoryDialogOpen}>
@@ -9324,7 +11999,25 @@ export function DashboardPage() {
                 <DialogTitle>Create Purchase Order</DialogTitle>
               </DialogHeader>
               <form onSubmit={handlePOSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>PO Type *</Label>
+                    <Select
+                      value={poForm.poType}
+                      onValueChange={(value: any) => setPOForm({...poForm, poType: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard PO</SelectItem>
+                        <SelectItem value="reference">Reference PO (Record Only)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {poForm.poType === 'reference' && (
+                      <p className="text-xs text-muted-foreground mt-1">For audit/document matching only</p>
+                    )}
+                  </div>
                   <div>
                     <Label>Supplier Name *</Label>
                     <Select
@@ -9513,8 +12206,131 @@ export function DashboardPage() {
             </DialogContent>
           </Dialog>
 
+          {/* GRN Type Selection Dialog - Now shows Inward Entries */}
+          <Dialog open={isGRNTypeDialogOpen} onOpenChange={setIsGRNTypeDialogOpen}>
+            <DialogContent 
+              className="max-h-[80vh] overflow-y-auto"
+              style={{
+                width: '90vw',
+                maxWidth: '1200px'
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>Create GRN from Inward Entry</DialogTitle>
+                <DialogDescription>
+                  Select an inward entry to generate GRN. Only accepted goods from inward entries will be added to warehouse stock.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600 mr-2" />
+                    <span className="text-gray-600">Loading inward entries...</span>
+                  </div>
+                ) : inwardEntries.filter((inward: any) => inward.status === 'PENDING_GRN').length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-30 text-gray-400" />
+                    <p className="text-lg font-medium text-gray-600">No pending inward entries</p>
+                    <p className="text-sm text-gray-500 mt-1">Create an inward entry first to generate GRN</p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => {
+                        setIsGRNTypeDialogOpen(false)
+                        setActiveSection("inventory-management")
+                        setActiveSubSection("inward")
+                        setIsInventoryManagementExpanded(true)
+                      }}
+                    >
+                      Go to Inward Tab
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Select Inward Entry:</Label>
+                    <div className="border rounded-lg overflow-x-auto w-full">
+                      <Table className="min-w-full w-full">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Inward Number</TableHead>
+                            <TableHead>PO Number</TableHead>
+                            <TableHead>Supplier</TableHead>
+                            <TableHead>Products</TableHead>
+                            <TableHead>Accepted Qty</TableHead>
+                            <TableHead>Received Date</TableHead>
+                            <TableHead>Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {inwardEntries
+                            .filter((inward: any) => inward.status === 'PENDING_GRN')
+                            .map((inward: any) => {
+                              const totalAccepted = inward.items.reduce((sum: number, item: any) => sum + item.acceptedQuantity, 0)
+                              return (
+                                <TableRow key={inward._id} className="hover:bg-blue-50">
+                                  <TableCell className="font-medium">{inward.inwardNumber}</TableCell>
+                                  <TableCell>
+                                    {inward.poNumber ? (
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                        {inward.poNumber}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-gray-400 text-sm">Direct Inward</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{inward.supplierName}</TableCell>
+                                  <TableCell>
+                                    <div className="space-y-1">
+                                      {inward.items.slice(0, 2).map((item: any, idx: number) => (
+                                        <Badge key={idx} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 mr-1 mb-1 text-xs">
+                                          {item.productName} ({item.acceptedQuantity})
+                                        </Badge>
+                                      ))}
+                                      {inward.items.length > 2 && (
+                                        <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+                                          +{inward.items.length - 2} more
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="default" className="bg-green-600">
+                                      {totalAccepted} units
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm text-gray-600">
+                                      {new Date(inward.receivedDate).toLocaleDateString()}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700 text-white"
+                                      onClick={() => {
+                                        setSelectedInward(inward)
+                                        setIsGRNTypeDialogOpen(false)
+                                        setIsGenerateGRNFromInwardOpen(true)
+                                      }}
+                                    >
+                                      Generate GRN
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* GRN Full-Page Overlay */}
-          {isGRNDialogOpen && selectedPO && (
+          {isGRNDialogOpen && (
             <>
               {/* Translucent Black Overlay - Full Document Height */}
               <div 
@@ -9530,166 +12346,475 @@ export function DashboardPage() {
                 }}
                 onClick={() => {
                   setIsGRNDialogOpen(false)
-                  setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+                  setGRNForm({ 
+                    poNumber: "", 
+                    receivedQuantity: "", 
+                    warehouseName: "Main Warehouse", 
+                    grnType: "GRN_CREATED",
+                    supplierName: "",
+                    location: {},
+                    notes: "",
+                    items: [] 
+                  })
                   setSelectedPO(null)
+                  setIsDirectGRN(false)
                 }}
               />
               
-              {/* Content Container */}
-              <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-8 pb-8 overflow-y-auto pointer-events-none">
-                {/* Content Card - Centered */}
-                <div className="relative z-10 w-full max-w-[98vw] mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto max-h-[90vh] overflow-y-auto">
-                  {/* Header with Close Button */}
-                  <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold">Receive Goods (GRN) - {grnForm.poNumber}</h2>
-                      <p className="text-sm text-muted-foreground mt-1">Accept goods from supplier. Optionally record damaged or lost items.</p>
+              {/* Content Container - Modern Centered */}
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+                {/* Content Card - Modern Design */}
+                <div className="relative z-10 w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-gray-200 pointer-events-auto max-h-[95vh] overflow-hidden flex flex-col">
+                  {/* Modern Header with Gradient */}
+                  <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6 flex items-center justify-between shadow-lg">
+                    <div className="text-white">
+                      <h2 className="text-2xl font-bold mb-1">
+                        {isDirectGRN ? 'Create Direct GRN' : selectedPO ? `Receive Goods (GRN) - ${grnForm.poNumber}` : 'Create GRN - Select PO'}
+                      </h2>
+                      <p className="text-sm text-blue-100">
+                        {isDirectGRN 
+                          ? 'Create GRN without Purchase Order. Enter items manually.'
+                          : selectedPO 
+                          ? 'Accept goods from supplier. Optionally record damaged or lost items.'
+                          : 'Select a Purchase Order to link this GRN to.'}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setIsGRNDialogOpen(false)
-                        setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
+                        setGRNForm({ 
+                          poNumber: "", 
+                          receivedQuantity: "", 
+                          warehouseName: "Main Warehouse", 
+                          grnType: "GRN_CREATED",
+                          supplierName: "",
+                          location: {},
+                          notes: "",
+                          items: [] 
+                        })
                         setSelectedPO(null)
+                        setIsDirectGRN(false)
                       }}
-                      className="h-8 w-8 p-0"
+                      className="h-9 w-9 p-0 hover:bg-white/20 text-white hover:text-white"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-5 w-5" />
                     </Button>
                   </div>
                   
-                  {/* Content */}
-                  <div className="p-6">
-                    <form onSubmit={handleGRNSubmit} className="space-y-4">
+                  {/* Content - Scrollable */}
+                  <div className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
+                    <form onSubmit={handleGRNSubmit} className="space-y-6">
+                  {!isDirectGRN && !selectedPO && (
+                    <div>
+                      <Label>Select Purchase Order *</Label>
+                      <Select
+                        value={grnForm.poNumber}
+                        onValueChange={(value) => {
+                          const po = purchaseOrders.find((p: any) => p.poNumber === value)
+                          if (po) {
+                            setSelectedPO(po)
+                            const totalQuantity = po.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+                            setGRNForm({
+                              poNumber: po.poNumber,
+                              receivedQuantity: totalQuantity.toString(),
+                              warehouseName: "Main Warehouse",
+                              grnType: "GRN_CREATED",
+                              supplierName: po.supplierName || "",
+                              location: {},
+                              notes: "",
+                              items: po.items.map((item: any) => ({
+                                productId: item.productId,
+                                productName: item.productName,
+                                orderedQuantity: item.quantity,
+                                receivedQuantity: item.quantity,
+                                damagedQuantity: 0,
+                                lostQuantity: 0,
+                                unitPrice: item.unitPrice || 0
+                              }))
+                            })
+                          }
+                        }}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a Purchase Order" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {purchaseOrders
+                            .filter((po: any) => po.status !== 'PO_CLOSED' || po.poType === 'reference')
+                            .map((po: any) => (
+                              <SelectItem key={po._id} value={po.poNumber}>
+                                {po.poNumber} - {po.supplierName} ({po.items.reduce((sum: number, item: any) => sum + item.quantity, 0)} items)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {!isDirectGRN && selectedPO && (
+                    <div>
+                      <Label>PO Number</Label>
+                      <Input
+                        value={grnForm.poNumber}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                  )}
+                  {isDirectGRN && (
+                    <div>
+                      <Label>Supplier Name *</Label>
+                      <Input
+                        value={grnForm.supplierName}
+                        onChange={(e) => setGRNForm({...grnForm, supplierName: e.target.value})}
+                        placeholder="Enter supplier name"
+                        required
+                      />
+                    </div>
+                  )}
                   <div>
-                    <Label>PO Number</Label>
-                    <Input
-                      value={grnForm.poNumber}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                  <div>
-                    <Label>Warehouse</Label>
-                    <Input
-                      value={grnForm.warehouseName}
-                      onChange={(e) => setGRNForm({...grnForm, warehouseName: e.target.value})}
-                    />
+                    <Label>Warehouse Name *</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative warehouse-dropdown-container">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsWarehouseDropdownOpen2(!isWarehouseDropdownOpen2)}
+                          className="w-full justify-between"
+                        >
+                          {grnForm.warehouseName || "Select warehouse"}
+                          <ChevronDown className="h-4 w-4 ml-2" />
+                        </Button>
+                        {isWarehouseDropdownOpen2 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                            <div className="p-1">
+                              {warehouses.map((warehouse) => (
+                                <div
+                                  key={warehouse}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer group"
+                                  onClick={() => {
+                                    setGRNForm({...grnForm, warehouseName: warehouse})
+                                    setIsWarehouseDropdownOpen2(false)
+                                  }}
+                                >
+                                  <span className={grnForm.warehouseName === warehouse ? "font-semibold" : ""}>
+                                    {warehouse}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (warehouses.length > 1) {
+                                        const updatedWarehouses = warehouses.filter(w => w !== warehouse)
+                                        setWarehouses(updatedWarehouses)
+                                        if (grnForm.warehouseName === warehouse) {
+                                          setGRNForm({...grnForm, warehouseName: updatedWarehouses[0] || ""})
+                                        }
+                                      } else {
+                                        alert("At least one warehouse must exist")
+                                      }
+                                    }}
+                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                              {isAddingWarehouse ? (
+                                <div className="flex gap-1 px-3 py-2 border-t mt-1">
+                                  <Input
+                                    value={newWarehouseName}
+                                    onChange={(e) => setNewWarehouseName(e.target.value)}
+                                    placeholder="Enter warehouse name"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && newWarehouseName.trim()) {
+                                        setWarehouses([...warehouses, newWarehouseName.trim()])
+                                        setGRNForm({...grnForm, warehouseName: newWarehouseName.trim()})
+                                        setNewWarehouseName("")
+                                        setIsAddingWarehouse(false)
+                                      }
+                                      if (e.key === 'Escape') {
+                                        setIsAddingWarehouse(false)
+                                        setNewWarehouseName("")
+                                      }
+                                    }}
+                                    autoFocus
+                                    className="h-8 text-sm"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (newWarehouseName.trim()) {
+                                        setWarehouses([...warehouses, newWarehouseName.trim()])
+                                        setGRNForm({...grnForm, warehouseName: newWarehouseName.trim()})
+                                        setNewWarehouseName("")
+                                        setIsAddingWarehouse(false)
+                                      }
+                                    }}
+                                    className="h-8 px-2"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setIsAddingWarehouse(false)
+                                      setNewWarehouseName("")
+                                    }}
+                                    className="h-8 px-2"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="px-3 py-2 border-t mt-1 cursor-pointer hover:bg-gray-100 rounded-md flex items-center gap-2 text-sm text-blue-600"
+                                  onClick={() => setIsAddingWarehouse(true)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span>Add Warehouse</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Items Table with Damaged/Lost Fields */}
-                  <div>
-                    <Label className="mb-2 block">Items - Record Received, Damaged, and Lost Quantities</Label>
+                  {(selectedPO || isDirectGRN) && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                      <Label>Items - Record Received, Damaged, and Lost Quantities</Label>
+                      {isDirectGRN && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setGRNForm({
+                              ...grnForm,
+                              items: [...grnForm.items, {
+                                productId: "",
+                                productName: "",
+                                orderedQuantity: 0,
+                                receivedQuantity: 0,
+                                damagedQuantity: 0,
+                                lostQuantity: 0,
+                                unitPrice: 0
+                              }]
+                            })
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Item
+                        </Button>
+                      )}
+                    </div>
                     <div className="border rounded-lg overflow-x-auto">
                       <Table className="min-w-full">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="min-w-[200px]">Product Name</TableHead>
-                            <TableHead className="min-w-[120px]">Ordered Qty</TableHead>
+                            {isDirectGRN && <TableHead className="min-w-[200px]">Product</TableHead>}
+                            {!isDirectGRN && <TableHead className="min-w-[200px]">Product Name</TableHead>}
+                            {!isDirectGRN && <TableHead className="min-w-[120px]">Ordered Qty</TableHead>}
                             <TableHead className="min-w-[140px]">Received Qty</TableHead>
                             <TableHead className="min-w-[140px]">Damaged Qty</TableHead>
                             <TableHead className="min-w-[140px]">Lost Qty</TableHead>
+                            <TableHead className="min-w-[140px]">Unit Cost (₹)</TableHead>
                             <TableHead className="min-w-[140px]">Accepted Qty</TableHead>
+                            {isDirectGRN && <TableHead className="min-w-[100px]">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {grnForm.items.map((item, index) => {
-                            const acceptedQty = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
-                            return (
-                              <TableRow key={index}>
-                                <TableCell className="font-medium">{item.productName}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{item.orderedQuantity}</Badge>
-                                </TableCell>
-                                <TableCell className="min-w-[140px]">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max={item.orderedQuantity}
-                                    value={item.receivedQuantity}
-                                    onChange={(e) => {
-                                      const newItems = [...grnForm.items]
-                                      newItems[index].receivedQuantity = parseInt(e.target.value) || 0
-                                      setGRNForm({...grnForm, items: newItems})
-                                    }}
-                                    className="w-full min-w-[100px]"
-                                  />
-                                </TableCell>
-                                <TableCell className="min-w-[140px]">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max={item.receivedQuantity}
-                                    value={item.damagedQuantity}
-                                    onChange={(e) => {
-                                      const newItems = [...grnForm.items]
-                                      newItems[index].damagedQuantity = parseInt(e.target.value) || 0
-                                      // Auto-adjust received quantity if damaged exceeds received
-                                      if (newItems[index].damagedQuantity + newItems[index].lostQuantity > newItems[index].receivedQuantity) {
-                                        newItems[index].receivedQuantity = newItems[index].damagedQuantity + newItems[index].lostQuantity
-                                      }
-                                      setGRNForm({...grnForm, items: newItems})
-                                    }}
-                                    className="w-full min-w-[100px]"
-                                    placeholder="0"
-                                  />
-                                </TableCell>
-                                <TableCell className="min-w-[140px]">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max={item.receivedQuantity}
-                                    value={item.lostQuantity}
-                                    onChange={(e) => {
-                                      const newItems = [...grnForm.items]
-                                      newItems[index].lostQuantity = parseInt(e.target.value) || 0
-                                      // Auto-adjust received quantity if lost exceeds received
-                                      if (newItems[index].damagedQuantity + newItems[index].lostQuantity > newItems[index].receivedQuantity) {
-                                        newItems[index].receivedQuantity = newItems[index].damagedQuantity + newItems[index].lostQuantity
-                                      }
-                                      setGRNForm({...grnForm, items: newItems})
-                                    }}
-                                    className="w-full min-w-[100px]"
-                                    placeholder="0"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={acceptedQty > 0 ? "default" : "destructive"}>
-                                    {acceptedQty}
-                                  </Badge>
-                                  {acceptedQty < 0 && (
-                                    <p className="text-xs text-red-600 mt-1">Invalid</p>
+                          {grnForm.items.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={isDirectGRN ? 6 : 6} className="text-center py-8">
+                                {isDirectGRN ? 'Click "Add Item" to add products' : 'No items'}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            grnForm.items.map((item, index) => {
+                              const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                              return (
+                                <TableRow key={index}>
+                                  {isDirectGRN ? (
+                                    <TableCell className="min-w-[200px]">
+                                      <Select
+                                        value={item.productId}
+                                        onValueChange={(value) => {
+                                          const product = products.find((p: any) => p._id === value)
+                                          const newItems = [...grnForm.items]
+                                          newItems[index] = {
+                                            ...newItems[index],
+                                            productId: value,
+                                            productName: product?.name || '',
+                                            unitPrice: product?.price || newItems[index].unitPrice || 0
+                                          }
+                                          setGRNForm({...grnForm, items: newItems})
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select product" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {products.map((p: any) => (
+                                            <SelectItem key={p._id} value={p._id}>
+                                              {p.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                  ) : (
+                                    <>
+                                      <TableCell className="font-medium">{item.productName}</TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">{item.orderedQuantity}</Badge>
+                                      </TableCell>
+                                    </>
                                   )}
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
+                                  <TableCell className="min-w-[140px]">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={!isDirectGRN ? item.orderedQuantity : undefined}
+                                      value={item.receivedQuantity}
+                                      onChange={(e) => {
+                                        const newItems = [...grnForm.items]
+                                        newItems[index].receivedQuantity = parseInt(e.target.value) || 0
+                                        setGRNForm({...grnForm, items: newItems})
+                                      }}
+                                      className="w-full min-w-[100px]"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="min-w-[140px]">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={item.receivedQuantity}
+                                      value={item.damagedQuantity || 0}
+                                      onChange={(e) => {
+                                        const newItems = [...grnForm.items]
+                                        newItems[index].damagedQuantity = parseInt(e.target.value) || 0
+                                        setGRNForm({...grnForm, items: newItems})
+                                      }}
+                                      className="w-full min-w-[100px]"
+                                      placeholder="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="min-w-[140px]">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={item.receivedQuantity}
+                                      value={item.lostQuantity || 0}
+                                      onChange={(e) => {
+                                        const newItems = [...grnForm.items]
+                                        newItems[index].lostQuantity = parseInt(e.target.value) || 0
+                                        setGRNForm({...grnForm, items: newItems})
+                                      }}
+                                      className="w-full min-w-[100px]"
+                                      placeholder="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="min-w-[140px]">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.unitPrice || 0}
+                                      onChange={(e) => {
+                                        const newItems = [...grnForm.items]
+                                        newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                                        setGRNForm({...grnForm, items: newItems})
+                                      }}
+                                      className="w-full min-w-[100px]"
+                                      placeholder="0.00"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={acceptedQty > 0 ? "default" : "destructive"}>
+                                      {acceptedQty}
+                                    </Badge>
+                                    {acceptedQty < 0 && (
+                                      <p className="text-xs text-red-600 mt-1">Invalid</p>
+                                    )}
+                                  </TableCell>
+                                  {isDirectGRN && (
+                                    <TableCell>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const newItems = grnForm.items.filter((_, i) => i !== index)
+                                          setGRNForm({...grnForm, items: newItems})
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              )
+                            })
+                          )}
                         </TableBody>
                       </Table>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Accepted Qty = Received Qty - Damaged Qty - Lost Qty
-                    </p>
-                  </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Accepted Qty = Received Qty - Damaged Qty - Lost Qty
+                      </p>
+                    </div>
+                  )}
 
-                      <div className="flex justify-end space-x-2 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => {
-                          setIsGRNDialogOpen(false)
-                          setGRNForm({ poNumber: "", receivedQuantity: "", warehouseName: "Main Warehouse", items: [] })
-                          setSelectedPO(null)
-                        }}>
+                      {/* Modern Footer */}
+                      <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4 flex justify-end gap-3 shadow-lg">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
+                            setIsGRNDialogOpen(false)
+                            setGRNForm({ 
+                              poNumber: "", 
+                              receivedQuantity: "", 
+                              warehouseName: "Main Warehouse", 
+                              grnType: "GRN_CREATED",
+                              supplierName: "",
+                              location: {},
+                              notes: "",
+                              items: [] 
+                            })
+                            setSelectedPO(null)
+                            setIsDirectGRN(false)
+                          }}
+                          className="px-6 border-2 hover:bg-gray-50"
+                        >
                           Cancel
                         </Button>
                         <Button 
                           type="submit" 
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          disabled={grnForm.items.some((item: any) => {
-                            const accepted = item.receivedQuantity - item.damagedQuantity - item.lostQuantity
-                            return accepted < 0
-                          })}
+                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 shadow-lg hover:shadow-xl transition-all duration-200"
+                          disabled={
+                            (!isDirectGRN && !selectedPO) ||
+                            grnForm.items.length === 0 || 
+                            grnForm.items.some((item: any) => {
+                              const accepted = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                              return accepted < 0 || (isDirectGRN && !item.productId)
+                            })
+                          }
                         >
-                          Accept & Receive Goods
+                          {isDirectGRN ? 'Create GRN' : selectedPO ? 'Accept & Receive Goods' : 'Select PO First'}
                         </Button>
                       </div>
                     </form>
@@ -10207,8 +13332,2284 @@ export function DashboardPage() {
               </div>
             </>
           )}
+
+          {/* View Warehouse Stock Details Dialog */}
+          <Dialog open={isViewStockDialogOpen} onOpenChange={(open) => {
+            setIsViewStockDialogOpen(open)
+            if (!open) {
+              setViewStockDialogPage(1)
+            }
+          }}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="h-6 w-6 text-blue-600" />
+                  Product Details - {viewingStock?.productName}
+                </DialogTitle>
+                <DialogDescription>
+                  Complete information about this warehouse stock entry
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {viewingStock && (
+                  <>
+                    {/* Page 1 */}
+                    {viewStockDialogPage === 1 && (
+                      <div className="space-y-4">
+                        {/* Top Section - Two Columns */}
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Left Column - Basic Information */}
+                          <div>
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                              <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <Package className="h-4 w-4 text-blue-600" />
+                                Basic Information
+                              </h3>
+                              <div className="space-y-2">
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Product Name</Label>
+                                  <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingStock.productName}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Product ID</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 font-mono text-xs">{viewingStock.productId || 'N/A'}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mt-2">
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Warehouse Name</Label>
+                                    <p className="text-sm text-gray-700 mt-0.5">{viewingStock.warehouseName || 'Main Warehouse'}</p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Status</Label>
+                                    <div className="mt-0.5">
+                                      <Badge 
+                                        variant={viewingStock.status === 'IN_WAREHOUSE' ? 'default' : 'secondary'}
+                                        className="text-xs"
+                                      >
+                                        {viewingStock.status || 'IN_WAREHOUSE'}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right Column - Stock Quantities */}
+                          <div>
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                              <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-green-600" />
+                                Stock Quantities
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Available Stock</Label>
+                                  <p className="text-2xl font-bold text-green-700 mt-1">{viewingStock.availableStock || 0}</p>
+                                  <p className="text-xs text-gray-500 mt-1">units</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Website Stock</Label>
+                                  <p className="text-2xl font-bold text-blue-700 mt-1">{viewingStock.adminStock || 0}</p>
+                                  <p className="text-xs text-gray-500 mt-1">units</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Total Received</Label>
+                                  <p className="text-2xl font-bold text-purple-700 mt-1">{viewingStock.totalReceivedFromSupplier || 0}</p>
+                                  <p className="text-xs text-gray-500 mt-1">from supplier</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Difference</Label>
+                                  <p className={`text-2xl font-bold mt-1 ${
+                                    ((viewingStock.adminStock || 0) - viewingStock.availableStock) > 0 
+                                      ? 'text-yellow-700' 
+                                      : ((viewingStock.adminStock || 0) - viewingStock.availableStock) < 0
+                                      ? 'text-blue-700'
+                                      : 'text-gray-700'
+                                  }`}>
+                                    {(viewingStock.adminStock || 0) - viewingStock.availableStock}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">units</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Section - Recent Receipts */}
+                        <div className="bg-white rounded-lg border border-gray-200">
+                          <div className="p-3 border-b bg-gray-50 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-blue-600" />
+                              Recent Receipts
+                            </h3>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                setIsViewStockDialogOpen(false)
+                                setIsGRNTypeDialogOpen(true)
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create GRN
+                            </Button>
+                          </div>
+                          <div className="p-3">
+                            <div className="border rounded-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow style={{ backgroundColor: '#1e2961' }}>
+                                    <TableHead style={{ color: '#ffffff' }}>Total Received</TableHead>
+                                    <TableHead style={{ color: '#ffffff' }}>Last Received</TableHead>
+                                    <TableHead style={{ color: '#ffffff' }}>Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {(() => {
+                                    // Fetch GRNs for this product - for now showing sample data
+                                    // TODO: Fetch actual GRN data for this product
+                                    const sampleReceipts = [
+                                      { totalReceived: viewingStock.totalReceivedFromSupplier || 0, lastReceived: viewingStock.lastReceivedDate, grnNumber: viewingStock.grnBatchId }
+                                    ].filter(r => r.totalReceived > 0)
+                                    
+                                    if (sampleReceipts.length === 0) {
+                                      return (
+                                        <TableRow>
+                                          <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                                            No receipts found
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    }
+                                    
+                                    return sampleReceipts.map((receipt, idx) => (
+                                      <TableRow key={idx}>
+                                        <TableCell>
+                                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                            {receipt.totalReceived}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Calendar className="h-4 w-4 text-blue-500" />
+                                            {receipt.lastReceived 
+                                              ? new Date(receipt.lastReceived).toLocaleDateString('en-US', {
+                                                  year: 'numeric',
+                                                  month: 'numeric',
+                                                  day: 'numeric'
+                                                })
+                                              : 'N/A'}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                // TODO: Implement view GRN details
+                                                alert('View GRN details')
+                                              }}
+                                              className="hover:bg-blue-50 hover:text-blue-600"
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                // TODO: Implement edit GRN
+                                                alert('Edit GRN')
+                                              }}
+                                              className="hover:bg-green-50 hover:text-green-600"
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                // TODO: Implement delete GRN
+                                                if (confirm('Are you sure you want to delete this receipt?')) {
+                                                  alert('Delete GRN')
+                                                }
+                                              }}
+                                              className="hover:bg-red-50 hover:text-red-600"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                  })()}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Page 2 */}
+                    {viewStockDialogPage === 2 && (
+                      <div className="space-y-4">
+                        {/* Top Section - Two Columns */}
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Left Column - GRN Batch Information */}
+                          <div>
+                            {viewingStock.grnBatchId ? (
+                              <div className="bg-gradient-to-r from-cyan-50 to-teal-50 rounded-lg p-4 border border-cyan-200">
+                                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-cyan-600" />
+                                  GRN Batch Information
+                                </h3>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">GRN Batch ID</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 font-mono text-xs">{viewingStock.grnBatchId}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gradient-to-r from-cyan-50 to-teal-50 rounded-lg p-4 border border-cyan-200">
+                                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-cyan-600" />
+                                  GRN Batch Information
+                                </h3>
+                                <p className="text-sm text-gray-500">No GRN Batch ID available</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right Column - Supplier Information */}
+                          <div>
+                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+                              <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <User className="h-4 w-4 text-purple-600" />
+                                Supplier Information
+                              </h3>
+                              <div className="space-y-2">
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Last Supplier</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                    <User className="h-3 w-3 text-indigo-500" />
+                                    {viewingStock.lastSupplier || 'Not specified'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Date of Arrival</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                    <Calendar className="h-3 w-3 text-blue-500" />
+                                    {viewingStock.lastReceivedDate 
+                                      ? new Date(viewingStock.lastReceivedDate).toLocaleDateString('en-US', { 
+                                          year: 'numeric', 
+                                          month: 'long', 
+                                          day: 'numeric' 
+                                        })
+                                      : 'Not available'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Section - Timestamps */}
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-600" />
+                            Timestamps
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Created At</Label>
+                              <p className="text-sm text-gray-700 mt-0.5">
+                                {viewingStock.createdAt 
+                                  ? new Date(viewingStock.createdAt).toLocaleString('en-US', { 
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : 'Not available'}
+                              </p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Last Updated</Label>
+                              <p className="text-sm text-gray-700 mt-0.5">
+                                {viewingStock.updatedAt 
+                                  ? new Date(viewingStock.updatedAt).toLocaleString('en-US', { 
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : 'Not available'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer with Pagination */}
+              <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t bg-white">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewStockDialogPage(1)}
+                    disabled={viewStockDialogPage === 1}
+                    className="flex items-center gap-1"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1 px-3">
+                    <span className="text-sm text-gray-600">Page {viewStockDialogPage} of 2</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewStockDialogPage(2)}
+                    disabled={viewStockDialogPage === 2}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsViewStockDialogOpen(false)}
+                  className="px-6"
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Inward Type Selection Dialog */}
+          <Dialog open={isInwardTypeDialogOpen} onOpenChange={setIsInwardTypeDialogOpen}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="h-6 w-6 text-blue-600" />
+                  Receive Goods - Select Inward Type
+                </DialogTitle>
+                <DialogDescription>
+                  Choose how you want to receive goods
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                <div className="space-y-4">
+                  <Button
+                    className="w-full h-20 flex flex-col items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => {
+                      setIsDirectInward(false)
+                      setIsInwardTypeDialogOpen(false)
+                      setIsInwardDialogOpen(true)
+                      setInwardFormPage(1)
+                    }}
+                  >
+                    <FileText className="h-6 w-6" />
+                    <span>Link to Purchase Order</span>
+                  </Button>
+                  <Button
+                    className="w-full h-20 flex flex-col items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      setIsDirectInward(true)
+                      setInwardForm({
+                        poNumber: "",
+                        inwardType: "DIRECT_INWARD",
+                        supplierName: "",
+                        receivedDate: new Date().toISOString().split('T')[0],
+                        items: [{
+                          productId: "",
+                          productName: "",
+                          orderedQuantity: 0,
+                          receivedQuantity: 0,
+                          damagedQuantity: 0,
+                          lostQuantity: 0,
+                          acceptedQuantity: 0,
+                          unitPrice: 0
+                        }],
+                        notes: ""
+                      })
+                      setIsInwardTypeDialogOpen(false)
+                      setIsInwardDialogOpen(true)
+                      setInwardFormPage(1)
+                    }}
+                  >
+                    <Package className="h-6 w-6" />
+                    <span>Direct Inward (No PO)</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex-shrink-0 flex items-center justify-end px-6 py-4 border-t bg-white">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsInwardTypeDialogOpen(false)}
+                  className="px-6"
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Inward Entry Dialog */}
+          <Dialog open={isInwardDialogOpen} onOpenChange={setIsInwardDialogOpen}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="h-6 w-6 text-blue-600" />
+                  Receive Goods - Create Inward Entry
+                </DialogTitle>
+                <DialogDescription>
+                  {isDirectInward ? 'Record goods received directly from supplier. Stock will be added to warehouse only after generating GRN.' : 'Record goods received from purchase order. Stock will be added to warehouse only after generating GRN.'}
+                </DialogDescription>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> This form only records the receipt of goods. Stock will NOT be added to warehouse until you generate a GRN from this inward entry. Only accepted goods (Received - Damaged - Lost) will be added to warehouse.
+                  </p>
+                </div>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                <form onSubmit={handleInwardSubmit} className="space-y-6" id="inward-form">
+                {!isDirectInward && (
+                  <div className="grid grid-cols-10 gap-4">
+                    {/* Left Side - 40% (4 columns) */}
+                    <div className="col-span-4 space-y-4">
+                      <div>
+                        <Label>Select Purchase Order</Label>
+                        <Select
+                          value={inwardForm.poNumber}
+                          onValueChange={(value) => {
+                            const po = purchaseOrders.find((p: any) => p.poNumber === value)
+                            setSelectedPO(po)
+                            setInwardForm({
+                              ...inwardForm,
+                              poNumber: value,
+                              items: po?.items.map((item: any) => ({
+                                productId: item.productId,
+                                productName: item.productName,
+                                orderedQuantity: item.quantity,
+                                receivedQuantity: 0,
+                                damagedQuantity: 0,
+                                lostQuantity: 0,
+                                acceptedQuantity: 0,
+                                unitPrice: item.unitPrice || 0
+                              })) || []
+                            })
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select PO" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {purchaseOrders
+                              .filter((po: any) => po.deliveryType === 'to_warehouse' && (po.status === 'pending' || po.status === 'PO_PARTIALLY_RECEIVED'))
+                              .map((po: any) => (
+                                <SelectItem key={po._id} value={po.poNumber}>
+                                  {po.poNumber} - {po.supplierName}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Received Date</Label>
+                        <Input
+                          type="date"
+                          value={inwardForm.receivedDate}
+                          onChange={(e) => setInwardForm({...inwardForm, receivedDate: e.target.value})}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>Notes (Optional)</Label>
+                        <Textarea
+                          value={inwardForm.notes}
+                          onChange={(e) => setInwardForm({...inwardForm, notes: e.target.value})}
+                          placeholder="Add any additional notes..."
+                          rows={6}
+                          className="resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Note: Accepted Qty = Received Qty - Damaged Qty - Lost Qty. Only Accepted Quantity will be added to warehouse stock when GRN is generated.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right Side - 60% (6 columns) */}
+                    <div className="col-span-6">
+
+                {isDirectInward && (
+                  <div className="grid grid-cols-10 gap-4">
+                    {/* Left Side - 40% (4 columns) */}
+                    <div className="col-span-4 space-y-4">
+                      <div>
+                        <Label>Supplier Name *</Label>
+                        <Input
+                          value={inwardForm.supplierName}
+                          onChange={(e) => setInwardForm({...inwardForm, supplierName: e.target.value})}
+                          placeholder="Enter supplier name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>Received Date</Label>
+                        <Input
+                          type="date"
+                          value={inwardForm.receivedDate}
+                          onChange={(e) => setInwardForm({...inwardForm, receivedDate: e.target.value})}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>Notes (Optional)</Label>
+                        <Textarea
+                          value={inwardForm.notes}
+                          onChange={(e) => setInwardForm({...inwardForm, notes: e.target.value})}
+                          placeholder="Add any additional notes..."
+                          rows={6}
+                          className="resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Note: Accepted Qty = Received Qty - Damaged Qty - Lost Qty. Only Accepted Quantity will be added to warehouse stock when GRN is generated.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right Side - 60% (6 columns) */}
+                    <div className="col-span-6">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <Label>Items - Record Received, Damaged, and Lost Quantities</Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Record what was received. Only Accepted Quantity will be added to warehouse when GRN is generated.
+                            </p>
+                          </div>
+                          {inwardFormPage === 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setInwardForm({
+                                  ...inwardForm,
+                                  items: [...inwardForm.items, {
+                                    productId: "",
+                                    productName: "",
+                                    orderedQuantity: 0,
+                                    receivedQuantity: 0,
+                                    damagedQuantity: 0,
+                                    lostQuantity: 0,
+                                    acceptedQuantity: 0,
+                                    unitPrice: 0
+                                  }]
+                                })
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Item
+                            </Button>
+                          )}
+                        </div>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table className="w-full table-fixed">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[25%] text-xs">Product</TableHead>
+                                <TableHead className="w-[12%] text-xs">Received</TableHead>
+                                <TableHead className="w-[12%] text-xs">Damaged</TableHead>
+                                <TableHead className="w-[12%] text-xs">Lost</TableHead>
+                                <TableHead className="w-[12%] text-xs">Unit Cost</TableHead>
+                                <TableHead className="w-[12%] text-xs">Accepted</TableHead>
+                                <TableHead className="w-[15%] text-xs">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inwardForm.items.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={7} className="text-center py-8">
+                                    Click "Add Item" to add products
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                (() => {
+                                  const itemsPerPage = 4
+                                  const startIndex = (inwardFormPage - 1) * itemsPerPage
+                                  const endIndex = startIndex + itemsPerPage
+                                  const paginatedItems = inwardForm.items.slice(startIndex, endIndex)
+                                  
+                                  return paginatedItems.map((item, relativeIndex) => {
+                                    const index = startIndex + relativeIndex
+                                  const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                                  return (
+                                    <TableRow key={index}>
+                                      <TableCell className="w-[25%]">
+                                        <Select
+                                          value={item.productId}
+                                          onValueChange={(value) => {
+                                            const product = products.find((p: any) => p._id === value)
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index] = {
+                                              ...newItems[index],
+                                              productId: value,
+                                              productName: product?.name || '',
+                                              unitPrice: product?.price || newItems[index].unitPrice || 0
+                                            }
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select product" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {products.map((p: any) => (
+                                              <SelectItem key={p._id} value={p._id}>
+                                                {p.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={item.receivedQuantity}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].receivedQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - (newItems[index].lostQuantity || 0)
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          max={item.receivedQuantity}
+                                          value={item.damagedQuantity || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].damagedQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - newItems[index].damagedQuantity - (newItems[index].lostQuantity || 0)
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          max={item.receivedQuantity}
+                                          value={item.lostQuantity || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].lostQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - newItems[index].lostQuantity
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={item.unitPrice || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0.00"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Badge variant={acceptedQty > 0 ? "default" : "destructive"} className="text-xs">
+                                          {acceptedQty}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="w-[15%]">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0"
+                                          onClick={() => {
+                                            const newItems = inwardForm.items.filter((_, i) => i !== index)
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  )
+                                  })
+                                })()
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                      {/* Items Table for PO Linked */}
+                      {selectedPO && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <Label>Items - Record Received, Damaged, and Lost Quantities</Label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Record what was received. Only Accepted Quantity will be added to warehouse when GRN is generated.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="border rounded-lg overflow-x-auto">
+                            <Table className="w-full table-fixed">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[20%] text-xs">Product</TableHead>
+                                  <TableHead className="w-[10%] text-xs">Ordered</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Received</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Damaged</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Lost</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Unit Cost</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Accepted</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {inwardForm.items.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center py-8">
+                                      No items
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  inwardForm.items.map((item, index) => {
+                                    const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                                    return (
+                                      <TableRow key={index}>
+                                        <TableCell className="w-[20%] font-medium text-sm">{item.productName}</TableCell>
+                                        <TableCell className="w-[10%]">
+                                          <Badge variant="outline" className="text-xs">{item.orderedQuantity}</Badge>
+                                        </TableCell>
+                                        <TableCell className="w-[12%]">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            max={item.orderedQuantity}
+                                            value={item.receivedQuantity}
+                                            onChange={(e) => {
+                                              const newItems = [...inwardForm.items]
+                                              newItems[index].receivedQuantity = parseInt(e.target.value) || 0
+                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - (newItems[index].lostQuantity || 0)
+                                              setInwardForm({...inwardForm, items: newItems})
+                                            }}
+                                            className="w-full"
+                                          />
+                                        </TableCell>
+                                        <TableCell className="w-[12%]">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            max={item.receivedQuantity}
+                                            value={item.damagedQuantity || 0}
+                                            onChange={(e) => {
+                                              const newItems = [...inwardForm.items]
+                                              newItems[index].damagedQuantity = parseInt(e.target.value) || 0
+                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - newItems[index].damagedQuantity - (newItems[index].lostQuantity || 0)
+                                              setInwardForm({...inwardForm, items: newItems})
+                                            }}
+                                            className="w-full"
+                                            placeholder="0"
+                                          />
+                                        </TableCell>
+                                        <TableCell className="w-[12%]">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            max={item.receivedQuantity}
+                                            value={item.lostQuantity || 0}
+                                            onChange={(e) => {
+                                              const newItems = [...inwardForm.items]
+                                              newItems[index].lostQuantity = parseInt(e.target.value) || 0
+                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - newItems[index].lostQuantity
+                                              setInwardForm({...inwardForm, items: newItems})
+                                            }}
+                                            className="w-full"
+                                            placeholder="0"
+                                          />
+                                        </TableCell>
+                                        <TableCell className="w-[12%]">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={item.unitPrice || 0}
+                                            onChange={(e) => {
+                                              const newItems = [...inwardForm.items]
+                                              newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                                              setInwardForm({...inwardForm, items: newItems})
+                                            }}
+                                            className="w-full"
+                                            placeholder="0.00"
+                                          />
+                                        </TableCell>
+                                        <TableCell className="w-[12%]">
+                                          <Badge variant={acceptedQty > 0 ? "default" : "destructive"} className="text-xs">
+                                            {acceptedQty}
+                                          </Badge>
+                                        </TableCell>
+                                      </TableRow>
+                                    )
+                                  })
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </form>
+              </div>
+              
+              {/* Footer */}
+              <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t bg-white">
+                <div className="flex items-center gap-2">
+                  {isDirectInward && inwardForm.items.length > 4 && (
+                    <>
+                      {inwardFormPage > 1 && (
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={() => setInwardFormPage(prev => prev - 1)}
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Previous
+                        </Button>
+                      )}
+                      <div className="flex items-center gap-1 px-3">
+                        <span className="text-sm text-gray-600">
+                          Page {inwardFormPage} of {Math.ceil(inwardForm.items.length / 4)}
+                        </span>
+                      </div>
+                      {inwardFormPage < Math.ceil(inwardForm.items.length / 4) && (
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={() => setInwardFormPage(prev => prev + 1)}
+                        >
+                          Next
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsInwardDialogOpen(false)
+                      setInwardForm({
+                        poNumber: "",
+                        inwardType: "PO_LINKED",
+                        supplierName: "",
+                        receivedDate: new Date().toISOString().split('T')[0],
+                        items: [],
+                        notes: ""
+                      })
+                      setSelectedPO(null)
+                      setIsDirectInward(false)
+                      setInwardFormPage(1)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    form="inward-form"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={
+                      (!isDirectInward && !selectedPO) ||
+                      inwardForm.items.length === 0 || 
+                      inwardForm.items.some((item: any) => {
+                        const accepted = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                        return accepted < 0 || (isDirectInward && !item.productId)
+                      })
+                    }
+                  >
+                    Create Inward Entry
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Inward Entry Dialog */}
+          <Dialog open={isViewInwardDialogOpen} onOpenChange={setIsViewInwardDialogOpen}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="h-6 w-6 text-blue-600" />
+                  Inward Entry Details - {viewingInward?.inwardNumber}
+                </DialogTitle>
+                <DialogDescription>
+                  View complete inward entry information
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {viewingInward && (
+                  <div className="grid grid-cols-10 gap-4">
+                    {/* Left Side - 40% (4 columns) */}
+                    <div className="col-span-4 space-y-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Inward Number</Label>
+                        <p className="text-sm">{viewingInward.inwardNumber}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">PO Number</Label>
+                        <p className="text-sm">{viewingInward.poNumber || 'Direct Inward'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Supplier</Label>
+                        <p className="text-sm">{viewingInward.supplierName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Status</Label>
+                        <Badge 
+                          variant="outline"
+                          className={
+                            viewingInward.status === 'PENDING_GRN'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                              : 'bg-green-100 text-green-800 border-green-300'
+                          }
+                        >
+                          {viewingInward.status === 'PENDING_GRN' ? 'Pending GRN' : 'GRN Created'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Received Date</Label>
+                        <p className="text-sm">{new Date(viewingInward.receivedDate).toLocaleDateString()}</p>
+                      </div>
+                      {viewingInward.grnLinks && viewingInward.grnLinks.length > 0 && (
+                        <div>
+                          <Label className="text-sm font-semibold">GRN Numbers</Label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {viewingInward.grnLinks.map((grn: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                {grn}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {viewingInward.notes && (
+                        <div>
+                          <Label className="text-sm font-semibold">Notes</Label>
+                          <p className="text-sm text-muted-foreground">{viewingInward.notes}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Side - 60% (6 columns) */}
+                    <div className="col-span-6">
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Items</Label>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table className="w-full table-fixed">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[25%] text-xs">Product</TableHead>
+                                <TableHead className="w-[12%] text-xs">Ordered</TableHead>
+                                <TableHead className="w-[12%] text-xs">Received</TableHead>
+                                <TableHead className="w-[12%] text-xs">Damaged</TableHead>
+                                <TableHead className="w-[12%] text-xs">Lost</TableHead>
+                                <TableHead className="w-[12%] text-xs">Accepted</TableHead>
+                                <TableHead className="w-[15%] text-xs">Unit Price</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {viewingInward.items.map((item: any, idx: number) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="w-[25%] text-sm">{item.productName}</TableCell>
+                                  <TableCell className="w-[12%]">
+                                    <Badge variant="outline" className="text-xs">{item.orderedQuantity}</Badge>
+                                  </TableCell>
+                                  <TableCell className="w-[12%] text-sm">{item.receivedQuantity}</TableCell>
+                                  <TableCell className="w-[12%] text-sm">{item.damagedQuantity || 0}</TableCell>
+                                  <TableCell className="w-[12%] text-sm">{item.lostQuantity || 0}</TableCell>
+                                  <TableCell className="w-[12%]">
+                                    <Badge variant={item.acceptedQuantity > 0 ? "default" : "destructive"} className="text-xs">
+                                      {item.acceptedQuantity}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="w-[15%] text-sm">₹{item.unitPrice || 0}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex-shrink-0 flex items-center justify-end px-6 py-4 border-t bg-white">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsViewInwardDialogOpen(false)}
+                  className="px-6"
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Inward Entry Dialog */}
+          <Dialog open={isEditInwardDialogOpen} onOpenChange={setIsEditInwardDialogOpen}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Edit className="h-6 w-6 text-blue-600" />
+                  Edit Inward Entry - {editingInward?.inwardNumber}
+                </DialogTitle>
+                <DialogDescription>
+                  Edit inward entry information. Only PENDING_GRN entries can be edited.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {editingInward && editingInward.status === 'PENDING_GRN' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault()
+                    try {
+                      const response = await fetch('/api/inward', {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          id: editingInward._id,
+                          supplierName: editInwardForm.supplierName,
+                          receivedDate: editInwardForm.receivedDate,
+                          notes: editInwardForm.notes,
+                          items: editInwardForm.items.map(item => ({
+                            ...item,
+                            acceptedQuantity: item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                          }))
+                        }),
+                      })
+                      const result = await response.json()
+                      if (result.success) {
+                        alert('Inward entry updated successfully')
+                        setIsEditInwardDialogOpen(false)
+                        setEditingInward(null)
+                        loadData()
+                      } else {
+                        alert('Error updating inward entry: ' + result.error)
+                      }
+                    } catch (error) {
+                      console.error('Error updating inward entry:', error)
+                      alert('Error updating inward entry')
+                    }
+                  }} className="grid grid-cols-10 gap-4" id="edit-inward-form">
+                    {/* Left Side - 40% (4 columns) */}
+                    <div className="col-span-4 space-y-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Inward Number</Label>
+                        <p className="text-sm">{editingInward.inwardNumber}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">PO Number</Label>
+                        <p className="text-sm">{editingInward.poNumber || 'Direct Inward'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Supplier *</Label>
+                        <Input
+                          value={editInwardForm.supplierName}
+                          onChange={(e) => setEditInwardForm({...editInwardForm, supplierName: e.target.value})}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Status</Label>
+                        <Badge 
+                          variant="outline"
+                          className="bg-yellow-100 text-yellow-800 border-yellow-300"
+                        >
+                          Pending GRN
+                        </Badge>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Received Date *</Label>
+                        <Input
+                          type="date"
+                          value={editInwardForm.receivedDate}
+                          onChange={(e) => setEditInwardForm({...editInwardForm, receivedDate: e.target.value})}
+                          required
+                        />
+                      </div>
+                      {editingInward.grnLinks && editingInward.grnLinks.length > 0 && (
+                        <div>
+                          <Label className="text-sm font-semibold">GRN Numbers</Label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {editingInward.grnLinks.map((grn: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                {grn}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <Label className="text-sm font-semibold">Notes</Label>
+                        <Textarea
+                          value={editInwardForm.notes}
+                          onChange={(e) => setEditInwardForm({...editInwardForm, notes: e.target.value})}
+                          placeholder="Add any additional notes..."
+                          rows={6}
+                          className="resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Side - 60% (6 columns) */}
+                    <div className="col-span-6">
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Items</Label>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table className="w-full table-fixed">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[25%] text-xs">Product</TableHead>
+                                <TableHead className="w-[12%] text-xs">Ordered</TableHead>
+                                <TableHead className="w-[12%] text-xs">Received</TableHead>
+                                <TableHead className="w-[12%] text-xs">Damaged</TableHead>
+                                <TableHead className="w-[12%] text-xs">Lost</TableHead>
+                                <TableHead className="w-[12%] text-xs">Accepted</TableHead>
+                                <TableHead className="w-[15%] text-xs">Unit Price</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {editInwardForm.items.map((item: any, idx: number) => {
+                                const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                                return (
+                                  <TableRow key={idx}>
+                                    <TableCell className="w-[25%] font-medium text-sm">{item.productName}</TableCell>
+                                    <TableCell className="w-[12%]">
+                                      <Badge variant="outline" className="text-xs">{item.orderedQuantity}</Badge>
+                                    </TableCell>
+                                    <TableCell className="w-[12%]">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max={item.orderedQuantity}
+                                        value={item.receivedQuantity}
+                                        onChange={(e) => {
+                                          const newItems = [...editInwardForm.items]
+                                          newItems[idx].receivedQuantity = parseInt(e.target.value) || 0
+                                          newItems[idx].acceptedQuantity = newItems[idx].receivedQuantity - (newItems[idx].damagedQuantity || 0) - (newItems[idx].lostQuantity || 0)
+                                          setEditInwardForm({...editInwardForm, items: newItems})
+                                        }}
+                                        className="w-full"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="w-[12%]">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max={item.receivedQuantity}
+                                        value={item.damagedQuantity || 0}
+                                        onChange={(e) => {
+                                          const newItems = [...editInwardForm.items]
+                                          newItems[idx].damagedQuantity = parseInt(e.target.value) || 0
+                                          newItems[idx].acceptedQuantity = newItems[idx].receivedQuantity - newItems[idx].damagedQuantity - (newItems[idx].lostQuantity || 0)
+                                          setEditInwardForm({...editInwardForm, items: newItems})
+                                        }}
+                                        className="w-full"
+                                        placeholder="0"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="w-[12%]">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max={item.receivedQuantity}
+                                        value={item.lostQuantity || 0}
+                                        onChange={(e) => {
+                                          const newItems = [...editInwardForm.items]
+                                          newItems[idx].lostQuantity = parseInt(e.target.value) || 0
+                                          newItems[idx].acceptedQuantity = newItems[idx].receivedQuantity - (newItems[idx].damagedQuantity || 0) - newItems[idx].lostQuantity
+                                          setEditInwardForm({...editInwardForm, items: newItems})
+                                        }}
+                                        className="w-full"
+                                        placeholder="0"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="w-[12%]">
+                                      <Badge variant={acceptedQty > 0 ? "default" : "destructive"} className="text-xs">
+                                        {acceptedQty}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="w-[15%]">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={item.unitPrice || 0}
+                                        onChange={(e) => {
+                                          const newItems = [...editInwardForm.items]
+                                          newItems[idx].unitPrice = parseFloat(e.target.value) || 0
+                                          setEditInwardForm({...editInwardForm, items: newItems})
+                                        }}
+                                        className="w-full"
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                )}
+                {editingInward && editingInward.status !== 'PENDING_GRN' && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">This inward entry cannot be edited because GRN has already been created.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex-shrink-0 flex items-center justify-end px-6 py-4 border-t bg-white">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsEditInwardDialogOpen(false)
+                    setEditingInward(null)
+                  }}
+                  className="mr-2"
+                >
+                  Cancel
+                </Button>
+                {editingInward && editingInward.status === 'PENDING_GRN' && (
+                  <Button 
+                    type="submit"
+                    form="edit-inward-form"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Save Changes
+                  </Button>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Generate GRN from Inward Dialog */}
+          <Dialog 
+            open={isGenerateGRNFromInwardOpen} 
+            onOpenChange={(open) => {
+              setIsGenerateGRNFromInwardOpen(open)
+              if (!open) {
+                // Reset split stock state when dialog closes
+                setIsSplitStock(false)
+                setCustomerAllocations([])
+                setGrnFormPage(1)
+              }
+            }}
+          >
+            <DialogContent 
+              className="p-0"
+              style={{
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Fixed Header */}
+              <div className="px-6 pt-4 pb-3 border-b bg-white" style={{ flexShrink: 0 }}>
+                <DialogHeader>
+                  <DialogTitle>Generate GRN from Inward Entry</DialogTitle>
+                  <DialogDescription>
+                    Generate GRN to move accepted goods from inward entry to warehouse storage. Only accepted quantities (Received - Damaged - Lost) will be added to warehouse stock.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              {selectedInward && (
+                <div 
+                  className="px-6 py-3 bg-white grn-dialog-scroll"
+                  style={{
+                    height: 'calc(90vh - 200px)',
+                    overflowY: 'scroll',
+                    overflowX: 'hidden',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  <form onSubmit={handleGenerateGRNFromInward} className="space-y-6" id="grn-form">
+                  {/* Page 1: Form Details */}
+                  {grnFormPage === 1 && (
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Left Column - Inward Entry Details */}
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <p className="text-sm font-semibold text-blue-900">Inward Entry: {selectedInward.inwardNumber}</p>
+                          <p className="text-xs text-blue-700">Supplier: {selectedInward.supplierName}</p>
+                          {selectedInward.poNumber && (
+                            <p className="text-xs text-blue-700">PO Number: {selectedInward.poNumber}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label>Warehouse Name *</Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1 relative warehouse-dropdown-container">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsWarehouseDropdownOpen(!isWarehouseDropdownOpen)}
+                                className="w-full justify-between"
+                              >
+                                {grnForm.warehouseName || "Select warehouse"}
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              </Button>
+                              {isWarehouseDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                                  <div className="p-1">
+                                    {warehouses.map((warehouse) => (
+                                      <div
+                                        key={warehouse}
+                                        className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer group"
+                                        onClick={() => {
+                                          setGRNForm({...grnForm, warehouseName: warehouse})
+                                          setIsWarehouseDropdownOpen(false)
+                                        }}
+                                      >
+                                        <span className={grnForm.warehouseName === warehouse ? "font-semibold" : ""}>
+                                          {warehouse}
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (warehouses.length > 1) {
+                                              const updatedWarehouses = warehouses.filter(w => w !== warehouse)
+                                              setWarehouses(updatedWarehouses)
+                                              if (grnForm.warehouseName === warehouse) {
+                                                setGRNForm({...grnForm, warehouseName: updatedWarehouses[0] || ""})
+                                              }
+                                            } else {
+                                              alert("At least one warehouse must exist")
+                                            }
+                                          }}
+                                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                    {isAddingWarehouse ? (
+                                      <div className="flex gap-1 px-3 py-2 border-t mt-1">
+                                        <Input
+                                          value={newWarehouseName}
+                                          onChange={(e) => setNewWarehouseName(e.target.value)}
+                                          placeholder="Enter warehouse name"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && newWarehouseName.trim()) {
+                                              setWarehouses([...warehouses, newWarehouseName.trim()])
+                                              setGRNForm({...grnForm, warehouseName: newWarehouseName.trim()})
+                                              setNewWarehouseName("")
+                                              setIsAddingWarehouse(false)
+                                            }
+                                            if (e.key === 'Escape') {
+                                              setIsAddingWarehouse(false)
+                                              setNewWarehouseName("")
+                                            }
+                                          }}
+                                          autoFocus
+                                          className="h-8 text-sm"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            if (newWarehouseName.trim()) {
+                                              setWarehouses([...warehouses, newWarehouseName.trim()])
+                                              setGRNForm({...grnForm, warehouseName: newWarehouseName.trim()})
+                                              setNewWarehouseName("")
+                                              setIsAddingWarehouse(false)
+                                            }
+                                          }}
+                                          className="h-8 px-2"
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setIsAddingWarehouse(false)
+                                            setNewWarehouseName("")
+                                          }}
+                                          className="h-8 px-2"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className="px-3 py-2 border-t mt-1 cursor-pointer hover:bg-gray-100 rounded-md flex items-center gap-2 text-sm text-blue-600"
+                                        onClick={() => setIsAddingWarehouse(true)}
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                        <span>Add Warehouse</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column - Split Stock Option */}
+                      <div className="space-y-4">
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-center space-x-2 mb-4">
+                            <input
+                              type="checkbox"
+                              id="splitStock"
+                              checked={isSplitStock}
+                              onChange={(e) => {
+                                setIsSplitStock(e.target.checked)
+                                if (!e.target.checked) {
+                                  setCustomerAllocations([])
+                                  setExpandedCustomerIndex(null)
+                                }
+                              }}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <Label htmlFor="splitStock" className="text-sm font-semibold cursor-pointer">
+                              Split stock between customer and warehouse
+                            </Label>
+                          </div>
+                          
+                          {isSplitStock && (
+                            <div className="space-y-4 mt-4">
+                              {expandedCustomerIndex !== null && customerAllocations[expandedCustomerIndex] ? (
+                                /* Show Expanded Form - Hide Grid */
+                                <div className="border rounded-lg p-4 bg-white space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="font-semibold text-sm">Customer {expandedCustomerIndex + 1}</h4>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const newAllocations = customerAllocations.filter((_, idx) => idx !== expandedCustomerIndex)
+                                          setCustomerAllocations(newAllocations)
+                                          setExpandedCustomerIndex(null)
+                                        }}
+                                        className="text-red-600 hover:text-red-700"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setExpandedCustomerIndex(null)}
+                                        className="text-gray-600 hover:text-gray-700"
+                                      >
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <Label>Select Customer *</Label>
+                                    <Select
+                                      value={customerAllocations[expandedCustomerIndex].customerId}
+                                      onValueChange={(value) => {
+                                        const customer = customers.find((c: any) => c._id === value)
+                                        const newAllocations = [...customerAllocations]
+                                        newAllocations[expandedCustomerIndex] = {
+                                          ...customerAllocations[expandedCustomerIndex],
+                                          customerId: value,
+                                          customerName: customer?.name || ''
+                                        }
+                                        setCustomerAllocations(newAllocations)
+                                      }}
+                                      required
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select customer" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {customers.map((customer: any) => (
+                                          <SelectItem key={customer._id} value={customer._id}>
+                                            {customer.name} {customer.email ? `(${customer.email})` : ''}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  
+                                  <div>
+                                    <Label>Selling Price (₹) *</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={customerAllocations[expandedCustomerIndex].sellingPrice || ''}
+                                      onChange={(e) => {
+                                        const newAllocations = [...customerAllocations]
+                                        newAllocations[expandedCustomerIndex] = {
+                                          ...customerAllocations[expandedCustomerIndex],
+                                          sellingPrice: parseFloat(e.target.value) || 0
+                                        }
+                                        setCustomerAllocations(newAllocations)
+                                      }}
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label>Allocate Stock - Enter quantities for customer (remaining goes to warehouse)</Label>
+                                    <div className="border rounded-lg overflow-x-auto mt-2">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Product Name</TableHead>
+                                            <TableHead>Total Accepted</TableHead>
+                                            <TableHead>To Customer</TableHead>
+                                            <TableHead>To Warehouse (Auto)</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {selectedInward.items.map((item: any, idx: number) => {
+                                            const customerAlloc = customerAllocations[expandedCustomerIndex]
+                                            const allocation = customerAlloc.itemAllocations.find(a => a.productId === item.productId) || { customerQuantity: 0 }
+                                            const customerQty = allocation.customerQuantity || 0
+                                            const totalAllocatedToCustomers = customerAllocations.reduce((sum, ca) => {
+                                              const alloc = ca.itemAllocations.find(a => a.productId === item.productId)
+                                              return sum + (alloc?.customerQuantity || 0)
+                                            }, 0)
+                                            const warehouseQty = item.acceptedQuantity - totalAllocatedToCustomers
+                                            return (
+                                              <TableRow key={idx}>
+                                                <TableCell className="font-medium">{item.productName}</TableCell>
+                                                <TableCell>
+                                                  <Badge variant="outline">{item.acceptedQuantity}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Input
+                                                    type="number"
+                                                    min="0"
+                                                    max={item.acceptedQuantity - (totalAllocatedToCustomers - customerQty)}
+                                                    value={customerQty}
+                                                    onChange={(e) => {
+                                                      const newQty = parseInt(e.target.value) || 0
+                                                      const newAllocations = [...customerAllocations]
+                                                      const itemAllocs = [...customerAlloc.itemAllocations]
+                                                      const existingIndex = itemAllocs.findIndex(a => a.productId === item.productId)
+                                                      
+                                                      if (existingIndex >= 0) {
+                                                        itemAllocs[existingIndex].customerQuantity = newQty
+                                                      } else {
+                                                        itemAllocs.push({
+                                                          productId: item.productId,
+                                                          customerQuantity: newQty
+                                                        })
+                                                      }
+                                                      newAllocations[expandedCustomerIndex] = {
+                                                        ...customerAlloc,
+                                                        itemAllocations: itemAllocs
+                                                      }
+                                                      setCustomerAllocations(newAllocations)
+                                                    }}
+                                                    className="w-24"
+                                                    placeholder="0"
+                                                  />
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Badge variant={warehouseQty > 0 ? "default" : "outline"} className={warehouseQty > 0 ? "bg-green-600" : ""}>
+                                                    {warehouseQty} units
+                                                  </Badge>
+                                                  {warehouseQty < 0 && (
+                                                    <p className="text-xs text-red-600 mt-1">Invalid</p>
+                                                  )}
+                                                </TableCell>
+                                              </TableRow>
+                                            )
+                                          })}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Show Grid - Hide Expanded Form */
+                                <>
+                                  {/* Add Customer Dropdown Button */}
+                                  <div className="flex justify-end">
+                                    <Select
+                                      onValueChange={(value) => {
+                                        const customer = customers.find((c: any) => c._id === value)
+                                        const newAllocation = {
+                                          customerId: value,
+                                          customerName: customer?.name || '',
+                                          sellingPrice: 0,
+                                          itemAllocations: selectedInward.items.map((item: any) => ({
+                                            productId: item.productId,
+                                            customerQuantity: 0
+                                          }))
+                                        }
+                                        setCustomerAllocations([...customerAllocations, newAllocation])
+                                        setExpandedCustomerIndex(customerAllocations.length)
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Add Customer" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {customers.map((customer: any) => (
+                                          <SelectItem key={customer._id} value={customer._id}>
+                                            {customer.name} {customer.email ? `(${customer.email})` : ''}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  {/* Customer Grid (3 columns) - Show first 10 customers */}
+                                  {customerAllocations.slice(0, 10).length > 0 && (
+                                    <div className="grid grid-cols-3 gap-3">
+                                      {customerAllocations.slice(0, 10).map((customerAlloc, customerIndex) => (
+                                        <Button
+                                          key={customerIndex}
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => setExpandedCustomerIndex(customerIndex)}
+                                          className="w-full h-20 flex flex-col items-center justify-center gap-1 border-2 border-dashed hover:border-solid hover:border-blue-500 transition-all"
+                                        >
+                                          <User className="h-5 w-5 text-gray-400" />
+                                          <span className="text-xs font-medium">
+                                            {customerAlloc.customerName || `Customer ${customerIndex + 1}`}
+                                          </span>
+                                          {customerAlloc.sellingPrice > 0 && (
+                                            <span className="text-xs text-gray-500">
+                                              ₹{customerAlloc.sellingPrice}
+                                            </span>
+                                          )}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  <p className="text-xs text-muted-foreground">
+                                    Click on a customer button to configure allocation. Enter the quantity you want to allocate to each customer. The remaining quantity will automatically go to warehouse.
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Page 2: Additional Customers (10th onwards) */}
+                  {grnFormPage === 2 && customerAllocations.length > 10 && (
+                    <div className="space-y-4">
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <h3 className="font-semibold mb-4">Additional Customers</h3>
+                        
+                        {expandedCustomerIndex !== null && expandedCustomerIndex >= 10 && customerAllocations[expandedCustomerIndex] ? (
+                          /* Show Expanded Form - Hide Grid */
+                          <div className="border rounded-lg p-4 bg-white space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">Customer {expandedCustomerIndex + 1}</h4>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newAllocations = customerAllocations.filter((_, idx) => idx !== expandedCustomerIndex)
+                                    setCustomerAllocations(newAllocations)
+                                    setExpandedCustomerIndex(null)
+                                  }}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setExpandedCustomerIndex(null)}
+                                  className="text-gray-600 hover:text-gray-700"
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <Label>Select Customer *</Label>
+                              <Select
+                                value={customerAllocations[expandedCustomerIndex].customerId}
+                                onValueChange={(value) => {
+                                  const customer = customers.find((c: any) => c._id === value)
+                                  const newAllocations = [...customerAllocations]
+                                  newAllocations[expandedCustomerIndex] = {
+                                    ...customerAllocations[expandedCustomerIndex],
+                                    customerId: value,
+                                    customerName: customer?.name || ''
+                                  }
+                                  setCustomerAllocations(newAllocations)
+                                }}
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select customer" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {customers.map((customer: any) => (
+                                    <SelectItem key={customer._id} value={customer._id}>
+                                      {customer.name} {customer.email ? `(${customer.email})` : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label>Selling Price (₹) *</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={customerAllocations[expandedCustomerIndex].sellingPrice || ''}
+                                onChange={(e) => {
+                                  const newAllocations = [...customerAllocations]
+                                  newAllocations[expandedCustomerIndex] = {
+                                    ...customerAllocations[expandedCustomerIndex],
+                                    sellingPrice: parseFloat(e.target.value) || 0
+                                  }
+                                  setCustomerAllocations(newAllocations)
+                                }}
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label>Allocate Stock - Enter quantities for customer (remaining goes to warehouse)</Label>
+                              <div className="border rounded-lg overflow-x-auto mt-2">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Product Name</TableHead>
+                                      <TableHead>Total Accepted</TableHead>
+                                      <TableHead>To Customer</TableHead>
+                                      <TableHead>To Warehouse (Auto)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {selectedInward.items.map((item: any, idx: number) => {
+                                      const customerAlloc = customerAllocations[expandedCustomerIndex]
+                                      const allocation = customerAlloc.itemAllocations.find(a => a.productId === item.productId) || { customerQuantity: 0 }
+                                      const customerQty = allocation.customerQuantity || 0
+                                      const totalAllocatedToCustomers = customerAllocations.reduce((sum, ca) => {
+                                        const alloc = ca.itemAllocations.find(a => a.productId === item.productId)
+                                        return sum + (alloc?.customerQuantity || 0)
+                                      }, 0)
+                                      const warehouseQty = item.acceptedQuantity - totalAllocatedToCustomers
+                                      return (
+                                        <TableRow key={idx}>
+                                          <TableCell className="font-medium">{item.productName}</TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline">{item.acceptedQuantity}</Badge>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              max={item.acceptedQuantity - (totalAllocatedToCustomers - customerQty)}
+                                              value={customerQty}
+                                              onChange={(e) => {
+                                                const newQty = parseInt(e.target.value) || 0
+                                                const newAllocations = [...customerAllocations]
+                                                const itemAllocs = [...customerAlloc.itemAllocations]
+                                                const existingIndex = itemAllocs.findIndex(a => a.productId === item.productId)
+                                                
+                                                if (existingIndex >= 0) {
+                                                  itemAllocs[existingIndex].customerQuantity = newQty
+                                                } else {
+                                                  itemAllocs.push({
+                                                    productId: item.productId,
+                                                    customerQuantity: newQty
+                                                  })
+                                                }
+                                                newAllocations[expandedCustomerIndex] = {
+                                                  ...customerAlloc,
+                                                  itemAllocations: itemAllocs
+                                                }
+                                                setCustomerAllocations(newAllocations)
+                                              }}
+                                              className="w-24"
+                                              placeholder="0"
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <Badge variant={warehouseQty > 0 ? "default" : "outline"} className={warehouseQty > 0 ? "bg-green-600" : ""}>
+                                              {warehouseQty} units
+                                            </Badge>
+                                            {warehouseQty < 0 && (
+                                              <p className="text-xs text-red-600 mt-1">Invalid</p>
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Show Grid - Hide Expanded Form */
+                          <>
+                            {/* Add Customer Dropdown Button */}
+                            <div className="flex justify-end mb-4">
+                              <Select
+                                onValueChange={(value) => {
+                                  const customer = customers.find((c: any) => c._id === value)
+                                  const newAllocation = {
+                                    customerId: value,
+                                    customerName: customer?.name || '',
+                                    sellingPrice: 0,
+                                    itemAllocations: selectedInward.items.map((item: any) => ({
+                                      productId: item.productId,
+                                      customerQuantity: 0
+                                    }))
+                                  }
+                                  setCustomerAllocations([...customerAllocations, newAllocation])
+                                  setExpandedCustomerIndex(customerAllocations.length)
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Add Customer" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {customers.map((customer: any) => (
+                                    <SelectItem key={customer._id} value={customer._id}>
+                                      {customer.name} {customer.email ? `(${customer.email})` : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Customer Grid (3 columns) */}
+                            {customerAllocations.slice(10).length > 0 && (
+                              <div className="grid grid-cols-3 gap-3">
+                                {customerAllocations.slice(10).map((customerAlloc, customerIndex) => {
+                                  const actualIndex = customerIndex + 10
+                                  return (
+                                    <Button
+                                      key={actualIndex}
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setExpandedCustomerIndex(actualIndex)}
+                                      className="w-full h-20 flex flex-col items-center justify-center gap-1 border-2 border-dashed hover:border-solid hover:border-blue-500 transition-all"
+                                    >
+                                      <User className="h-5 w-5 text-gray-400" />
+                                      <span className="text-xs font-medium">
+                                        {customerAlloc.customerName || `Customer ${actualIndex + 1}`}
+                                      </span>
+                                      {customerAlloc.sellingPrice > 0 && (
+                                        <span className="text-xs text-gray-500">
+                                          ₹{customerAlloc.sellingPrice}
+                                        </span>
+                                      )}
+                                    </Button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Page 2 or 3: Summary Table with Notes */}
+                  {((grnFormPage === 2 && customerAllocations.length <= 10) || (grnFormPage === 3 && customerAllocations.length > 10)) && (
+                    <div className="space-y-6">
+                      <div>
+                        <Label>Items Summary - {isSplitStock ? 'Stock Allocation' : 'Only Accepted Quantities Will Be Added to Warehouse'}</Label>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Product Name</TableHead>
+                                <TableHead>Received Qty</TableHead>
+                                <TableHead>Damaged Qty</TableHead>
+                                <TableHead>Lost Qty</TableHead>
+                                {isSplitStock ? (
+                                  <>
+                                    <TableHead className="bg-blue-50">To Customer</TableHead>
+                                    <TableHead className="bg-green-50">To Warehouse</TableHead>
+                                  </>
+                                ) : (
+                                  <TableHead className="bg-green-50">Accepted Qty (Will be added to warehouse)</TableHead>
+                                )}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedInward.items.map((item: any, idx: number) => {
+                                const totalReceived = item.receivedQuantity
+                                const totalDamaged = item.damagedQuantity || 0
+                                const totalLost = item.lostQuantity || 0
+                                const acceptedQty = item.acceptedQuantity
+                                // Calculate total customer allocation for this item across all customers
+                                const totalCustomerQty = isSplitStock ? customerAllocations.reduce((sum, ca) => {
+                                  const alloc = ca.itemAllocations.find(a => a.productId === item.productId)
+                                  return sum + (alloc?.customerQuantity || 0)
+                                }, 0) : 0
+                                const warehouseQty = acceptedQty - totalCustomerQty
+                                
+                                return (
+                                  <TableRow key={idx}>
+                                    <TableCell className="font-medium">{item.productName}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline">{totalReceived}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {totalDamaged > 0 ? (
+                                        <Badge variant="destructive" className="bg-orange-500">{totalDamaged} (waste)</Badge>
+                                      ) : (
+                                        <span className="text-gray-400">0</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {totalLost > 0 ? (
+                                        <Badge variant="destructive" className="bg-yellow-500">{totalLost} (waste)</Badge>
+                                      ) : (
+                                        <span className="text-gray-400">0</span>
+                                      )}
+                                    </TableCell>
+                                    {isSplitStock ? (
+                                      <>
+                                        <TableCell className="bg-blue-50">
+                                          <Badge variant="default" className="bg-blue-600">{totalCustomerQty} units</Badge>
+                                          <p className="text-xs text-blue-700 mt-1">To {customerAllocations.length} customer{customerAllocations.length > 1 ? 's' : ''}</p>
+                                        </TableCell>
+                                        <TableCell className="bg-green-50">
+                                          <Badge variant="default" className="bg-green-600">{warehouseQty} units</Badge>
+                                          <p className="text-xs text-green-700 mt-1">To warehouse</p>
+                                        </TableCell>
+                                      </>
+                                    ) : (
+                                      <TableCell className="bg-green-50">
+                                        <Badge variant="default" className="bg-green-600">{acceptedQty} units</Badge>
+                                        <p className="text-xs text-green-700 mt-1">Will be added to warehouse</p>
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                          <p className="text-xs text-blue-800">
+                            {isSplitStock ? (
+                              <>
+                                <strong>Summary:</strong> Total Accepted Quantity = {selectedInward.items.reduce((sum: number, item: any) => sum + item.acceptedQuantity, 0)} units.
+                                {' '}Customer allocation = {selectedInward.items.reduce((sum: number, item: any) => {
+                                  const totalCustomerQty = customerAllocations.reduce((customerSum, ca) => {
+                                    const alloc = ca.itemAllocations.find(a => a.productId === item.productId)
+                                    return customerSum + (alloc?.customerQuantity || 0)
+                                  }, 0)
+                                  return sum + totalCustomerQty
+                                }, 0)} units across {customerAllocations.length} customer{customerAllocations.length > 1 ? 's' : ''}.
+                                {' '}Warehouse allocation = {selectedInward.items.reduce((sum: number, item: any) => {
+                                  const totalCustomerQty = customerAllocations.reduce((customerSum, ca) => {
+                                    const alloc = ca.itemAllocations.find(a => a.productId === item.productId)
+                                    return customerSum + (alloc?.customerQuantity || 0)
+                                  }, 0)
+                                  return sum + (item.acceptedQuantity - totalCustomerQty)
+                                }, 0)} units.
+                              </>
+                            ) : (
+                              <>
+                                <strong>Summary:</strong> Total Accepted Quantity = {selectedInward.items.reduce((sum: number, item: any) => sum + item.acceptedQuantity, 0)} units will be added to warehouse stock.
+                                {selectedInward.items.reduce((sum: number, item: any) => sum + (item.damagedQuantity || 0) + (item.lostQuantity || 0), 0) > 0 && (
+                                  <> {selectedInward.items.reduce((sum: number, item: any) => sum + (item.damagedQuantity || 0) + (item.lostQuantity || 0), 0)} units will be recorded as waste.</>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Notes (Optional)</Label>
+                        <Textarea
+                          value={grnForm.notes}
+                          onChange={(e) => setGRNForm({...grnForm, notes: e.target.value})}
+                          placeholder="Add any additional notes..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  </form>
+                </div>
+              )}
+              
+              {/* Fixed Footer with Pagination */}
+              {selectedInward && (
+                <div className="px-6 py-4 border-t bg-gray-50 flex justify-between items-center" style={{ flexShrink: 0 }}>
+                  <div className="flex items-center space-x-2">
+                    {grnFormPage > 1 && (
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => setGrnFormPage(prev => prev - 1)}
+                      >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Previous
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const totalPages = customerAllocations.length > 10 ? 3 : 2
+                      return <span className="text-sm text-gray-600">Page {grnFormPage} of {totalPages}</span>
+                    })()}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {grnFormPage === 1 ? (
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => {
+                          const nextPage = customerAllocations.length > 10 ? 2 : 2
+                          setGrnFormPage(nextPage)
+                        }}
+                      >
+                        Next
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    ) : grnFormPage === 2 && customerAllocations.length > 10 ? (
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => setGrnFormPage(3)}
+                      >
+                        Next
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
+                            setIsGenerateGRNFromInwardOpen(false)
+                            setSelectedInward(null)
+                            setIsSplitStock(false)
+                            setCustomerAllocations([])
+                            setGrnFormPage(1)
+                            setGRNForm({ 
+                              poNumber: "", 
+                              receivedQuantity: "", 
+                              warehouseName: "Main Warehouse", 
+                              grnType: "GRN_CREATED",
+                              supplierName: "",
+                              location: {},
+                              notes: "",
+                              items: [] 
+                            })
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          form="grn-form"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Generate GRN
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+
         </main>
       </div>
     </div>
   )
 }
+

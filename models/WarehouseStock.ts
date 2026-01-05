@@ -31,6 +31,20 @@ const WarehouseStockSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0
+  },
+  location: {
+    zone: String,
+    rack: String,
+    bin: String
+  },
+  grnBatchId: {
+    type: String,
+    ref: 'GRN'
+  },
+  status: {
+    type: String,
+    enum: ['IN_WAREHOUSE', 'IN_TRANSIT', 'DISPATCHED'],
+    default: 'IN_WAREHOUSE'
   }
 }, {
   timestamps: true
