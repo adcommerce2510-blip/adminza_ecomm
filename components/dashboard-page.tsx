@@ -218,6 +218,32 @@ const fetchWasteEntries = async () => {
   return data.success ? data.data : []
 }
 
+const fetchOutwardEntries = async () => {
+  const response = await fetch('/api/outwards')
+  const data = await response.json()
+  return data.success ? data.data : []
+}
+
+const fetchRelatedOutwards = async (referenceNumber: string, customerId: string, outwardDate: Date) => {
+  if (!referenceNumber) return []
+  try {
+    const response = await fetch(`/api/outwards?referenceNumber=${encodeURIComponent(referenceNumber)}&customerId=${customerId}`)
+    const data = await response.json()
+    if (data.success) {
+      // Filter by same date (within same day)
+      const sameDate = new Date(outwardDate).toDateString()
+      return data.data.filter((entry: any) => {
+        const entryDate = new Date(entry.outwardDate || entry.createdAt).toDateString()
+        return entryDate === sameDate
+      })
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching related outwards:', error)
+    return []
+  }
+}
+
 const fetchInwardEntries = async () => {
   const response = await fetch('/api/inward')
   const data = await response.json()
@@ -884,6 +910,40 @@ export function DashboardPage() {
   const [currentWarehouseStockPage, setCurrentWarehouseStockPage] = useState(1)
   const warehouseStockPerPage = 5
   const [wasteEntries, setWasteEntries] = useState<any[]>([])
+  const [outwardEntries, setOutwardEntries] = useState<any[]>([])
+  const [isOutwardDialogOpen, setIsOutwardDialogOpen] = useState(false)
+  const [outwardForm, setOutwardForm] = useState({
+    customerId: "",
+    customerName: "",
+    warehouseName: "Main Warehouse",
+    referenceNumber: "",
+    notes: "",
+    outwardDate: new Date().toISOString().split('T')[0],
+    items: [] as Array<{
+      productId: string
+      productName: string
+      quantity: number
+      unitPrice: number
+      outwardType: "offline_direct" | "sample" | "return_replacement"
+      totalAmount: number
+    }>
+  })
+  const [outwardFormPage, setOutwardFormPage] = useState(1)
+  const [expandedProductIndex, setExpandedProductIndex] = useState<number | null>(null)
+  const [currentOutwardPage, setCurrentOutwardPage] = useState(1)
+  const outwardPerPage = 5
+  const [currentWastePage, setCurrentWastePage] = useState(1)
+  const wastePerPage = 5
+  const [isViewOutwardDialogOpen, setIsViewOutwardDialogOpen] = useState(false)
+  const [viewingOutward, setViewingOutward] = useState<any>(null)
+  const [relatedOutwards, setRelatedOutwards] = useState<any[]>([])
+  const [viewOutwardDialogPage, setViewOutwardDialogPage] = useState(1)
+  const [isConvertSampleDialogOpen, setIsConvertSampleDialogOpen] = useState(false)
+  const [convertingOutward, setConvertingOutward] = useState<any>(null)
+  const [convertForm, setConvertForm] = useState({
+    unitPrice: "",
+    notes: ""
+  })
   const [isViewStockDialogOpen, setIsViewStockDialogOpen] = useState(false)
   const [viewingStock, setViewingStock] = useState<any>(null)
   const [viewStockDialogPage, setViewStockDialogPage] = useState(1)
@@ -1370,7 +1430,7 @@ export function DashboardPage() {
       } else {
         setLoading(true)
       }
-      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData, purchaseOrdersData, warehouseStockData, wasteEntriesData, suppliersData, inwardEntriesData] = await Promise.all([
+      const [productsData, servicesData, categoriesData, subCategoriesData, level2CategoriesData, customersData, eshopData, ordersData, quotationsData, enquiriesData, invoicesData, purchaseOrdersData, warehouseStockData, wasteEntriesData, suppliersData, inwardEntriesData, outwardEntriesData] = await Promise.all([
         fetchProducts(),
         fetchServices(),
         fetchCategories(),
@@ -1386,7 +1446,8 @@ export function DashboardPage() {
         fetchWarehouseStock(),
         fetchWasteEntries(),
         fetch('/api/suppliers?isActive=true').then(res => res.json()).then(data => data.success ? data.data : []).catch(() => []),
-        fetchInwardEntries()
+        fetchInwardEntries(),
+        fetchOutwardEntries()
       ])
       setProducts(productsData)
       setServices(servicesData)
@@ -1404,6 +1465,7 @@ export function DashboardPage() {
       setWasteEntries(wasteEntriesData)
       setSuppliers(suppliersData)
       setInwardEntries(inwardEntriesData)
+      setOutwardEntries(outwardEntriesData)
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -3905,6 +3967,187 @@ export function DashboardPage() {
     }
   }
 
+  // Convert Sample to Sale Handler
+  const handleConvertSampleToSale = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!convertingOutward || !convertForm.unitPrice) {
+        alert('Please enter unit price')
+        return
+      }
+      
+      const unitPrice = parseFloat(convertForm.unitPrice)
+      if (isNaN(unitPrice) || unitPrice <= 0) {
+        alert('Unit price must be a positive number')
+        return
+      }
+      
+      const response = await fetch(`/api/outwards/${convertingOutward._id}/convert`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unitPrice: unitPrice,
+          notes: convertForm.notes
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data
+        const [outwardData, eshopData] = await Promise.all([
+          fetchOutwardEntries(),
+          fetchEshopInventory()
+        ])
+        setOutwardEntries(outwardData)
+        setEshopInventory(eshopData)
+        setConvertForm({ unitPrice: "", notes: "" })
+        setConvertingOutward(null)
+        setIsConvertSampleDialogOpen(false)
+        alert('Sample successfully converted to sale! Product has been added to customer inventory.')
+      } else {
+        alert('Error converting sample: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error converting sample:', error)
+      alert('Error converting sample to sale')
+    }
+  }
+
+  // Delete Outward Entry Handler
+  const handleDeleteOutward = async (outwardId: string) => {
+    if (!confirm('Are you sure you want to delete this outward entry? This will restore the stock back to the warehouse.')) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/outwards/${outwardId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Refresh data
+        const [outwardData, wsData, eshopData] = await Promise.all([
+          fetchOutwardEntries(),
+          fetchWarehouseStock(),
+          fetchEshopInventory()
+        ])
+        setOutwardEntries(outwardData)
+        setWarehouseStock(wsData)
+        setEshopInventory(eshopData)
+        
+        alert('Outward entry deleted successfully. Stock has been restored to warehouse.')
+      } else {
+        alert(`Error deleting outward entry: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error deleting outward entry:', error)
+      alert('Error deleting outward entry')
+    }
+  }
+
+  // Outward Entry Handler - Multiple Products
+  const handleOutwardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      // Validation
+      if (!outwardForm.customerId) {
+        alert('Please select a customer')
+        return
+      }
+      
+      if (!outwardForm.items || outwardForm.items.length === 0) {
+        alert('Please add at least one product')
+        return
+      }
+
+      // Validate all items
+      for (const item of outwardForm.items) {
+        if (!item.productId) {
+          alert(`Please select a product for item ${outwardForm.items.indexOf(item) + 1}`)
+          return
+        }
+        if (item.quantity <= 0) {
+          alert(`Please enter a valid quantity for ${item.productName || 'item ' + (outwardForm.items.indexOf(item) + 1)}`)
+          return
+        }
+        
+        // Check stock availability
+        const warehouseItem = warehouseStock.find((ws: any) => ws.productId === item.productId && ws.warehouseName === outwardForm.warehouseName)
+        if (!warehouseItem) {
+          alert(`Product ${item.productName} not found in selected warehouse`)
+          return
+        }
+        if (warehouseItem.availableStock < item.quantity) {
+          alert(`Insufficient stock for ${item.productName}. Available: ${warehouseItem.availableStock}, Requested: ${item.quantity}`)
+          return
+        }
+      }
+      
+      // Submit all products - use same reference number for batch
+      const submissions = outwardForm.items.map(async (item) => {
+        const response = await fetch('/api/outwards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: item.productId,
+            productName: item.productName,
+            customerId: outwardForm.customerId,
+            customerName: outwardForm.customerName,
+            quantity: item.quantity,
+            warehouseName: outwardForm.warehouseName,
+            unitPrice: item.unitPrice || 0,
+            outwardType: item.outwardType,
+            referenceNumber: outwardForm.referenceNumber || '',
+            notes: outwardForm.notes,
+            outwardDate: outwardForm.outwardDate,
+            recordedBy: "Admin" // You can get this from auth context if available
+          })
+        })
+        return response.json()
+      })
+      
+      const results = await Promise.all(submissions)
+      
+      // Check if all succeeded
+      const failed = results.filter(r => !r.success)
+      if (failed.length > 0) {
+        alert(`Error recording ${failed.length} outward entry/entries: ${failed.map(f => f.error).join(', ')}`)
+        return
+      }
+      
+      // Refresh data
+      const [outwardData, wsData, eshopData] = await Promise.all([
+        fetchOutwardEntries(),
+        fetchWarehouseStock(),
+        fetchEshopInventory()
+      ])
+      setOutwardEntries(outwardData)
+      setWarehouseStock(wsData)
+      setEshopInventory(eshopData)
+      
+      // Reset form
+      setOutwardForm({
+        customerId: "",
+        customerName: "",
+        warehouseName: "Main Warehouse",
+        referenceNumber: "",
+        notes: "",
+        outwardDate: new Date().toISOString().split('T')[0],
+        items: []
+      })
+      setOutwardFormPage(1)
+      setIsOutwardDialogOpen(false)
+      
+      alert(`Successfully recorded ${outwardForm.items.length} outward entry/entries! Stock has been deducted from warehouse.`)
+    } catch (error) {
+      console.error('Error recording outward entry:', error)
+      alert('Error recording outward entry')
+    }
+  }
+
   const handleMultipleProductsSubmit = async () => {
     try {
       if (!eshopForm.customerId) {
@@ -4503,6 +4746,17 @@ export function DashboardPage() {
                 >
                   <Trash2 className="h-3 w-3 mr-2" />
                   Waste Management
+                </Button>
+                <Button 
+                  variant={activeSubSection === "outwards" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("outwards")
+                  }}
+                >
+                  <ArrowRight className="h-3 w-3 mr-2" />
+                  Outwards
                 </Button>
               </div>
             )}
@@ -9600,95 +9854,423 @@ export function DashboardPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Reason</TableHead>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Description</TableHead>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
-                            <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {loading ? (
-                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                              <TableCell colSpan={6} className="text-center py-8">
-                                <div className="flex items-center justify-center gap-2">
-                                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                                  <span className="text-gray-600">Loading...</span>
+                    {(() => {
+                      const sortedWasteEntries = [...wasteEntries].sort((a: any, b: any) => {
+                        const dateA = new Date(a.date || a.createdAt).getTime()
+                        const dateB = new Date(b.date || b.createdAt).getTime()
+                        return dateB - dateA
+                      })
+                      
+                      const totalPages = Math.ceil(sortedWasteEntries.length / wastePerPage)
+                      const startIndex = (currentWastePage - 1) * wastePerPage
+                      const endIndex = startIndex + wastePerPage
+                      const paginatedWasteEntries = sortedWasteEntries.slice(startIndex, endIndex)
+                      
+                      return (
+                        <>
+                          <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product Name</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Reason</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Description</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
+                                  <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {loading ? (
+                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                    <TableCell colSpan={6} className="text-center py-8">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                        <span className="text-gray-600">Loading...</span>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : sortedWasteEntries.length === 0 ? (
+                                  <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                    <TableCell colSpan={6} className="text-center py-12">
+                                      <div className="flex flex-col items-center text-muted-foreground">
+                                        <Trash2 className="h-16 w-16 mb-4 opacity-30 text-red-400" />
+                                        <p className="text-lg font-medium">No waste entries found</p>
+                                        <p className="text-sm mt-1">Record waste entries to track damaged or lost products</p>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  paginatedWasteEntries.map((waste: any, index: number) => (
+                                    <TableRow 
+                                      key={waste._id}
+                                      className="bg-white hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                    >
+                                      <TableCell className="font-semibold text-slate-900 group-hover:text-red-700 transition-colors py-4">
+                                        <div className="flex items-center gap-2">
+                                          <Package className="h-4 w-4 text-red-500" />
+                                          {waste.productName}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="py-4">
+                                        <Badge variant="destructive" className="bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm">
+                                          <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>
+                                          {waste.quantity} units
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="py-4">
+                                        <Badge 
+                                          variant="outline"
+                                          className={
+                                            waste.reason === 'damaged'
+                                              ? 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300 shadow-sm'
+                                              : waste.reason === 'expired'
+                                              ? 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 shadow-sm'
+                                              : waste.reason === 'lost'
+                                              ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
+                                              : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300 shadow-sm'
+                                          }
+                                        >
+                                          {waste.reason === 'damaged' && <div className="h-2 w-2 rounded-full bg-orange-600 mr-1.5"></div>}
+                                          {waste.reason === 'expired' && <div className="h-2 w-2 rounded-full bg-red-600 mr-1.5"></div>}
+                                          {waste.reason === 'lost' && <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div>}
+                                          {waste.reason === 'other' && <div className="h-2 w-2 rounded-full bg-gray-600 mr-1.5"></div>}
+                                          {waste.reason.charAt(0).toUpperCase() + waste.reason.slice(1)}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="py-4">
+                                        <div className="text-sm text-slate-600 group-hover:text-slate-900 max-w-xs truncate transition-colors">
+                                          {waste.description || '-'}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="py-4">
+                                        <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                          <Calendar className="h-4 w-4 text-blue-500" />
+                                          {new Date(waste.date || waste.createdAt).toLocaleDateString()}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="py-4">
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              // Add view/edit functionality if needed
+                                            }}
+                                            className="hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          
+                          {sortedWasteEntries.length > 0 && totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-4">
+                              <div className="text-sm text-gray-600">
+                                Showing {startIndex + 1} to {Math.min(endIndex, sortedWasteEntries.length)} of {sortedWasteEntries.length} entries
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCurrentWastePage(prev => Math.max(1, prev - 1))}
+                                  disabled={currentWastePage === 1}
+                                >
+                                  <ArrowLeft className="h-4 w-4 mr-1" />
+                                  Previous
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    <Button
+                                      key={page}
+                                      variant={currentWastePage === page ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => setCurrentWastePage(page)}
+                                      className={currentWastePage === page ? "bg-red-600 text-white" : ""}
+                                    >
+                                      {page}
+                                    </Button>
+                                  ))}
                                 </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : wasteEntries.length === 0 ? (
-                            <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
-                              <TableCell colSpan={6} className="text-center py-12">
-                                <div className="flex flex-col items-center text-muted-foreground">
-                                  <Trash2 className="h-16 w-16 mb-4 opacity-30 text-red-400" />
-                                  <p className="text-lg font-medium">No waste entries found</p>
-                                  <p className="text-sm mt-1">Record waste entries to track damaged or lost products</p>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            wasteEntries.map((waste: any, index: number) => (
-                              <TableRow 
-                                key={waste._id}
-                                className="bg-white hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
-                              >
-                                <TableCell className="font-semibold text-slate-900 group-hover:text-red-700 transition-colors py-4">
-                                  <div className="flex items-center gap-2">
-                                    <Package className="h-4 w-4 text-red-500" />
-                                    {waste.productName}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <Badge variant="destructive" className="bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm">
-                                    <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div>
-                                    {waste.quantity} units
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <Badge 
-                                    variant="outline"
-                                    className={
-                                      waste.reason === 'damaged'
-                                        ? 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300 shadow-sm'
-                                        : waste.reason === 'expired'
-                                        ? 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 shadow-sm'
-                                        : waste.reason === 'lost'
-                                        ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
-                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300 shadow-sm'
-                                    }
-                                  >
-                                    {waste.reason === 'damaged' && <div className="h-2 w-2 rounded-full bg-orange-600 mr-1.5"></div>}
-                                    {waste.reason === 'expired' && <div className="h-2 w-2 rounded-full bg-red-600 mr-1.5"></div>}
-                                    {waste.reason === 'lost' && <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div>}
-                                    {waste.reason === 'other' && <div className="h-2 w-2 rounded-full bg-gray-600 mr-1.5"></div>}
-                                    {waste.reason.charAt(0).toUpperCase() + waste.reason.slice(1)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-slate-600 group-hover:text-slate-900 max-w-xs truncate transition-colors">
-                                    {waste.description || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-                                    <Calendar className="h-4 w-4 text-blue-500" />
-                                    {new Date(waste.date).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCurrentWastePage(prev => Math.min(totalPages, prev + 1))}
+                                  disabled={currentWastePage === totalPages}
+                                >
+                                  Next
+                                  <ArrowRight className="h-4 w-4 ml-1" />
+                                </Button>
+                              </div>
+                            </div>
                           )}
-                        </TableBody>
-                      </Table>
-                    </div>
+                        </>
+                      )
+                    })()}
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Outwards Tab */}
+              {activeSubSection === "outwards" && (
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>Outwards Management</CardTitle>
+                          <CardDescription>Track offline product handouts directly from warehouse to customers</CardDescription>
+                        </div>
+                        <Button 
+                          onClick={() => {
+                            setOutwardForm({
+                              customerId: "",
+                              customerName: "",
+                              warehouseName: "Main Warehouse",
+                              referenceNumber: "",
+                              notes: "",
+                              outwardDate: new Date().toISOString().split('T')[0],
+                              items: []
+                            })
+                            setOutwardFormPage(1)
+                            setIsOutwardDialogOpen(true)
+                          }}
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Outward Entry
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {(() => {
+                        const sortedOutwards = [...outwardEntries].sort((a: any, b: any) => {
+                          const dateA = new Date(a.outwardDate || a.createdAt).getTime()
+                          const dateB = new Date(b.outwardDate || b.createdAt).getTime()
+                          return dateB - dateA
+                        })
+                        
+                        const totalPages = Math.ceil(sortedOutwards.length / outwardPerPage)
+                        const startIndex = (currentOutwardPage - 1) * outwardPerPage
+                        const endIndex = startIndex + outwardPerPage
+                        const paginatedOutwards = sortedOutwards.slice(startIndex, endIndex)
+                        
+                        return (
+                          <>
+                            <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Customer</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Product</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Quantity</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Type</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Reference</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Warehouse</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Amount</TableHead>
+                                    <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {loading ? (
+                                    <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                      <TableCell colSpan={9} className="text-center py-8">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                                          <span className="text-gray-600">Loading...</span>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : sortedOutwards.length === 0 ? (
+                                    <TableRow className="bg-white hover:bg-blue-50/30 transition-all duration-200">
+                                      <TableCell colSpan={9} className="text-center py-12">
+                                        <div className="flex flex-col items-center text-muted-foreground">
+                                          <ArrowRight className="h-16 w-16 mb-4 opacity-30 text-orange-400" />
+                                          <p className="text-lg font-medium">No outward entries found</p>
+                                          <p className="text-sm mt-1">Record offline product handouts to track stock movements</p>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    paginatedOutwards.map((outward: any, index: number) => (
+                                      <TableRow 
+                                        key={outward._id}
+                                        className="bg-white hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 transition-all duration-200 cursor-pointer border-b border-gray-100 group"
+                                      >
+                                        <TableCell className="py-4">
+                                          <div className="flex items-center gap-2 text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                                            <Calendar className="h-4 w-4 text-orange-500" />
+                                            {new Date(outward.outwardDate || outward.createdAt).toLocaleDateString()}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="font-semibold text-slate-900 group-hover:text-orange-700 transition-colors py-4">
+                                          <div className="flex items-center gap-2">
+                                            <User className="h-4 w-4 text-orange-500" />
+                                            {outward.customerName}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="font-semibold text-slate-900 group-hover:text-orange-700 transition-colors py-4">
+                                          <div className="flex items-center gap-2">
+                                            <Package className="h-4 w-4 text-orange-500" />
+                                            {outward.productName}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                            {outward.quantity} units
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <Badge 
+                                            variant="outline"
+                                            className={
+                                              outward.outwardType === 'offline_direct'
+                                                ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                                : outward.outwardType === 'sample'
+                                                ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                                : 'bg-green-100 text-green-800 border-green-300'
+                                            }
+                                          >
+                                            {outward.outwardType === 'offline_direct' ? 'Direct' : outward.outwardType === 'sample' ? 'Sample' : 'Return/Replacement'}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <div className="text-sm text-slate-600 group-hover:text-slate-900 max-w-xs truncate transition-colors">
+                                            {outward.referenceNumber || '-'}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                            {outward.warehouseName}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          {outward.totalAmount > 0 ? (
+                                            <span className="font-semibold text-green-600">₹{outward.totalAmount.toLocaleString()}</span>
+                                          ) : (
+                                            <span className="text-gray-400">-</span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="py-4">
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={async (e) => {
+                                                e.stopPropagation()
+                                                setViewingOutward(outward)
+                                                // Fetch related outwards if referenceNumber exists
+                                                if (outward.referenceNumber) {
+                                                  const related = await fetchRelatedOutwards(
+                                                    outward.referenceNumber,
+                                                    outward.customerId,
+                                                    new Date(outward.outwardDate || outward.createdAt)
+                                                  )
+                                                  setRelatedOutwards(related)
+                                                } else {
+                                                  setRelatedOutwards([])
+                                                }
+                                                setViewOutwardDialogPage(1)
+                                                setIsViewOutwardDialogOpen(true)
+                                              }}
+                                              className="hover:bg-orange-50 hover:text-orange-600 transition-all duration-200"
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                            </Button>
+                                            {outward.outwardType === 'sample' && !outward.convertedToSale && (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setConvertingOutward(outward)
+                                                  setConvertForm({
+                                                    unitPrice: "",
+                                                    notes: ""
+                                                  })
+                                                  setIsConvertSampleDialogOpen(true)
+                                                }}
+                                                className="hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+                                                title="Convert sample to sale"
+                                              >
+                                                <ShoppingCart className="h-4 w-4" />
+                                              </Button>
+                                            )}
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDeleteOutward(outward._id)
+                                              }}
+                                              className="hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                                              title="Delete outward entry"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            
+                            {sortedOutwards.length > 0 && totalPages > 1 && (
+                              <div className="flex items-center justify-between mt-4">
+                                <div className="text-sm text-gray-600">
+                                  Showing {startIndex + 1} to {Math.min(endIndex, sortedOutwards.length)} of {sortedOutwards.length} entries
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentOutwardPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentOutwardPage === 1}
+                                  >
+                                    <ArrowLeft className="h-4 w-4 mr-1" />
+                                    Previous
+                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                      <Button
+                                        key={page}
+                                        variant={currentOutwardPage === page ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setCurrentOutwardPage(page)}
+                                        className={currentOutwardPage === page ? "bg-orange-600 text-white" : ""}
+                                      >
+                                        {page}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentOutwardPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentOutwardPage === totalPages}
+                                  >
+                                    Next
+                                    <ArrowRight className="h-4 w-4 ml-1" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </CardContent>
+                  </Card>
+                </div>
               )}
             </div>
           )}
@@ -13333,6 +13915,1523 @@ export function DashboardPage() {
             </>
           )}
 
+          {/* Record Outward Entry Dialog */}
+          <Dialog 
+            open={isOutwardDialogOpen} 
+            onOpenChange={(open) => {
+              setIsOutwardDialogOpen(open)
+              if (!open) {
+                setOutwardForm({
+                  customerId: "",
+                  customerName: "",
+                  warehouseName: "Main Warehouse",
+                  referenceNumber: "",
+                  notes: "",
+                  outwardDate: new Date().toISOString().split('T')[0],
+                  items: []
+                })
+                setOutwardFormPage(1)
+                setExpandedProductIndex(null)
+              }
+            }}
+          >
+            <DialogContent 
+              className="p-0"
+              style={{
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Fixed Header */}
+              <div className="px-6 pt-4 pb-3 border-b bg-white" style={{ flexShrink: 0 }}>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                    <ArrowRight className="h-6 w-6 text-orange-600" />
+                    Record Outward Entry
+                  </DialogTitle>
+                  <DialogDescription>
+                    Track offline product handouts from warehouse to customers. Add multiple products with different outward types.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-3 bg-white grn-dialog-scroll"
+                style={{
+                  height: 'calc(90vh - 200px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                <form onSubmit={handleOutwardSubmit} className="space-y-6" id="outward-form">
+                  {/* Page 1: Customer & Products Grid */}
+                  {outwardFormPage === 1 && (
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Left Column - Customer & Warehouse Info */}
+                      <div className="space-y-4">
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                          <p className="text-sm font-semibold text-orange-900">Outward Entry Details</p>
+                          <p className="text-xs text-orange-700 mt-1">Customer: {outwardForm.customerName || 'Not selected'}</p>
+                          <p className="text-xs text-orange-700">Warehouse: {outwardForm.warehouseName}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Customer *</Label>
+                            <Select
+                              value={outwardForm.customerId}
+                              onValueChange={(value) => {
+                                const customer = customers.find((c: any) => c._id === value)
+                                if (customer) {
+                                  setOutwardForm({
+                                    ...outwardForm,
+                                    customerId: value,
+                                    customerName: customer.name
+                                  })
+                                }
+                              }}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select customer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {customers.map((customer: any) => (
+                                  <SelectItem key={customer._id} value={customer._id}>
+                                    {customer.name} {customer.email ? `(${customer.email})` : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <Label>Warehouse *</Label>
+                            <Select
+                              value={outwardForm.warehouseName}
+                              onValueChange={(value) => {
+                                setOutwardForm({
+                                  ...outwardForm,
+                                  warehouseName: value
+                                })
+                              }}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {warehouses.map((wh: string) => (
+                                  <SelectItem key={wh} value={wh}>{wh}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Outward Date *</Label>
+                          <Input
+                            type="date"
+                            value={outwardForm.outwardDate}
+                            onChange={(e) => setOutwardForm({...outwardForm, outwardDate: e.target.value})}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Reference Number - Optional</Label>
+                          <Input
+                            value={outwardForm.referenceNumber}
+                            onChange={(e) => setOutwardForm({...outwardForm, referenceNumber: e.target.value})}
+                            placeholder="Challan/Invoice No."
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Notes - Optional</Label>
+                          <Textarea
+                            value={outwardForm.notes}
+                            onChange={(e) => setOutwardForm({...outwardForm, notes: e.target.value})}
+                            rows={4}
+                            placeholder="Additional notes..."
+                            className="resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right Column - Products Grid (Similar to Customer Grid in GRN) */}
+                      <div className="space-y-4">
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-4">
+                            <Label className="text-sm font-semibold">Products</Label>
+                            <Select
+                              onValueChange={(value) => {
+                                const stock = warehouseStock.find((ws: any) => ws.productId === value && ws.warehouseName === outwardForm.warehouseName)
+                                if (stock) {
+                                  const newItem = {
+                                    productId: value,
+                                    productName: stock.productName,
+                                    quantity: 0,
+                                    unitPrice: stock.price || 0,
+                                    outwardType: "offline_direct" as const,
+                                    totalAmount: 0
+                                  }
+                                  setOutwardForm({
+                                    ...outwardForm,
+                                    items: [...(outwardForm.items || []), newItem]
+                                  })
+                                  setExpandedProductIndex((outwardForm.items || []).length)
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Add Product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {warehouseStock
+                                  .filter((ws: any) => ws.warehouseName === outwardForm.warehouseName && ws.availableStock > 0)
+                                  .map((stock: any) => (
+                                    <SelectItem key={stock.productId} value={stock.productId}>
+                                      {stock.productName} (Available: {stock.availableStock})
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {expandedProductIndex !== null && expandedProductIndex < 10 && outwardForm.items && outwardForm.items[expandedProductIndex] ? (
+                            /* Show Expanded Form - Hide Grid */
+                            <div className="border rounded-lg p-4 bg-white space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-sm">Product {expandedProductIndex + 1}</h4>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newItems = (outwardForm.items || []).filter((_, idx) => idx !== expandedProductIndex)
+                                      setOutwardForm({...outwardForm, items: newItems})
+                                      setExpandedProductIndex(null)
+                                    }}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setExpandedProductIndex(null)}
+                                    className="text-gray-600 hover:text-gray-700"
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label>Select Product *</Label>
+                                <Select
+                                  value={outwardForm.items[expandedProductIndex].productId}
+                                  onValueChange={(value) => {
+                                    const stock = warehouseStock.find((ws: any) => ws.productId === value && ws.warehouseName === outwardForm.warehouseName)
+                                    const newItems = [...(outwardForm.items || [])]
+                                    newItems[expandedProductIndex] = {
+                                      ...newItems[expandedProductIndex],
+                                      productId: value,
+                                      productName: stock?.productName || '',
+                                      unitPrice: stock?.price || newItems[expandedProductIndex].unitPrice || 0
+                                    }
+                                    setOutwardForm({...outwardForm, items: newItems})
+                                  }}
+                                  required
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select product" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {warehouseStock
+                                      .filter((ws: any) => ws.warehouseName === outwardForm.warehouseName && ws.availableStock > 0)
+                                      .map((stock: any) => (
+                                        <SelectItem key={stock.productId} value={stock.productId}>
+                                          {stock.productName} (Available: {stock.availableStock})
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label>Quantity *</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={warehouseStock.find((ws: any) => ws.productId === outwardForm.items[expandedProductIndex].productId && ws.warehouseName === outwardForm.warehouseName)?.availableStock || 0}
+                                  value={outwardForm.items[expandedProductIndex].quantity || ""}
+                                  onChange={(e) => {
+                                    const newItems = [...(outwardForm.items || [])]
+                                    const qty = parseInt(e.target.value) || 0
+                                    newItems[expandedProductIndex] = {
+                                      ...newItems[expandedProductIndex],
+                                      quantity: qty,
+                                      totalAmount: qty * newItems[expandedProductIndex].unitPrice
+                                    }
+                                    setOutwardForm({...outwardForm, items: newItems})
+                                  }}
+                                  placeholder="0"
+                                  required
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label>Outward Type *</Label>
+                                <Select
+                                  value={outwardForm.items[expandedProductIndex].outwardType}
+                                  onValueChange={(value: any) => {
+                                    const newItems = [...(outwardForm.items || [])]
+                                    newItems[expandedProductIndex] = {
+                                      ...newItems[expandedProductIndex],
+                                      outwardType: value
+                                    }
+                                    setOutwardForm({...outwardForm, items: newItems})
+                                  }}
+                                  required
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="offline_direct">Direct Offline</SelectItem>
+                                    <SelectItem value="sample">Sample</SelectItem>
+                                    <SelectItem value="return_replacement">Return/Replacement</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label>Unit Price (₹) - Optional</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={outwardForm.items[expandedProductIndex].unitPrice || ""}
+                                  onChange={(e) => {
+                                    const newItems = [...(outwardForm.items || [])]
+                                    const price = parseFloat(e.target.value) || 0
+                                    newItems[expandedProductIndex] = {
+                                      ...newItems[expandedProductIndex],
+                                      unitPrice: price,
+                                      totalAmount: newItems[expandedProductIndex].quantity * price
+                                    }
+                                    setOutwardForm({...outwardForm, items: newItems})
+                                  }}
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              
+                              {outwardForm.items[expandedProductIndex].quantity > 0 && outwardForm.items[expandedProductIndex].unitPrice > 0 && (
+                                <div className="bg-green-50 border border-green-200 rounded p-2">
+                                  <p className="text-xs text-green-800">
+                                    Total: ₹{(outwardForm.items[expandedProductIndex].quantity * outwardForm.items[expandedProductIndex].unitPrice).toLocaleString()}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            /* Show Grid - Hide Expanded Form */
+                            <>
+                              {/* Product Grid (3 columns) - Show first 10 products */}
+                              {(outwardForm.items || []).slice(0, 10).length > 0 && (
+                                <div className="grid grid-cols-3 gap-3">
+                                  {(outwardForm.items || []).slice(0, 10).map((item, productIndex) => (
+                                    <Button
+                                      key={productIndex}
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setExpandedProductIndex(productIndex)}
+                                      className="w-full h-20 flex flex-col items-center justify-center gap-1 border-2 border-dashed hover:border-solid hover:border-orange-500 transition-all"
+                                    >
+                                      <Package className="h-5 w-5 text-gray-400" />
+                                      <span className="text-xs font-medium">
+                                        {item.productName || `Product ${productIndex + 1}`}
+                                      </span>
+                                      {item.quantity > 0 && (
+                                        <span className="text-xs text-gray-500">
+                                          {item.quantity} units
+                                        </span>
+                                      )}
+                                    </Button>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-muted-foreground">
+                                Click on a product button to configure details. Each product can have different outward type (Direct, Sample, Return/Replacement).
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Page 2: Additional Products (10th onwards) */}
+                  {outwardFormPage === 2 && (outwardForm.items || []).length > 10 && (
+                    <div className="space-y-4">
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <h3 className="font-semibold mb-4">Additional Products</h3>
+                        
+                        {expandedProductIndex !== null && expandedProductIndex >= 10 && outwardForm.items && outwardForm.items[expandedProductIndex] ? (
+                          /* Show Expanded Form - Hide Grid */
+                          <div className="border rounded-lg p-4 bg-white space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">Product {expandedProductIndex + 1}</h4>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newItems = (outwardForm.items || []).filter((_, idx) => idx !== expandedProductIndex)
+                                    setOutwardForm({...outwardForm, items: newItems})
+                                    setExpandedProductIndex(null)
+                                  }}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setExpandedProductIndex(null)}
+                                  className="text-gray-600 hover:text-gray-700"
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <Label>Select Product *</Label>
+                              <Select
+                                value={outwardForm.items[expandedProductIndex].productId}
+                                onValueChange={(value) => {
+                                  const stock = warehouseStock.find((ws: any) => ws.productId === value && ws.warehouseName === outwardForm.warehouseName)
+                                  const newItems = [...(outwardForm.items || [])]
+                                  newItems[expandedProductIndex] = {
+                                    ...newItems[expandedProductIndex],
+                                    productId: value,
+                                    productName: stock?.productName || '',
+                                    unitPrice: stock?.price || newItems[expandedProductIndex].unitPrice || 0
+                                  }
+                                  setOutwardForm({...outwardForm, items: newItems})
+                                }}
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select product" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {warehouseStock
+                                    .filter((ws: any) => ws.warehouseName === outwardForm.warehouseName && ws.availableStock > 0)
+                                    .map((stock: any) => (
+                                      <SelectItem key={stock.productId} value={stock.productId}>
+                                        {stock.productName} (Available: {stock.availableStock})
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label>Quantity *</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max={warehouseStock.find((ws: any) => ws.productId === outwardForm.items[expandedProductIndex].productId && ws.warehouseName === outwardForm.warehouseName)?.availableStock || 0}
+                                value={outwardForm.items[expandedProductIndex].quantity || ""}
+                                onChange={(e) => {
+                                  const newItems = [...(outwardForm.items || [])]
+                                  const qty = parseInt(e.target.value) || 0
+                                  newItems[expandedProductIndex] = {
+                                    ...newItems[expandedProductIndex],
+                                    quantity: qty,
+                                    totalAmount: qty * newItems[expandedProductIndex].unitPrice
+                                  }
+                                  setOutwardForm({...outwardForm, items: newItems})
+                                }}
+                                placeholder="0"
+                                required
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label>Outward Type *</Label>
+                              <Select
+                                value={outwardForm.items[expandedProductIndex].outwardType}
+                                onValueChange={(value: any) => {
+                                  const newItems = [...(outwardForm.items || [])]
+                                  newItems[expandedProductIndex] = {
+                                    ...newItems[expandedProductIndex],
+                                    outwardType: value
+                                  }
+                                  setOutwardForm({...outwardForm, items: newItems})
+                                }}
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="offline_direct">Direct Offline</SelectItem>
+                                  <SelectItem value="sample">Sample</SelectItem>
+                                  <SelectItem value="return_replacement">Return/Replacement</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label>Unit Price (₹) - Optional</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={outwardForm.items[expandedProductIndex].unitPrice || ""}
+                                onChange={(e) => {
+                                  const newItems = [...(outwardForm.items || [])]
+                                  const price = parseFloat(e.target.value) || 0
+                                  newItems[expandedProductIndex] = {
+                                    ...newItems[expandedProductIndex],
+                                    unitPrice: price,
+                                    totalAmount: newItems[expandedProductIndex].quantity * price
+                                  }
+                                  setOutwardForm({...outwardForm, items: newItems})
+                                }}
+                                placeholder="0.00"
+                              />
+                            </div>
+                            
+                            {outwardForm.items[expandedProductIndex].quantity > 0 && outwardForm.items[expandedProductIndex].unitPrice > 0 && (
+                              <div className="bg-green-50 border border-green-200 rounded p-2">
+                                <p className="text-xs text-green-800">
+                                  Total: ₹{(outwardForm.items[expandedProductIndex].quantity * outwardForm.items[expandedProductIndex].unitPrice).toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Show Grid - Hide Expanded Form */
+                          <>
+                            {/* Add Product Dropdown Button */}
+                            <div className="flex justify-end mb-4">
+                              <Select
+                                onValueChange={(value) => {
+                                  const stock = warehouseStock.find((ws: any) => ws.productId === value && ws.warehouseName === outwardForm.warehouseName)
+                                  if (stock) {
+                                    const newItem = {
+                                      productId: value,
+                                      productName: stock.productName,
+                                      quantity: 0,
+                                      unitPrice: stock.price || 0,
+                                      outwardType: "offline_direct" as const,
+                                      totalAmount: 0
+                                    }
+                                    setOutwardForm({
+                                      ...outwardForm,
+                                      items: [...(outwardForm.items || []), newItem]
+                                    })
+                                    setExpandedProductIndex((outwardForm.items || []).length)
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Add Product" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {warehouseStock
+                                    .filter((ws: any) => ws.warehouseName === outwardForm.warehouseName && ws.availableStock > 0)
+                                    .map((stock: any) => (
+                                      <SelectItem key={stock.productId} value={stock.productId}>
+                                        {stock.productName} (Available: {stock.availableStock})
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Product Grid (3 columns) - Show products from index 10 onwards */}
+                            {(outwardForm.items || []).slice(10).length > 0 && (
+                              <div className="grid grid-cols-3 gap-3">
+                                {(outwardForm.items || []).slice(10).map((item, productIndex) => {
+                                  const actualIndex = productIndex + 10
+                                  return (
+                                    <Button
+                                      key={actualIndex}
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setExpandedProductIndex(actualIndex)}
+                                      className="w-full h-20 flex flex-col items-center justify-center gap-1 border-2 border-dashed hover:border-solid hover:border-orange-500 transition-all"
+                                    >
+                                      <Package className="h-5 w-5 text-gray-400" />
+                                      <span className="text-xs font-medium">
+                                        {item.productName || `Product ${actualIndex + 1}`}
+                                      </span>
+                                      {item.quantity > 0 && (
+                                        <span className="text-xs text-gray-500">
+                                          {item.quantity} units
+                                        </span>
+                                      )}
+                                    </Button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            
+                            {(outwardForm.items || []).slice(10).length === 0 && (
+                              <p className="text-xs text-muted-foreground text-center py-4">
+                                No additional products. Add products from Page 1.
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Page 2 or 3: Summary Table */}
+                  {((outwardFormPage === 2 && (outwardForm.items || []).length <= 10) || (outwardFormPage === 3 && (outwardForm.items || []).length > 10)) && (outwardForm.items || []).length > 0 && (
+                    <div className="space-y-6">
+                      <div>
+                        <Label>Products Summary - Outward Entry Details</Label>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Product Name</TableHead>
+                                <TableHead>Quantity</TableHead>
+                                <TableHead>Outward Type</TableHead>
+                                <TableHead>Unit Price</TableHead>
+                                <TableHead>Total Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(outwardForm.items || []).map((item, idx: number) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium">{item.productName || 'Not selected'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">{item.quantity} units</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge 
+                                      variant="outline"
+                                      className={
+                                        item.outwardType === 'offline_direct'
+                                          ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                          : item.outwardType === 'sample'
+                                          ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                          : 'bg-green-100 text-green-800 border-green-300'
+                                      }
+                                    >
+                                      {item.outwardType === 'offline_direct' ? 'Direct' : item.outwardType === 'sample' ? 'Sample' : 'Return'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>₹{item.unitPrice.toLocaleString()}</TableCell>
+                                  <TableCell className="font-semibold text-green-600">₹{item.totalAmount.toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-2">
+                          <p className="text-xs text-orange-800">
+                            <strong>Summary:</strong> Total Products = {(outwardForm.items || []).length} products.
+                            {' '}Total Quantity = {(outwardForm.items || []).reduce((sum, item) => sum + item.quantity, 0)} units.
+                            {' '}Total Amount = ₹{(outwardForm.items || []).reduce((sum, item) => sum + item.totalAmount, 0).toLocaleString()}.
+                            {' '}Stock will be deducted from warehouse: {outwardForm.warehouseName}.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Notes (Optional)</Label>
+                        <Textarea
+                          value={outwardForm.notes}
+                          onChange={(e) => setOutwardForm({...outwardForm, notes: e.target.value})}
+                          placeholder="Add any additional notes..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                </form>
+              </div>
+
+              {/* Footer with Pagination */}
+              <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t bg-white">
+                <div className="flex items-center gap-2">
+                  {outwardFormPage > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOutwardFormPage(prev => prev - 1)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Previous
+                    </Button>
+                  )}
+                  <div className="flex items-center gap-1 px-3">
+                    <span className="text-sm text-gray-600">
+                      {(() => {
+                        const totalPages = (outwardForm.items || []).length > 10 ? 3 : 2
+                        return `Page ${outwardFormPage} of ${totalPages}`
+                      })()}
+                    </span>
+                  </div>
+                  {(() => {
+                    const totalPages = (outwardForm.items || []).length > 10 ? 3 : 2
+                    return outwardFormPage < totalPages
+                  })() && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOutwardFormPage(prev => prev + 1)}
+                    >
+                      Next
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsOutwardDialogOpen(false)
+                      setOutwardForm({
+                        customerId: "",
+                        customerName: "",
+                        warehouseName: "Main Warehouse",
+                        referenceNumber: "",
+                        notes: "",
+                        outwardDate: new Date().toISOString().split('T')[0],
+                        items: []
+                      })
+                      setOutwardFormPage(1)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="outward-form"
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                    disabled={
+                      !outwardForm.customerId ||
+                      !outwardForm.items ||
+                      outwardForm.items.length === 0 ||
+                      outwardForm.items.some((item: any) => !item.productId || item.quantity <= 0)
+                    }
+                  >
+                    Record Outward Entry
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Convert Sample to Sale Dialog */}
+          {isConvertSampleDialogOpen && convertingOutward && (
+            <>
+              {/* Overlay */}
+              <div
+                data-overlay="convert-sample-view"
+                className="fixed bg-black/60 backdrop-blur-sm z-[9998]"
+                style={{
+                  top: 0, left: 0, right: 0, width: '100%', position: 'fixed', minHeight: '100vh'
+                }}
+                onClick={() => {
+                  setIsConvertSampleDialogOpen(false)
+                  setConvertingOutward(null)
+                  setConvertForm({ unitPrice: "", notes: "" })
+                }}
+              />
+
+              {/* Content Container */}
+              <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-8 pb-8 overflow-y-auto pointer-events-none">
+                {/* Content Card */}
+                <div className="relative z-10 w-full max-w-lg mx-4 bg-card rounded-lg shadow-2xl border pointer-events-auto">
+                  {/* Header */}
+                  <div className="sticky top-0 z-20 bg-card border-b px-6 py-4 rounded-t-lg flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold">Convert Sample to Sale</h2>
+                      <p className="text-sm text-muted-foreground mt-1">Convert sample product to a sale and add to customer inventory</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsConvertSampleDialogOpen(false)
+                        setConvertingOutward(null)
+                        setConvertForm({ unitPrice: "", notes: "" })
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Form Content */}
+                  <div className="p-6">
+                    {/* Sample Info Display */}
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                      <h3 className="font-semibold text-purple-900 mb-2">Sample Details</h3>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Customer:</span>
+                          <span className="font-medium text-purple-900">{convertingOutward.customerName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Product:</span>
+                          <span className="font-medium text-purple-900">{convertingOutward.productName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Quantity:</span>
+                          <span className="font-medium text-purple-900">{convertingOutward.quantity} units</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Date Given:</span>
+                          <span className="font-medium text-purple-900">
+                            {new Date(convertingOutward.outwardDate || convertingOutward.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleConvertSampleToSale} className="space-y-4">
+                      {/* Unit Price */}
+                      <div>
+                        <Label>Unit Price (₹) *</Label>
+                        <Input
+                          type="number"
+                          value={convertForm.unitPrice}
+                          onChange={(e) => setConvertForm({...convertForm, unitPrice: e.target.value})}
+                          required
+                          min="0"
+                          step="0.01"
+                          placeholder="Enter price per unit"
+                        />
+                        {convertForm.unitPrice && convertingOutward.quantity && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Total Amount: ₹{(parseFloat(convertForm.unitPrice) * convertingOutward.quantity).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <Label>Notes (Optional)</Label>
+                        <Textarea
+                          value={convertForm.notes}
+                          onChange={(e) => setConvertForm({...convertForm, notes: e.target.value})}
+                          placeholder="Add any notes about this conversion..."
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* Info Message */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          <strong>Note:</strong> This will convert the sample entry to a sale, update the outward type to "Direct Offline", 
+                          and add the product to the customer's inventory ({convertingOutward.customerName}).
+                        </p>
+                      </div>
+
+                      {/* Footer Buttons */}
+                      <div className="flex justify-end space-x-2 pt-4 border-t">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
+                            setIsConvertSampleDialogOpen(false)
+                            setConvertingOutward(null)
+                            setConvertForm({ unitPrice: "", notes: "" })
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          disabled={!convertForm.unitPrice || parseFloat(convertForm.unitPrice) <= 0}
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Convert to Sale
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* View Outward Entry Details Dialog */}
+          <Dialog open={isViewOutwardDialogOpen} onOpenChange={(open) => {
+            setIsViewOutwardDialogOpen(open)
+            if (!open) {
+              setViewingOutward(null)
+              setRelatedOutwards([])
+              setViewOutwardDialogPage(1)
+            }
+          }}>
+            <DialogContent 
+              className="p-0"
+              style={{ 
+                width: '90vw',
+                maxWidth: '1400px',
+                height: '90vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b bg-white">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <ArrowRight className="h-6 w-6 text-orange-600" />
+                  Outward Entry Details
+                </DialogTitle>
+                <DialogDescription>
+                  Complete information about this outward entry
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Scrollable Content - Internal Modal Scrollbar */}
+              <div 
+                className="px-6 py-4 bg-white grn-dialog-scroll"
+                style={{ 
+                  height: 'calc(90vh - 180px)',
+                  overflowY: 'scroll',
+                  overflowX: 'hidden',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {viewingOutward && (
+                  <>
+                    {/* Page 1 - Basic Information */}
+                    {viewOutwardDialogPage === 1 && (
+                      <div className="space-y-6">
+                        {/* Top Section - Two Columns */}
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Left Column - Customer & Product Info */}
+                          <div>
+                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200">
+                          <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <User className="h-4 w-4 text-orange-600" />
+                            Customer Information
+                          </h3>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Customer Name</Label>
+                              <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingOutward.customerName}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Customer ID</Label>
+                              <p className="text-sm text-gray-700 mt-0.5 font-mono text-xs">{viewingOutward.customerId || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                          {/* Right Column - Product Info */}
+                          <div>
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                          <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <Package className="h-4 w-4 text-blue-600" />
+                            Product Information
+                          </h3>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Product Name</Label>
+                              <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingOutward.productName}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Product ID</Label>
+                              <p className="text-sm text-gray-700 mt-0.5 font-mono text-xs">{viewingOutward.productId || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                        {/* Middle Section - Transaction Details */}
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Left Column - Transaction Info */}
+                          <div>
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                          <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-green-600" />
+                            Transaction Details
+                          </h3>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Outward Date</Label>
+                              <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                                {new Date(viewingOutward.outwardDate || viewingOutward.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Quantity</Label>
+                              <p className="text-2xl font-bold text-green-700 mt-1">{viewingOutward.quantity}</p>
+                              <p className="text-xs text-gray-500 mt-1">units</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Outward Type</Label>
+                              <div className="mt-1">
+                                <Badge 
+                                  variant="outline"
+                                  className={
+                                    viewingOutward.outwardType === 'offline_direct'
+                                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                      : viewingOutward.outwardType === 'sample'
+                                      ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                      : 'bg-green-100 text-green-800 border-green-300'
+                                  }
+                                >
+                                  {viewingOutward.outwardType === 'offline_direct' ? 'Direct Offline' : viewingOutward.outwardType === 'sample' ? 'Sample' : 'Return/Replacement'}
+                                </Badge>
+                                {viewingOutward.convertedToSale && (
+                                  <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-300">
+                                    Converted to Sale
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {viewingOutward.convertedAt && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-600">Converted At</Label>
+                                <p className="text-sm text-gray-700 mt-0.5">
+                                  {new Date(viewingOutward.convertedAt).toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                          {/* Right Column - Warehouse & Financial Info */}
+                          <div>
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+                          <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-purple-600" />
+                            Warehouse & Financial
+                          </h3>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600">Warehouse</Label>
+                              <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingOutward.warehouseName || 'Main Warehouse'}</p>
+                            </div>
+                            {viewingOutward.unitPrice > 0 && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-600">Unit Price</Label>
+                                <p className="text-lg font-bold text-purple-700 mt-1">₹{viewingOutward.unitPrice.toLocaleString()}</p>
+                              </div>
+                            )}
+                            {viewingOutward.totalAmount > 0 && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-600">Total Amount</Label>
+                                <p className="text-2xl font-bold text-green-700 mt-1">₹{viewingOutward.totalAmount.toLocaleString()}</p>
+                              </div>
+                            )}
+                            {viewingOutward.referenceNumber && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-600">Reference Number</Label>
+                                <p className="text-sm text-gray-700 mt-0.5 font-mono">{viewingOutward.referenceNumber}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                        {/* Multiple Products Indicator */}
+                        {relatedOutwards.length > 1 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-blue-800">
+                              <Package className="h-5 w-5 text-blue-600" />
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  This batch contains {relatedOutwards.length} products
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                  Go to Page 2 to view all products in this batch
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Page 2 - Shows All Products if multiple, or Additional Info if single */}
+                    {viewOutwardDialogPage === 2 && (
+                      <>
+                        {/* If multiple products, show all products list */}
+                        {relatedOutwards.length > 1 ? (
+                          <div className="space-y-6">
+                            <div>
+                              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200 mb-4">
+                                <h3 className="text-base font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-orange-600" />
+                                  Batch Information
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Reference Number</Label>
+                                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingOutward.referenceNumber}</p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Total Products</Label>
+                                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{relatedOutwards.length} products</p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Total Quantity</Label>
+                                    <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                                      {relatedOutwards.reduce((sum, item) => sum + (item.quantity || 0), 0)} units
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Total Amount</Label>
+                                    <p className="text-sm font-semibold text-green-700 mt-0.5">
+                                      ₹{relatedOutwards.reduce((sum, item) => sum + (item.totalAmount || 0), 0).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Products Table */}
+                            <div>
+                              <div className="bg-white rounded-lg border border-gray-200">
+                                <div className="p-3 border-b bg-gray-50">
+                                  <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-blue-600" />
+                                    All Products in This Batch
+                                  </h3>
+                                </div>
+                                <div className="p-3">
+                                  <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow style={{ backgroundColor: '#1e2961' }}>
+                                          <TableHead style={{ color: '#ffffff' }}>Product Name</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Product ID</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Quantity</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Unit Price</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Total Amount</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Warehouse</TableHead>
+                                          <TableHead style={{ color: '#ffffff' }}>Type</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {relatedOutwards.map((item: any, index: number) => (
+                                          <TableRow 
+                                            key={item._id || index}
+                                            className={item._id === viewingOutward._id ? 'bg-orange-50' : ''}
+                                          >
+                                            <TableCell className="font-semibold">
+                                              <div className="flex items-center gap-2">
+                                                <Package className="h-4 w-4 text-orange-500" />
+                                                {item.productName}
+                                                {item._id === viewingOutward._id && (
+                                                  <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
+                                                    Current
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell>
+                                              <p className="text-sm text-gray-600 font-mono text-xs">{item.productId}</p>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                {item.quantity} units
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                              {item.unitPrice > 0 ? (
+                                                <span className="text-sm font-semibold text-gray-700">₹{item.unitPrice.toLocaleString()}</span>
+                                              ) : (
+                                                <span className="text-sm text-gray-400">-</span>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {item.totalAmount > 0 ? (
+                                                <span className="font-semibold text-green-600">₹{item.totalAmount.toLocaleString()}</span>
+                                              ) : (
+                                                <span className="text-gray-400">-</span>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                                {item.warehouseName || 'Main Warehouse'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge 
+                                                variant="outline"
+                                                className={
+                                                  item.outwardType === 'offline_direct'
+                                                    ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                                    : item.outwardType === 'sample'
+                                                    ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                                    : 'bg-green-100 text-green-800 border-green-300'
+                                                }
+                                              >
+                                                {item.outwardType === 'offline_direct' ? 'Direct' : item.outwardType === 'sample' ? 'Sample' : 'Return/Replacement'}
+                                              </Badge>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* If single product, show Additional Information on Page 2 */
+                          <div className="space-y-6">
+                            {/* Additional Information Section */}
+                            <div>
+                              <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg p-4 border border-gray-200">
+                                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-gray-600" />
+                                  Additional Information
+                                </h3>
+                                <div className="space-y-3">
+                                  {viewingOutward.notes ? (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                                      <div className="mt-1 p-3 bg-white rounded border border-gray-200">
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingOutward.notes}</p>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                                      <p className="text-sm text-gray-500 mt-1 italic">No notes available</p>
+                                    </div>
+                                  )}
+                                  {viewingOutward.referenceNumber && (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Reference Number</Label>
+                                      <p className="text-sm text-gray-700 mt-0.5 font-mono bg-white p-2 rounded border border-gray-200">
+                                        {viewingOutward.referenceNumber}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Audit Trail Section */}
+                            <div>
+                              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200">
+                                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-indigo-600" />
+                                  Audit Trail
+                                </h3>
+                                <div className="space-y-3">
+                                  {viewingOutward.recordedBy && (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Recorded By</Label>
+                                      <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                        <UserCircle className="h-4 w-4 text-indigo-500" />
+                                        {viewingOutward.recordedBy}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <Label className="text-sm font-medium text-gray-600">Entry Created</Label>
+                                    <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                      <Calendar className="h-4 w-4 text-indigo-500" />
+                                      {new Date(viewingOutward.createdAt).toLocaleString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  </div>
+                                  {viewingOutward.updatedAt && viewingOutward.updatedAt !== viewingOutward.createdAt && (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Last Updated</Label>
+                                      <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                        <RefreshCw className="h-4 w-4 text-indigo-500" />
+                                        {new Date(viewingOutward.updatedAt).toLocaleString('en-US', {
+                                          year: 'numeric',
+                                          month: 'long',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {viewingOutward.convertedAt && (
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Converted to Sale</Label>
+                                      <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                        {new Date(viewingOutward.convertedAt).toLocaleString('en-US', {
+                                          year: 'numeric',
+                                          month: 'long',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Conversion History (if converted) */}
+                            {viewingOutward.convertedToSale && (
+                              <div>
+                                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                                  <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                    <ShoppingCart className="h-4 w-4 text-green-600" />
+                                    Conversion Information
+                                  </h3>
+                                  <div className="space-y-2">
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Original Type</Label>
+                                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 mt-1">
+                                        Sample
+                                      </Badge>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Current Type</Label>
+                                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 mt-1">
+                                        Direct Offline
+                                      </Badge>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm font-medium text-gray-600">Status</Label>
+                                      <p className="text-sm text-green-700 font-semibold mt-1">
+                                        ✓ Successfully converted and added to customer inventory
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Page 3 - Additional Information & History (only when multiple products) */}
+                    {viewOutwardDialogPage === 3 && relatedOutwards.length > 1 && (
+                      <div className="space-y-6">
+                        {/* Additional Information Section */}
+                        <div>
+                          <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg p-4 border border-gray-200">
+                            <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-gray-600" />
+                              Additional Information
+                            </h3>
+                            <div className="space-y-3">
+                              {viewingOutward.notes ? (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                                  <div className="mt-1 p-3 bg-white rounded border border-gray-200">
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingOutward.notes}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                                  <p className="text-sm text-gray-500 mt-1 italic">No notes available</p>
+                                </div>
+                              )}
+                              {viewingOutward.referenceNumber && (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Reference Number</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 font-mono bg-white p-2 rounded border border-gray-200">
+                                    {viewingOutward.referenceNumber}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Audit Trail Section */}
+                        <div>
+                          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200">
+                            <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-indigo-600" />
+                              Audit Trail
+                            </h3>
+                            <div className="space-y-3">
+                              {viewingOutward.recordedBy && (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Recorded By</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                    <UserCircle className="h-4 w-4 text-indigo-500" />
+                                    {viewingOutward.recordedBy}
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <Label className="text-sm font-medium text-gray-600">Entry Created</Label>
+                                <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-indigo-500" />
+                                  {new Date(viewingOutward.createdAt).toLocaleString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                              {viewingOutward.updatedAt && viewingOutward.updatedAt !== viewingOutward.createdAt && (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Last Updated</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                    <RefreshCw className="h-4 w-4 text-indigo-500" />
+                                    {new Date(viewingOutward.updatedAt).toLocaleString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                </div>
+                              )}
+                              {viewingOutward.convertedAt && (
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Converted to Sale</Label>
+                                  <p className="text-sm text-gray-700 mt-0.5 flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    {new Date(viewingOutward.convertedAt).toLocaleString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Conversion History (if converted) */}
+                        {viewingOutward.convertedToSale && (
+                          <div>
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                              <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <ShoppingCart className="h-4 w-4 text-green-600" />
+                                Conversion Information
+                              </h3>
+                              <div className="space-y-2">
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Original Type</Label>
+                                  <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 mt-1">
+                                    Sample
+                                  </Badge>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Current Type</Label>
+                                  <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 mt-1">
+                                    Direct Offline
+                                  </Badge>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-medium text-gray-600">Status</Label>
+                                  <p className="text-sm text-green-700 font-semibold mt-1">
+                                    ✓ Successfully converted and added to customer inventory
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer with Pagination */}
+              <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t bg-white">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewOutwardDialogPage(prev => Math.max(1, prev - 1))}
+                    disabled={viewOutwardDialogPage === 1}
+                    className="flex items-center gap-1"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1 px-3">
+                    <span className="text-sm text-gray-600">
+                      Page {viewOutwardDialogPage} of {relatedOutwards.length > 1 ? 3 : 2}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewOutwardDialogPage(prev => {
+                      const maxPage = relatedOutwards.length > 1 ? 3 : 2
+                      return Math.min(maxPage, prev + 1)
+                    })}
+                    disabled={viewOutwardDialogPage === (relatedOutwards.length > 1 ? 3 : 2)}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsViewOutwardDialogOpen(false)
+                    setViewingOutward(null)
+                    setRelatedOutwards([])
+                    setViewOutwardDialogPage(1)
+                  }}
+                  className="px-6"
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* View Warehouse Stock Details Dialog */}
           <Dialog open={isViewStockDialogOpen} onOpenChange={(open) => {
             setIsViewStockDialogOpen(open)
@@ -13849,7 +15948,7 @@ export function DashboardPage() {
                 }}
               >
                 <form onSubmit={handleInwardSubmit} className="space-y-6" id="inward-form">
-                {!isDirectInward && (
+                {!isDirectInward ? (
                   <div className="grid grid-cols-10 gap-4">
                     {/* Left Side - 40% (4 columns) */}
                     <div className="col-span-4 space-y-4">
@@ -13916,8 +16015,119 @@ export function DashboardPage() {
 
                     {/* Right Side - 60% (6 columns) */}
                     <div className="col-span-6">
-
-                {isDirectInward && (
+                      {/* Items Table for PO Linked */}
+                      {selectedPO && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <Label>Items - Record Received, Damaged, and Lost Quantities</Label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Record what was received. Only Accepted Quantity will be added to warehouse when GRN is generated.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="border rounded-lg overflow-x-auto">
+                            <Table className="w-full table-fixed">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[25%] text-xs">Product</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Ordered</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Received</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Damaged</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Lost</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Unit Cost</TableHead>
+                                  <TableHead className="w-[12%] text-xs">Accepted</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {inwardForm.items.map((item, index) => {
+                                  const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
+                                  return (
+                                    <TableRow key={index}>
+                                      <TableCell className="w-[25%]">
+                                        <p className="text-sm font-medium">{item.productName}</p>
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Badge variant="outline">{item.orderedQuantity}</Badge>
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={item.receivedQuantity}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].receivedQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - (newItems[index].lostQuantity || 0)
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          max={item.receivedQuantity}
+                                          value={item.damagedQuantity || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].damagedQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - newItems[index].damagedQuantity - (newItems[index].lostQuantity || 0)
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          max={item.receivedQuantity}
+                                          value={item.lostQuantity || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].lostQuantity = parseInt(e.target.value) || 0
+                                            newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - newItems[index].lostQuantity
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={item.unitPrice || 0}
+                                          onChange={(e) => {
+                                            const newItems = [...inwardForm.items]
+                                            newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                                            setInwardForm({...inwardForm, items: newItems})
+                                          }}
+                                          className="w-full"
+                                          placeholder="0.00"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="w-[12%]">
+                                        <Badge variant={acceptedQty > 0 ? "default" : "destructive"} className="text-xs">
+                                          {acceptedQty}
+                                        </Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  )
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Direct Inward Form */
                   <div className="grid grid-cols-10 gap-4">
                     {/* Left Side - 40% (4 columns) */}
                     <div className="col-span-4 space-y-4">
@@ -14138,126 +16348,6 @@ export function DashboardPage() {
                           </Table>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                      {/* Items Table for PO Linked */}
-                      {selectedPO && (
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <Label>Items - Record Received, Damaged, and Lost Quantities</Label>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Record what was received. Only Accepted Quantity will be added to warehouse when GRN is generated.
-                              </p>
-                            </div>
-                          </div>
-                          <div className="border rounded-lg overflow-x-auto">
-                            <Table className="w-full table-fixed">
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[20%] text-xs">Product</TableHead>
-                                  <TableHead className="w-[10%] text-xs">Ordered</TableHead>
-                                  <TableHead className="w-[12%] text-xs">Received</TableHead>
-                                  <TableHead className="w-[12%] text-xs">Damaged</TableHead>
-                                  <TableHead className="w-[12%] text-xs">Lost</TableHead>
-                                  <TableHead className="w-[12%] text-xs">Unit Cost</TableHead>
-                                  <TableHead className="w-[12%] text-xs">Accepted</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {inwardForm.items.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8">
-                                      No items
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  inwardForm.items.map((item, index) => {
-                                    const acceptedQty = item.receivedQuantity - (item.damagedQuantity || 0) - (item.lostQuantity || 0)
-                                    return (
-                                      <TableRow key={index}>
-                                        <TableCell className="w-[20%] font-medium text-sm">{item.productName}</TableCell>
-                                        <TableCell className="w-[10%]">
-                                          <Badge variant="outline" className="text-xs">{item.orderedQuantity}</Badge>
-                                        </TableCell>
-                                        <TableCell className="w-[12%]">
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            max={item.orderedQuantity}
-                                            value={item.receivedQuantity}
-                                            onChange={(e) => {
-                                              const newItems = [...inwardForm.items]
-                                              newItems[index].receivedQuantity = parseInt(e.target.value) || 0
-                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - (newItems[index].lostQuantity || 0)
-                                              setInwardForm({...inwardForm, items: newItems})
-                                            }}
-                                            className="w-full"
-                                          />
-                                        </TableCell>
-                                        <TableCell className="w-[12%]">
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            max={item.receivedQuantity}
-                                            value={item.damagedQuantity || 0}
-                                            onChange={(e) => {
-                                              const newItems = [...inwardForm.items]
-                                              newItems[index].damagedQuantity = parseInt(e.target.value) || 0
-                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - newItems[index].damagedQuantity - (newItems[index].lostQuantity || 0)
-                                              setInwardForm({...inwardForm, items: newItems})
-                                            }}
-                                            className="w-full"
-                                            placeholder="0"
-                                          />
-                                        </TableCell>
-                                        <TableCell className="w-[12%]">
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            max={item.receivedQuantity}
-                                            value={item.lostQuantity || 0}
-                                            onChange={(e) => {
-                                              const newItems = [...inwardForm.items]
-                                              newItems[index].lostQuantity = parseInt(e.target.value) || 0
-                                              newItems[index].acceptedQuantity = newItems[index].receivedQuantity - (newItems[index].damagedQuantity || 0) - newItems[index].lostQuantity
-                                              setInwardForm({...inwardForm, items: newItems})
-                                            }}
-                                            className="w-full"
-                                            placeholder="0"
-                                          />
-                                        </TableCell>
-                                        <TableCell className="w-[12%]">
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={item.unitPrice || 0}
-                                            onChange={(e) => {
-                                              const newItems = [...inwardForm.items]
-                                              newItems[index].unitPrice = parseFloat(e.target.value) || 0
-                                              setInwardForm({...inwardForm, items: newItems})
-                                            }}
-                                            className="w-full"
-                                            placeholder="0.00"
-                                          />
-                                        </TableCell>
-                                        <TableCell className="w-[12%]">
-                                          <Badge variant={acceptedQty > 0 ? "default" : "destructive"} className="text-xs">
-                                            {acceptedQty}
-                                          </Badge>
-                                        </TableCell>
-                                      </TableRow>
-                                    )
-                                  })
-                                )}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
