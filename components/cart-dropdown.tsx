@@ -150,11 +150,6 @@ export function CartDropdown({ isOpen, onClose, triggerRef }: CartDropdownProps)
             <div className="space-y-3">
               {cartItems.map((item) => (
                 <div key={item.id} className="flex items-center space-x-3">
-                  <img
-                    src={item.image || "/placeholder.jpg"}
-                    alt={item.name}
-                    className="w-12 h-12 object-cover rounded"
-                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
                     <span className="text-xs text-gray-600">{item.quantity} × ₹{item.price.toLocaleString()}</span>

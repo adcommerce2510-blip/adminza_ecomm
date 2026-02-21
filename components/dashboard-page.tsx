@@ -54,7 +54,9 @@ import {
   RefreshCw,
   CheckCircle2 as CheckCircle,
   Clock,
-  UserCircle
+  UserCircle,
+  Ban,
+  UserCheck
 } from "lucide-react"
 
 // API functions
@@ -725,8 +727,10 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadingExcel, setUploadingExcel] = useState(false)
+  const [uploadingServiceExcel, setUploadingServiceExcel] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const excelFileInputRef = useRef<HTMLInputElement>(null)
+  const serviceExcelFileInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState("dashboard")
   const [activeSubSection, setActiveSubSection] = useState("all-items")
   const [isProductsManagementExpanded, setIsProductsManagementExpanded] = useState(false)
@@ -868,6 +872,7 @@ export function DashboardPage() {
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
   const viewProductModalRef = useRef<HTMLDivElement>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const [openEditCustomerDropdownId, setOpenEditCustomerDropdownId] = useState<string | null>(null)
   const [openOrderDropdownId, setOpenOrderDropdownId] = useState<string | null>(null)
   const [isEditOrderDialogOpen, setIsEditOrderDialogOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<any>(null)
@@ -2522,12 +2527,13 @@ export function DashboardPage() {
 
   // Handle block/unblock customer
   const handleToggleCustomerStatus = async (customer: any) => {
-    const action = customer.status === 'active' ? 'block' : 'unblock'
+    const isBlocked = customer.isBlocked || customer.status === 'blocked'
+    const action = isBlocked ? 'unblock' : 'block'
     const confirmMessage = `Are you sure you want to ${action} ${customer.name}?`
     
     if (confirm(confirmMessage)) {
       try {
-        const newStatus = customer.status === 'active' ? 'blocked' : 'active'
+        const newStatus = isBlocked ? 'active' : 'blocked'
         const response = await fetch(`/api/customers/${customer._id}`, {
           method: 'PUT',
           headers: {
@@ -2864,6 +2870,11 @@ export function DashboardPage() {
     setOpenDropdownId(openDropdownId === itemId ? null : itemId)
   }
 
+  // Toggle edit customer dropdown
+  const toggleEditCustomerDropdown = (customerId: string) => {
+    setOpenEditCustomerDropdownId(openEditCustomerDropdownId === customerId ? null : customerId)
+  }
+
   // Toggle order dropdown
   const toggleOrderDropdown = (orderId: string) => {
     setOpenOrderDropdownId(openOrderDropdownId === orderId ? null : orderId)
@@ -2892,6 +2903,18 @@ export function DashboardPage() {
       return () => document.removeEventListener('click', handleClickOutside)
     }
   }, [openOrderDropdownId])
+
+  // Close edit customer dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setOpenEditCustomerDropdownId(null)
+    }
+    
+    if (openEditCustomerDropdownId) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [openEditCustomerDropdownId])
 
   // Reset to page 1 when search term changes
   useEffect(() => {
@@ -3204,10 +3227,12 @@ export function DashboardPage() {
           // Parse images (if provided, can be comma-separated)
           // Can be either:
           // 1. Direct URLs (http:// or https://) - used as-is
-          // 2. Image names - fetched from Cloudinary using existing credentials
+          // 2. Image names - will construct Cloudinary URL directly
+          // 3. If no image provided, use product name to construct Cloudinary URL
           const imageNames = images ? images.split(',').map((img: string) => img.trim()).filter((img: string) => img) : []
           
-          // Store image names for later processing (will fetch Cloudinary URLs before creating products)
+          // Store image names for later processing (will construct Cloudinary URLs before creating products)
+          // If no image names provided, use product name as image name
           productsToCreate.push({
             name: productName,
             category: categoryString || 'Uncategorized',
@@ -3223,7 +3248,7 @@ export function DashboardPage() {
             stock: stock,
             description: description || `${productName} - Quality product`,
             hslCode: hslCode || '',
-            imageNames: imageNames, // Store image names temporarily
+            imageNames: imageNames.length > 0 ? imageNames : [productName], // Use product name if no image specified
             images: [], // Will be populated with Cloudinary URLs
             vendor: "Admin"
           })
@@ -3238,7 +3263,23 @@ export function DashboardPage() {
         return
       }
 
-      // Fetch Cloudinary URLs for all products with image names/URLs
+      // Get Cloudinary cloud name from API (one-time fetch)
+      let cloudinaryCloudName = ''
+      try {
+        const cloudNameResponse = await fetch('/api/cloudinary/get-cloud-name')
+        if (cloudNameResponse.ok) {
+          const cloudNameData = await cloudNameResponse.json()
+          cloudinaryCloudName = cloudNameData.cloudName || ''
+        }
+      } catch (error) {
+        console.warn('Could not fetch Cloudinary cloud name, will try API fetch method')
+      }
+
+      // Process images for all products - both ways operational:
+      // 1. Full URLs (http/https) - used as-is
+      // 2. Image names - construct Cloudinary URL directly OR fetch via API
+      const cloudinaryFolder = 'adminza/products' // Single folder for all product images
+      
       for (const productData of productsToCreate) {
         if (productData.imageNames && productData.imageNames.length > 0) {
           const imageUrls: string[] = []
@@ -3249,25 +3290,63 @@ export function DashboardPage() {
                 // It's a direct URL, use it as-is
                 imageUrls.push(imageValue)
               } else {
-                // It's an image name, fetch from Cloudinary
-                const response = await fetch('/api/cloudinary/fetch-image', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    imageName: imageValue,
-                    folder: 'adminza/products' // Default folder for product images
-                  })
-                })
+                // It's an image name - both methods operational:
+                // Method 1: Construct Cloudinary URL directly (faster, preferred method)
+                // Method 2: Fetch from Cloudinary API (fallback method)
                 
-                const imageData = await response.json()
-                if (imageData.success && imageData.url) {
-                  imageUrls.push(imageData.url)
-                } else {
-                  // Log warning but don't block product creation
-                  console.warn(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found'}`)
-                  errors.push(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found in Cloudinary'}`)
+                let imageUrlFound = false
+                
+                // Method 1: Construct Cloudinary URL directly (faster, works if cloud name is available)
+                if (cloudinaryCloudName) {
+                  // Sanitize the image name for URL (remove spaces, special chars)
+                  const sanitizedImageName = imageValue
+                    .trim()
+                    .replace(/\s+/g, '-') // Replace spaces with hyphens
+                    .replace(/[^a-zA-Z0-9.-]/g, '') // Remove special characters except dots and hyphens
+                    .toLowerCase()
+                  
+                  // Construct the Cloudinary URL directly
+                  const constructedUrl = `https://res.cloudinary.com/${cloudinaryCloudName}/image/upload/${cloudinaryFolder}/${sanitizedImageName}`
+                  imageUrls.push(constructedUrl)
+                  imageUrlFound = true
+                }
+                
+                // Method 2: Fetch from Cloudinary API (fallback if direct construction not possible or as backup)
+                if (!imageUrlFound) {
+                  try {
+                    const response = await fetch('/api/cloudinary/fetch-image', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        imageName: imageValue,
+                        folder: cloudinaryFolder
+                      })
+                    })
+                    
+                    const imageData = await response.json()
+                    if (imageData.success && imageData.url) {
+                      // If we already added a constructed URL, replace it with the API-fetched one (more accurate)
+                      if (imageUrlFound) {
+                        imageUrls.pop()
+                      }
+                      imageUrls.push(imageData.url)
+                      imageUrlFound = true
+                    } else {
+                      // If API fails and we don't have a constructed URL, log error
+                      if (!imageUrlFound) {
+                        console.warn(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found'}`)
+                        errors.push(`${productData.name}: Image "${imageValue}" - ${imageData.error || 'not found in Cloudinary'}`)
+                      }
+                    }
+                  } catch (apiError) {
+                    // If API fails and we don't have a constructed URL, log error
+                    if (!imageUrlFound) {
+                      console.error(`Error fetching image ${imageValue} from API:`, apiError)
+                      errors.push(`${productData.name}: Failed to fetch image "${imageValue}" from API`)
+                    }
+                  }
                 }
               }
             } catch (error) {
@@ -3377,6 +3456,296 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error creating product:', error)
       alert('Error creating product')
+    }
+  }
+
+  // Handle Excel file upload and parse for Services
+  const handleServiceExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    if (!['xlsx', 'xls'].includes(fileExtension || '')) {
+      alert('Please upload a valid Excel file (.xlsx or .xls)')
+      return
+    }
+
+    try {
+      setUploadingServiceExcel(true)
+      
+      // Read Excel file
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      
+      // Convert to JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      
+      if (jsonData.length < 2) {
+        alert('Excel file must contain at least a header row and one data row')
+        setUploadingServiceExcel(false)
+        return
+      }
+
+      // Get header row (first row)
+      const headers = (jsonData[0] as any[]).map((h: any) => String(h).toLowerCase().trim())
+      
+      // Find column indices
+      const getColumnIndex = (possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.includes(name))
+          if (index !== -1) return index
+        }
+        return -1
+      }
+
+      const nameIndex = getColumnIndex(['service name', 'name', 'service'])
+      const mainCategoryIndex = getColumnIndex(['main category', 'maincategory', 'category'])
+      const subCategoryIndex = getColumnIndex(['sub category', 'subcategory', 'sub'])
+      const level2CategoryIndex = getColumnIndex(['level2', 'level 2', 'level2category', 'level 2 category'])
+      const priceIndex = getColumnIndex(['price', 'service price', 'cost'])
+      const durationIndex = getColumnIndex(['duration', 'time', 'period'])
+      const descriptionIndex = getColumnIndex(['description', 'desc'])
+      const locationIndex = getColumnIndex(['location', 'area', 'place'])
+      const imagesIndex = getColumnIndex(['images', 'image', 'image url', 'imageurl'])
+
+      // Validate required columns
+      if (nameIndex === -1 || priceIndex === -1 || durationIndex === -1 || locationIndex === -1) {
+        alert('Excel file must contain the following columns: Service Name, Price, Duration, and Location')
+        setUploadingServiceExcel(false)
+        return
+      }
+
+      // Process data rows (skip header row)
+      const servicesToCreate: any[] = []
+      const errors: string[] = []
+
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i] as any[]
+        
+        // Skip empty rows
+        if (!row[nameIndex] || String(row[nameIndex]).trim() === '') continue
+
+        try {
+          const serviceName = String(row[nameIndex] || '').trim()
+          const mainCategory = mainCategoryIndex !== -1 ? String(row[mainCategoryIndex] || '').trim() : ''
+          const subCategory = subCategoryIndex !== -1 ? String(row[subCategoryIndex] || '').trim() : ''
+          const level2Category = level2CategoryIndex !== -1 ? String(row[level2CategoryIndex] || '').trim() : ''
+          const price = parseFloat(String(row[priceIndex] || '0').replace(/[^0-9.]/g, '')) || 0
+          const duration = durationIndex !== -1 ? String(row[durationIndex] || '').trim() : ''
+          const description = descriptionIndex !== -1 ? String(row[descriptionIndex] || '').trim() : ''
+          const location = locationIndex !== -1 ? String(row[locationIndex] || '').trim() : ''
+          const images = imagesIndex !== -1 ? String(row[imagesIndex] || '').trim() : ''
+
+          // Validate required fields
+          if (!serviceName) {
+            errors.push(`Row ${i + 1}: Service name is required`)
+            continue
+          }
+          if (price <= 0) {
+            errors.push(`Row ${i + 1}: Price must be greater than 0`)
+            continue
+          }
+          if (!duration) {
+            errors.push(`Row ${i + 1}: Duration is required`)
+            continue
+          }
+          if (!location) {
+            errors.push(`Row ${i + 1}: Location is required`)
+            continue
+          }
+
+          // Build category string
+          let categoryString = mainCategory || ''
+          if (subCategory) {
+            categoryString += categoryString ? `/${subCategory}` : subCategory
+          }
+          if (level2Category) {
+            categoryString += categoryString ? `/${level2Category}` : level2Category
+          }
+
+          // Parse images (if provided, can be comma-separated)
+          // Can be either:
+          // 1. Direct URLs (http:// or https://) - used as-is
+          // 2. Image names - will construct Cloudinary URL directly
+          // 3. If no image provided, use service name to construct Cloudinary URL
+          const imageNames = images ? images.split(',').map((img: string) => img.trim()).filter((img: string) => img) : []
+          
+          // Store image names for later processing (will construct Cloudinary URLs before creating services)
+          // If no image names provided, use service name as image name
+          servicesToCreate.push({
+            name: serviceName,
+            category: categoryString || 'Uncategorized',
+            mainCategory: mainCategory,
+            subCategory: subCategory,
+            level2Category: level2Category,
+            price: price,
+            duration: duration,
+            description: description || `${serviceName} - Quality service`,
+            location: location,
+            imageNames: imageNames.length > 0 ? imageNames : [serviceName], // Use service name if no image specified
+            images: [], // Will be populated with Cloudinary URLs
+            vendor: "Admin"
+          })
+        } catch (rowError) {
+          errors.push(`Row ${i + 1}: Error processing row - ${rowError}`)
+        }
+      }
+
+      if (servicesToCreate.length === 0) {
+        alert('No valid services found in Excel file. Please check your data.')
+        setUploadingServiceExcel(false)
+        return
+      }
+
+      // Get Cloudinary cloud name from API (one-time fetch)
+      let cloudinaryCloudName = ''
+      try {
+        const cloudNameResponse = await fetch('/api/cloudinary/get-cloud-name')
+        if (cloudNameResponse.ok) {
+          const cloudNameData = await cloudNameResponse.json()
+          cloudinaryCloudName = cloudNameData.cloudName || ''
+        }
+      } catch (error) {
+        console.warn('Could not fetch Cloudinary cloud name, will try API fetch method')
+      }
+
+      // Process images for all services - both ways operational:
+      // 1. Full URLs (http/https) - used as-is
+      // 2. Image names - construct Cloudinary URL directly OR fetch via API
+      const cloudinaryFolder = 'adminza/services' // Single folder for all service images
+      
+      for (const serviceData of servicesToCreate) {
+        if (serviceData.imageNames && serviceData.imageNames.length > 0) {
+          const imageUrls: string[] = []
+          for (const imageValue of serviceData.imageNames) {
+            try {
+              // Check if it's already a full URL (starts with http/https)
+              if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) {
+                // It's a direct URL, use it as-is
+                imageUrls.push(imageValue)
+              } else {
+                // It's an image name - both methods operational:
+                // Method 1: Construct Cloudinary URL directly (faster, preferred method)
+                // Method 2: Fetch from Cloudinary API (fallback method)
+                
+                let imageUrlFound = false
+                
+                // Method 1: Construct Cloudinary URL directly (faster, works if cloud name is available)
+                if (cloudinaryCloudName) {
+                  // Sanitize the image name for URL (remove spaces, special chars)
+                  const sanitizedImageName = imageValue
+                    .trim()
+                    .replace(/\s+/g, '-') // Replace spaces with hyphens
+                    .replace(/[^a-zA-Z0-9.-]/g, '') // Remove special characters except dots and hyphens
+                    .toLowerCase()
+                  
+                  // Construct the Cloudinary URL directly
+                  const constructedUrl = `https://res.cloudinary.com/${cloudinaryCloudName}/image/upload/${cloudinaryFolder}/${sanitizedImageName}`
+                  imageUrls.push(constructedUrl)
+                  imageUrlFound = true
+                }
+                
+                // Method 2: Fetch from Cloudinary API (fallback if direct construction not possible or as backup)
+                if (!imageUrlFound) {
+                  try {
+                    const response = await fetch('/api/cloudinary/fetch-image', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        imageName: imageValue,
+                        folder: cloudinaryFolder
+                      })
+                    })
+                    
+                    const imageData = await response.json()
+                    if (imageData.success && imageData.url) {
+                      // If we already added a constructed URL, replace it with the API-fetched one (more accurate)
+                      if (imageUrlFound) {
+                        imageUrls.pop()
+                      }
+                      imageUrls.push(imageData.url)
+                      imageUrlFound = true
+                    } else {
+                      // If API fails and we don't have a constructed URL, log error
+                      if (!imageUrlFound) {
+                        console.warn(`${serviceData.name}: Image "${imageValue}" - ${imageData.error || 'not found'}`)
+                        errors.push(`${serviceData.name}: Image "${imageValue}" - ${imageData.error || 'not found in Cloudinary'}`)
+                      }
+                    }
+                  } catch (apiError) {
+                    // If API fails and we don't have a constructed URL, log error
+                    if (!imageUrlFound) {
+                      console.error(`Error fetching image ${imageValue} from API:`, apiError)
+                      errors.push(`${serviceData.name}: Failed to fetch image "${imageValue}" from API`)
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(`Error processing image ${imageValue}:`, error)
+              errors.push(`${serviceData.name}: Failed to process image "${imageValue}"`)
+            }
+          }
+          // Update service data with image URLs (Cloudinary URLs or direct URLs)
+          serviceData.images = imageUrls
+          delete serviceData.imageNames // Remove temporary field
+        }
+      }
+
+      // Create services
+      let successCount = 0
+      let failCount = 0
+      const createdServices: any[] = []
+
+      for (const serviceData of servicesToCreate) {
+        try {
+          const result = await createService(serviceData)
+          if (result.success) {
+            successCount++
+            createdServices.push(result.data)
+          } else {
+            failCount++
+            errors.push(`${serviceData.name}: ${result.error || 'Failed to create'}`)
+          }
+        } catch (error) {
+          failCount++
+          errors.push(`${serviceData.name}: Error creating service`)
+        }
+      }
+
+      // Refresh services list
+      if (successCount > 0) {
+        const updatedServices = await fetchServices()
+        setServices(updatedServices)
+      }
+
+      // Show results
+      let message = `Successfully created ${successCount} service(s).`
+      if (failCount > 0) {
+        message += ` ${failCount} service(s) failed.`
+      }
+      if (errors.length > 0 && errors.length <= 10) {
+        message += `\n\nErrors:\n${errors.join('\n')}`
+      } else if (errors.length > 10) {
+        message += `\n\nFirst 10 errors:\n${errors.slice(0, 10).join('\n')}\n...and ${errors.length - 10} more errors.`
+      }
+      
+      alert(message)
+
+      // Reset file input
+      if (serviceExcelFileInputRef.current) {
+        serviceExcelFileInputRef.current.value = ''
+      }
+    } catch (error) {
+      console.error('Error processing Excel file:', error)
+      alert('Error processing Excel file: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setUploadingServiceExcel(false)
     }
   }
 
@@ -4715,17 +5084,6 @@ export function DashboardPage() {
                   Purchase Orders
                 </Button>
                 <Button 
-                  variant={activeSubSection === "warehouse-stock" ? "default" : "ghost"} 
-                  className="w-full justify-start text-sm"
-                  onClick={() => {
-                    setActiveSection("inventory-management")
-                    setActiveSubSection("warehouse-stock")
-                  }}
-                >
-                  <Package className="h-3 w-3 mr-2" />
-                  Warehouse Stock
-                </Button>
-                <Button 
                   variant={activeSubSection === "inward" ? "default" : "ghost"} 
                   className="w-full justify-start text-sm"
                   onClick={() => {
@@ -4737,15 +5095,15 @@ export function DashboardPage() {
                   Inward
                 </Button>
                 <Button 
-                  variant={activeSubSection === "waste-management" ? "default" : "ghost"} 
+                  variant={activeSubSection === "warehouse-stock" ? "default" : "ghost"} 
                   className="w-full justify-start text-sm"
                   onClick={() => {
                     setActiveSection("inventory-management")
-                    setActiveSubSection("waste-management")
+                    setActiveSubSection("warehouse-stock")
                   }}
                 >
-                  <Trash2 className="h-3 w-3 mr-2" />
-                  Waste Management
+                  <Package className="h-3 w-3 mr-2" />
+                  Warehouse Stock
                 </Button>
                 <Button 
                   variant={activeSubSection === "outwards" ? "default" : "ghost"} 
@@ -4757,6 +5115,17 @@ export function DashboardPage() {
                 >
                   <ArrowRight className="h-3 w-3 mr-2" />
                   Outwards
+                </Button>
+                <Button 
+                  variant={activeSubSection === "waste-management" ? "default" : "ghost"} 
+                  className="w-full justify-start text-sm"
+                  onClick={() => {
+                    setActiveSection("inventory-management")
+                    setActiveSubSection("waste-management")
+                  }}
+                >
+                  <Trash2 className="h-3 w-3 mr-2" />
+                  Waste Management
                 </Button>
               </div>
             )}
@@ -5018,6 +5387,23 @@ export function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <CardTitle>Services</CardTitle>
                         <div className="flex items-center space-x-2">
+                          <input
+                            ref={serviceExcelFileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            className="hidden"
+                            onChange={handleServiceExcelUpload}
+                            disabled={uploadingServiceExcel}
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() => serviceExcelFileInputRef.current?.click()}
+                            disabled={uploadingServiceExcel}
+                            className="border-green-600 text-green-600 hover:bg-green-50"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingServiceExcel ? 'Uploading...' : 'Upload Excel'}
+                          </Button>
                           <Dialog open={isServiceDialogOpen} onOpenChange={setIsServiceDialogOpen}>
                             <DialogTrigger asChild>
                               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -8539,23 +8925,72 @@ export function DashboardPage() {
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="py-4">
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm">
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleDeleteCustomer(customer._id)} className="text-red-600">
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <div className="relative">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 hover:bg-slate-100"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          toggleEditCustomerDropdown(customer._id)
+                                        }}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                      {openEditCustomerDropdownId === customer._id && (
+                                        <div
+                                          className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[9999] py-1"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleEditCustomer(customer)
+                                              setOpenEditCustomerDropdownId(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleToggleCustomerStatus(customer)
+                                              setOpenEditCustomerDropdownId(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                          >
+                                            {(customer.isBlocked || customer.status === 'blocked') ? (
+                                              <>
+                                                <UserCheck className="h-4 w-4" />
+                                                Unblock
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Ban className="h-4 w-4" />
+                                                Block
+                                              </>
+                                            )}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleDeleteCustomer(customer._id)
+                                              setOpenEditCustomerDropdownId(null)
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -9220,68 +9655,70 @@ export function DashboardPage() {
                                 <TableCell className="py-4">
                                   {po.deliveryType === 'direct_to_customer' ? (
                                     <Select
-                                      value={po.status}
+                                      value={po.status || 'pending'}
                                       onValueChange={(value) => handlePOStatusUpdate(po._id, value)}
                                     >
-                                      <SelectTrigger className="w-36 h-9 border-2 hover:border-blue-400 transition-colors">
-                                        <SelectValue />
+                                      <SelectTrigger className="w-40 h-9 border-2 hover:border-blue-400 transition-colors min-w-[140px]">
+                                        <Badge
+                                          variant="secondary"
+                                          className={
+                                            po.status === 'reached' || po.status === 'received'
+                                              ? 'bg-green-500 hover:bg-green-600 text-white border-0'
+                                              : po.status === 'cancelled'
+                                              ? 'bg-red-500 hover:bg-red-600 text-white border-0'
+                                              : 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                          }
+                                        >
+                                          {po.status === 'reached' ? 'Reached' : po.status === 'received' ? 'Received' : po.status === 'cancelled' ? 'Cancelled' : 'Pending'}
+                                        </Badge>
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="pending">
-                                          <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
-                                            Pending
-                                          </div>
-                                        </SelectItem>
-                                        <SelectItem value="reached">
-                                          <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                            Reached
-                                          </div>
-                                        </SelectItem>
-                                        <SelectItem value="cancelled">
-                                          <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-red-500"></div>
-                                            Cancelled
-                                          </div>
-                                        </SelectItem>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="reached">Reached</SelectItem>
+                                        <SelectItem value="received">Received</SelectItem>
+                                        <SelectItem value="cancelled">Cancelled</SelectItem>
                                       </SelectContent>
                                     </Select>
+                                  ) : po.poType === 'reference' ? (
+                                    <div className="flex flex-col gap-1">
+                                      <Badge variant="outline" className="bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300 shadow-sm">
+                                        <FileText className="h-3 w-3 mr-1" />
+                                        Reference
+                                      </Badge>
+                                    </div>
                                   ) : (
                                     <div className="flex flex-col gap-1">
-                                      <Badge 
-                                        variant={
-                                          po.status === 'PO_CLOSED' || po.status === 'received' 
-                                            ? 'default' 
-                                            : po.status === 'PO_REFERENCE'
-                                            ? 'outline'
-                                            : po.status === 'cancelled' 
-                                            ? 'destructive' 
-                                            : 'secondary'
-                                        }
-                                        className={
-                                          po.status === 'PO_CLOSED' || po.status === 'received'
-                                            ? 'bg-green-500 hover:bg-green-600 text-white border-0 shadow-sm' 
-                                            : po.status === 'PO_PARTIALLY_RECEIVED'
-                                            ? 'bg-blue-500 hover:bg-blue-600 text-white border-0 shadow-sm'
-                                            : po.status === 'PO_REFERENCE'
-                                            ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300 shadow-sm'
-                                            : po.status === 'cancelled'
-                                            ? 'bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm'
-                                            : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300 shadow-sm'
-                                        }
+                                      <Select
+                                        value={po.status || 'PO_CREATED'}
+                                        onValueChange={(value) => handlePOStatusUpdate(po._id, value)}
                                       >
-                                        {po.status === 'PO_CLOSED' || po.status === 'received' ? <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div> : null}
-                                        {po.status === 'PO_PARTIALLY_RECEIVED' ? <div className="h-2 w-2 rounded-full bg-white mr-1.5"></div> : null}
-                                        {po.status === 'PO_CREATED' || po.status === 'pending' ? <div className="h-2 w-2 rounded-full bg-yellow-600 mr-1.5"></div> : null}
-                                        {po.status === 'PO_REFERENCE' ? <FileText className="h-3 w-3 mr-1" /> : null}
-                                        {po.status === 'PO_CREATED' ? 'Created' : 
-                                         po.status === 'PO_PARTIALLY_RECEIVED' ? 'Partially Received' :
-                                         po.status === 'PO_CLOSED' ? 'Closed' :
-                                         po.status === 'PO_REFERENCE' ? 'Reference' :
-                                         po.status}
-                                      </Badge>
-                                      {(po.status === 'PO_PARTIALLY_RECEIVED' || po.status === 'PO_CREATED') && po.receivedQuantity !== undefined && po.pendingQuantity !== undefined && (
+                                        <SelectTrigger className="w-44 h-9 border-2 hover:border-blue-400 transition-colors min-w-[160px]">
+                                          <Badge
+                                            variant="secondary"
+                                            className={
+                                              po.status === 'PO_CLOSED' || po.status === 'received'
+                                                ? 'bg-green-500 hover:bg-green-600 text-white border-0'
+                                                : po.status === 'PO_PARTIALLY_RECEIVED' || po.status === 'reached'
+                                                ? 'bg-blue-500 hover:bg-blue-600 text-white border-0'
+                                                : po.status === 'cancelled'
+                                                ? 'bg-red-500 hover:bg-red-600 text-white border-0'
+                                                : 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                            }
+                                          >
+                                            {po.status === 'PO_CREATED' ? 'Created' : po.status === 'pending' ? 'Pending' : po.status === 'PO_PARTIALLY_RECEIVED' ? 'Partially Received' : po.status === 'PO_CLOSED' ? 'Closed' : po.status === 'received' ? 'Received' : po.status === 'reached' ? 'Reached' : po.status === 'cancelled' ? 'Cancelled' : po.status || 'Created'}
+                                          </Badge>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="PO_CREATED">Created</SelectItem>
+                                          <SelectItem value="pending">Pending</SelectItem>
+                                          <SelectItem value="PO_PARTIALLY_RECEIVED">Partially Received</SelectItem>
+                                          <SelectItem value="PO_CLOSED">Closed</SelectItem>
+                                          <SelectItem value="received">Received</SelectItem>
+                                          <SelectItem value="reached">Reached</SelectItem>
+                                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {(po.status === 'PO_PARTIALLY_RECEIVED' || po.status === 'PO_CREATED' || po.status === 'pending') && po.receivedQuantity !== undefined && po.pendingQuantity !== undefined && (
                                         <div className="text-xs text-muted-foreground">
                                           {po.receivedQuantity || 0}/{po.receivedQuantity + po.pendingQuantity} received
                                         </div>
@@ -15980,7 +16417,7 @@ export function DashboardPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {purchaseOrders
-                              .filter((po: any) => po.deliveryType === 'to_warehouse' && (po.status === 'pending' || po.status === 'PO_PARTIALLY_RECEIVED'))
+                              .filter((po: any) => po.deliveryType === 'to_warehouse' && (po.status === 'pending' || po.status === 'PO_CREATED' || po.status === 'PO_PARTIALLY_RECEIVED'))
                               .map((po: any) => (
                                 <SelectItem key={po._id} value={po.poNumber}>
                                   {po.poNumber} - {po.supplierName}
