@@ -1,9 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+
+const DROPDOWN_WIDTH = 320
+const NESTED_WIDTH = 288
+const VIEWPORT_PADDING = 8
 
 interface SubCategory {
   name: string
@@ -19,6 +24,8 @@ interface NavigationDropdownProps {
 function NestedMenuItem({ subcategory }: { subcategory: SubCategory }) {
   const [isNestedOpen, setIsNestedOpen] = useState(false)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [nestedStyle, setNestedStyle] = useState<React.CSSProperties>({})
+  const rowRef = useRef<HTMLDivElement>(null)
 
   const handleMouseEnter = () => {
     if (timeoutId) {
@@ -34,6 +41,24 @@ function NestedMenuItem({ subcategory }: { subcategory: SubCategory }) {
     }, 200)
     setTimeoutId(id)
   }
+
+  useLayoutEffect(() => {
+    if (!isNestedOpen || !rowRef.current || typeof window === "undefined") return
+    const rect = rowRef.current.getBoundingClientRect()
+    let left = rect.right + 4
+    if (left + NESTED_WIDTH > window.innerWidth - VIEWPORT_PADDING) {
+      left = rect.left - NESTED_WIDTH - 4
+    }
+    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING
+    const top = Math.max(VIEWPORT_PADDING, Math.min(rect.top, window.innerHeight - 200 - VIEWPORT_PADDING))
+    setNestedStyle({
+      position: "fixed",
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${NESTED_WIDTH}px`,
+      zIndex: 10000,
+    })
+  }, [isNestedOpen])
 
   if (!subcategory.nested) {
     return (
@@ -52,48 +77,39 @@ function NestedMenuItem({ subcategory }: { subcategory: SubCategory }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer border-b border-gray-100 transition-colors duration-150">
+      <div
+        ref={rowRef}
+        className="flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer border-b border-gray-100 transition-colors duration-150"
+      >
         <span className="font-medium">{subcategory.name}</span>
         <ChevronRight className="h-4 w-4 text-gray-500" />
       </div>
 
-      {isNestedOpen && (
-        <div 
-          className="absolute left-full top-0 w-72 bg-white border border-gray-200 shadow-xl z-[9999] rounded-lg"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          style={{
-            display: 'block',
-            visibility: 'visible',
-            opacity: '1',
-            position: 'absolute',
-            top: '0',
-            left: '100%',
-            marginLeft: '4px',
-            width: '288px',
-            backgroundColor: 'white',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            zIndex: 9999,
-            borderRadius: '8px'
-          }}
-        >
-          <div className="py-3 px-2">
-            <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
-              {subcategory.name}
+      {isNestedOpen && nestedStyle.left !== undefined &&
+        createPortal(
+          <div
+            className="bg-white border border-gray-200 shadow-xl rounded-lg"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            style={nestedStyle}
+          >
+            <div className="py-3 px-2 max-h-[70vh] overflow-y-auto">
+              <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
+                {subcategory.name}
+              </div>
+              {subcategory.nested.map((nestedItem, index) => (
+                <Link
+                  key={index}
+                  href={nestedItem.href}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-md mx-1 transition-colors duration-150"
+                >
+                  {nestedItem.name}
+                </Link>
+              ))}
             </div>
-            {subcategory.nested.map((nestedItem, index) => (
-              <Link
-                key={index}
-                href={nestedItem.href}
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-md mx-1 transition-colors duration-150"
-              >
-                {nestedItem.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
@@ -101,6 +117,8 @@ function NestedMenuItem({ subcategory }: { subcategory: SubCategory }) {
 export function NavigationDropdown({ title, subcategories }: NavigationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const handleMouseEnter = () => {
     if (timeoutId) {
@@ -117,13 +135,32 @@ export function NavigationDropdown({ title, subcategories }: NavigationDropdownP
     setTimeoutId(id)
   }
 
+  useLayoutEffect(() => {
+    if (!isOpen || !triggerRef.current || typeof window === "undefined") return
+    const rect = triggerRef.current.getBoundingClientRect()
+    let left = rect.left
+    if (left + DROPDOWN_WIDTH > window.innerWidth - VIEWPORT_PADDING) {
+      left = window.innerWidth - DROPDOWN_WIDTH - VIEWPORT_PADDING
+    }
+    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING
+    setDropdownStyle({
+      position: "fixed",
+      left: `${left}px`,
+      top: `${rect.bottom + 4}px`,
+      width: `${DROPDOWN_WIDTH}px`,
+      zIndex: 9999,
+    })
+  }, [isOpen])
+
   return (
-    <div 
-      className="relative" 
+    <div
+      className="relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button 
+      <button
+        ref={triggerRef}
+        type="button"
         className="flex items-center space-x-1 px-2 py-1 text-sm font-medium text-gray-700 hover:text-blue-600 whitespace-nowrap"
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -131,37 +168,25 @@ export function NavigationDropdown({ title, subcategories }: NavigationDropdownP
         <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
       </button>
 
-      {isOpen && (
-        <div 
-          className="absolute top-full left-0 w-80 bg-white border border-gray-200 shadow-xl z-[9999] rounded-lg"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          style={{
-            display: 'block',
-            visibility: 'visible',
-            opacity: '1',
-            position: 'absolute',
-            top: '100%',
-            left: '0',
-            marginTop: '4px',
-            width: '320px',
-            backgroundColor: 'white',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            zIndex: 9999,
-            borderRadius: '8px'
-          }}
-        >
-          <div className="py-3 px-2">
-            <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
-              {title} Categories
+      {isOpen && dropdownStyle.left !== undefined &&
+        createPortal(
+          <div
+            className="bg-white border border-gray-200 shadow-xl rounded-lg"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            style={dropdownStyle}
+          >
+            <div className="py-3 px-2 max-h-[70vh] overflow-y-auto">
+              <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
+                {title} Categories
+              </div>
+              {subcategories.map((subcategory, index) => (
+                <NestedMenuItem key={index} subcategory={subcategory} />
+              ))}
             </div>
-            {subcategories.map((subcategory, index) => (
-              <NestedMenuItem key={index} subcategory={subcategory} />
-            ))}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

@@ -8,16 +8,67 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, CheckCircle } from "lucide-react"
+import { Send, CheckCircle, Loader2 } from "lucide-react"
+
+const INQUIRY_LABELS: Record<string, string> = {
+  general: "General Inquiry",
+  vendor: "Vendor Partnership",
+  "bulk-order": "Bulk Order",
+  "custom-solution": "Custom Solution",
+  support: "Technical Support",
+  complaint: "Complaint",
+}
 
 export function ContactForm() {
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [company, setCompany] = useState("")
+  const [inquiryType, setInquiryType] = useState("")
+  const [message, setMessage] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
-    setIsSubmitted(true)
-    setTimeout(() => setIsSubmitted(false), 3000)
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const label = INQUIRY_LABELS[inquiryType] || inquiryType
+      const res = await fetch("/api/enquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "guest",
+          userEmail: email,
+          userName: [firstName, lastName].filter(Boolean).join(" ") || undefined,
+          company: company || undefined,
+          phone: phone || undefined,
+          itemType: "contact",
+          itemName: label,
+          message,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to send message")
+      }
+      setIsSubmitted(true)
+      setFirstName("")
+      setLastName("")
+      setEmail("")
+      setPhone("")
+      setCompany("")
+      setInquiryType("")
+      setMessage("")
+      setTimeout(() => setIsSubmitted(false), 5000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isSubmitted) {
@@ -43,32 +94,62 @@ export function ContactForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">First Name *</label>
-              <Input placeholder="John" required className="rounded-xl" />
+              <Input
+                placeholder="John"
+                required
+                className="rounded-xl"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Last Name *</label>
-              <Input placeholder="Doe" required className="rounded-xl" />
+              <Input
+                placeholder="Doe"
+                required
+                className="rounded-xl"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
             </div>
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">Email Address *</label>
-            <Input type="email" placeholder="john@company.com" required className="rounded-xl" />
+            <Input
+              type="email"
+              placeholder="john@company.com"
+              required
+              className="rounded-xl"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">Phone Number</label>
-            <Input type="tel" placeholder="+91 98765 43210" className="rounded-xl" />
+            <Input
+              type="tel"
+              placeholder="+91 98765 43210"
+              className="rounded-xl"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">Company Name</label>
-            <Input placeholder="Your Company Ltd." className="rounded-xl" />
+            <Input
+              placeholder="Your Company Ltd."
+              className="rounded-xl"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+            />
           </div>
 
           <div>
             <label className="text-sm font-medium mb-2 block">Inquiry Type *</label>
-            <Select required>
+            <Select required value={inquiryType} onValueChange={setInquiryType}>
               <SelectTrigger className="rounded-xl">
                 <SelectValue placeholder="Select inquiry type" />
               </SelectTrigger>
@@ -89,12 +170,33 @@ export function ContactForm() {
               placeholder="Tell us about your requirements or how we can help you..."
               required
               className="min-h-32 rounded-xl"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
             />
           </div>
 
-          <Button type="submit" size="lg" className="w-full rounded-xl hover-lift">
-            Send Message
-            <Send className="ml-2 h-4 w-4" />
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            variant="default"
+            className="w-full rounded-xl hover-lift bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                Send Message
+                <Send className="ml-2 h-4 w-4" />
+              </>
+            )}
           </Button>
         </form>
       </CardContent>

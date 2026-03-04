@@ -66,8 +66,8 @@ export function DynamicNavbar() {
 
   if (loading) {
     return (
-      <nav className="hidden lg:flex items-center justify-start w-full overflow-x-auto scrollbar-hide">
-        <div className="flex items-center space-x-1 min-w-max">
+      <nav className="hidden lg:flex items-center justify-start w-full">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
           <div className="animate-pulse bg-gray-200 h-6 w-32 rounded"></div>
           <div className="animate-pulse bg-gray-200 h-6 w-24 rounded"></div>
           <div className="animate-pulse bg-gray-200 h-6 w-28 rounded"></div>
@@ -84,10 +84,15 @@ export function DynamicNavbar() {
     )
   }
 
+  const maxPerRow = 9
+  const row1Categories = categories.slice(0, maxPerRow)
+  const row2Categories = categories.slice(maxPerRow)
+
   return (
-    <nav className="hidden lg:flex items-center justify-start w-full overflow-x-auto scrollbar-hide">
-      <div className="flex items-center space-x-1 min-w-max">
-        {categories.map((category, index) => (
+    <nav className="hidden lg:flex flex-col items-start w-full gap-y-1">
+      {/* Row 1: exactly first 9 tabs, no wrap */}
+      <div className="flex items-center flex-nowrap gap-x-1 min-w-0">
+        {row1Categories.map((category, index) => (
           <NavigationDropdown
             key={index}
             title={category.title}
@@ -95,6 +100,18 @@ export function DynamicNavbar() {
           />
         ))}
       </div>
+      {/* Row 2: 10th tab onwards, no wrap */}
+      {row2Categories.length > 0 && (
+        <div className="flex items-center flex-nowrap gap-x-1 min-w-0">
+          {row2Categories.map((category, index) => (
+            <NavigationDropdown
+              key={maxPerRow + index}
+              title={category.title}
+              subcategories={category.subcategories}
+            />
+          ))}
+        </div>
+      )}
     </nav>
   )
 }

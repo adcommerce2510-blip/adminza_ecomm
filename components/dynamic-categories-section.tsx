@@ -12,6 +12,7 @@ interface Category {
   _id: string
   name: string
   description?: string
+  image?: string
 }
 
 // Mapping category names to their images
@@ -136,7 +137,7 @@ export function DynamicCategoriesSection() {
                           clipPath: 'inset(0 0 0 0)'
                         }}>
                           <Image
-                            src={getCategoryImage(category.name)}
+                            src={category.image && category.image.trim() ? category.image : getCategoryImage(category.name)}
                             alt={category.name}
                             fill
                             className="object-cover z-0"

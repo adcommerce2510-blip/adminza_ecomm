@@ -3,8 +3,10 @@ import mongoose from 'mongoose'
 const EnquirySchema = new mongoose.Schema({
   userId: { type: String, required: true },
   userEmail: { type: String, required: true },
+  userName: String,
+  company: String,
   itemId: String,
-  itemType: { type: String, enum: ['product', 'service'], required: true },
+  itemType: { type: String, enum: ['product', 'service', 'contact'], required: true },
   itemName: { type: String, required: true },
   message: { type: String, required: true },
   phone: String,

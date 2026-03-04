@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-serif ${ibmPlexSerif.variable} ${GeistMono.variable} page-enter`}>
+      <body className={`font-serif ${ibmPlexSerif.variable} ${GeistMono.variable} page-enter overflow-x-hidden`}>
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>

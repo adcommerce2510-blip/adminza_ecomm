@@ -739,10 +739,12 @@ export function DashboardPage() {
   const [isReportsExpanded, setIsReportsExpanded] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     mainUse: "",
-    description: ""
+    description: "",
+    image: ""
   })
   const [subCategories, setSubCategories] = useState<any[]>([])
   const [isSubCategoryDialogOpen, setIsSubCategoryDialogOpen] = useState(false)
@@ -1591,21 +1593,39 @@ export function DashboardPage() {
     }
   }
 
-  // Handle category form submission
+  // Handle category form submission (add or update)
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const result = await createCategory(categoryForm)
-      if (result.success) {
-        setCategories([...categories, result.data])
-        setCategoryForm({ name: "", mainUse: "", description: "" })
-        setIsCategoryDialogOpen(false)
+      if (editingCategoryId) {
+        const response = await fetch(`/api/categories/${editingCategoryId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(categoryForm),
+        })
+        const result = await response.json()
+        if (result.success) {
+          setCategories(categories.map((c: any) => c._id === editingCategoryId ? result.data : c))
+          setCategoryForm({ name: "", mainUse: "", description: "", image: "" })
+          setEditingCategoryId(null)
+          setIsCategoryDialogOpen(false)
+          alert('Category updated successfully')
+        } else {
+          alert('Error updating category: ' + result.error)
+        }
       } else {
-        alert('Error creating category: ' + result.error)
+        const result = await createCategory(categoryForm)
+        if (result.success) {
+          setCategories([...categories, result.data])
+          setCategoryForm({ name: "", mainUse: "", description: "", image: "" })
+          setIsCategoryDialogOpen(false)
+        } else {
+          alert('Error creating category: ' + result.error)
+        }
       }
     } catch (error) {
-      console.error('Error creating category:', error)
-      alert('Error creating category')
+      console.error('Error saving category:', error)
+      alert('Error saving category')
     }
   }
 
@@ -1634,10 +1654,12 @@ export function DashboardPage() {
 
   // Edit category
   const handleEditCategory = (category: any) => {
+    setEditingCategoryId(category._id)
     setCategoryForm({
       name: category.name,
       mainUse: category.mainUse,
-      description: category.description || ""
+      description: category.description || "",
+      image: category.image || ""
     })
     setIsCategoryDialogOpen(true)
   }
@@ -7274,7 +7296,13 @@ export function DashboardPage() {
                         {activeSubSection === "level2-categories" && "Level2 Sub Categories"}
                       </CardTitle>
                       {activeSubSection === "categories" && (
-                        <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                        <Dialog open={isCategoryDialogOpen} onOpenChange={(open) => {
+                          setIsCategoryDialogOpen(open)
+                          if (!open) {
+                            setEditingCategoryId(null)
+                            setCategoryForm({ name: "", mainUse: "", description: "", image: "" })
+                          }
+                        }}>
                           <DialogTrigger asChild>
                             <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                               <Plus className="h-4 w-4 mr-2" />
@@ -7283,7 +7311,7 @@ export function DashboardPage() {
                           </DialogTrigger>
                           <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
-                              <DialogTitle>Add New Category</DialogTitle>
+                              <DialogTitle>{editingCategoryId ? "Edit Category" : "Add New Category"}</DialogTitle>
                             </DialogHeader>
                             <form onSubmit={handleCategorySubmit} className="space-y-4">
                               <div className="space-y-2">
@@ -7309,6 +7337,20 @@ export function DashboardPage() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
+                                <Label htmlFor="category-image">Image URL (for Explore Our Categories on home page)</Label>
+                                <Input
+                                  id="category-image"
+                                  placeholder="e.g., /office-stationery.jpg or https://..."
+                                  value={categoryForm.image}
+                                  onChange={(e) => setCategoryForm({ ...categoryForm, image: e.target.value })}
+                                />
+                                {categoryForm.image && (
+                                  <div className="relative w-full h-20 rounded border overflow-hidden bg-muted">
+                                    <img src={categoryForm.image} alt="Preview" className="object-cover w-full h-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="space-y-2">
                                 <Label htmlFor="description">Description (Optional)</Label>
                                 <Textarea
                                   id="description"
@@ -7322,7 +7364,7 @@ export function DashboardPage() {
                                   Cancel
                                 </Button>
                                 <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                                  Add Category
+                                  {editingCategoryId ? "Update Category" : "Add Category"}
                                 </Button>
                               </div>
                             </form>
@@ -12143,9 +12185,8 @@ export function DashboardPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm max-w-xs truncate overflow-hidden" title={enquiry.message}>
-                              {enquiry.message.split(' ').slice(0, 3).join(' ')}
-                              {enquiry.message.split(' ').length > 3 && '...'}
+                            <div className="text-sm max-w-xs truncate overflow-hidden" title={enquiry.message || ''}>
+                              {enquiry.message ? (enquiry.message.split(' ').slice(0, 3).join(' ') + (enquiry.message.split(' ').length > 3 ? '...' : '')) : '—'}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -12183,15 +12224,17 @@ export function DashboardPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSendQuotation(enquiry)}
-                                title="Send Quotation"
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
+                              {enquiry.itemType !== 'contact' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSendQuotation(enquiry)}
+                                  title="Send Quotation"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -12231,6 +12274,12 @@ export function DashboardPage() {
                 <div className="space-y-6">
                   {/* Customer Info */}
                   <div className="grid grid-cols-2 gap-4">
+                    {viewingEnquiry.userName && (
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Name</Label>
+                        <p className="text-sm font-medium mt-1">{viewingEnquiry.userName}</p>
+                      </div>
+                    )}
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">User Email</Label>
                       <p className="text-sm font-medium mt-1">{viewingEnquiry.userEmail}</p>
@@ -12239,6 +12288,12 @@ export function DashboardPage() {
                       <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
                       <p className="text-sm mt-1">{viewingEnquiry.phone || 'N/A'}</p>
                     </div>
+                    {viewingEnquiry.company && (
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Company</Label>
+                        <p className="text-sm mt-1">{viewingEnquiry.company}</p>
+                      </div>
+                    )}
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Enquiry Date</Label>
                       <p className="text-sm mt-1">{new Date(viewingEnquiry.enquiryDate).toLocaleString()}</p>
@@ -12288,13 +12343,15 @@ export function DashboardPage() {
                   )}
 
                   <div className="flex justify-end space-x-2">
-                    <Button 
-                      onClick={() => handleSendQuotation(viewingEnquiry)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Send Quotation
-                    </Button>
+                    {viewingEnquiry.itemType !== 'contact' && (
+                      <Button 
+                        onClick={() => handleSendQuotation(viewingEnquiry)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Send Quotation
+                      </Button>
+                    )}
                     <Button onClick={() => setIsViewEnquiryDialogOpen(false)}>
                       Close
                     </Button>

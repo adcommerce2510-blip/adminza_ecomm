@@ -7,7 +7,14 @@ import Level2Category from '@/models/Level2Category'
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
+  } catch (connectionError) {
+    // When MongoDB is unreachable (no internet, DNS, or Atlas down), return empty data
+    // so the navbar still loads and the site doesn't break with 500
+    console.warn('Navbar: MongoDB unreachable, returning empty categories.', connectionError instanceof Error ? connectionError.message : connectionError)
+    return NextResponse.json({ success: true, data: [] })
+  }
 
+  try {
     // Fetch all categories, subcategories, and level2 categories
     const categories = await Category.find().sort({ createdAt: 1 })
     const subcategories = await SubCategory.find().sort({ createdAt: 1 })

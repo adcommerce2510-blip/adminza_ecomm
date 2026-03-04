@@ -306,7 +306,7 @@ export function Header() {
               </div>
               <div className="flex items-center space-x-2 text-primary">
                 <Mail className="h-4 w-4" />
-                <span className="font-medium">customercare@adminza.in</span>
+                <span className="font-medium">customer@adminza.com</span>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
@@ -405,7 +405,7 @@ export function Header() {
                           <div className="w-9 h-9 bg-orange-100 group-hover:bg-orange-200 rounded-lg flex items-center justify-center mr-3 transition-colors">
                             <User className="h-4 w-4 text-orange-600" />
                           </div>
-                          <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">Accounts</span>
+                          <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">My Accounts</span>
                         </Link>
                         
                         <div className="border-t border-gray-200 my-2"></div>
@@ -485,7 +485,7 @@ export function Header() {
             className="z-[101] w-full max-w-md px-4"
             style={{ 
               position: 'fixed', 
-              top: '8%', 
+              top: '50%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)'
             }}
@@ -558,7 +558,7 @@ export function Header() {
             className="z-[101] w-full max-w-2xl px-4"
             style={{ 
               position: 'fixed', 
-              top: '6.2%', 
+              top: '50%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)',
               maxHeight: '90vh',

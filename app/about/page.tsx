@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { 
-  Building2, 
   Target, 
   MessageSquare, 
   Users, 
@@ -57,10 +56,10 @@ export default function AboutPage() {
       <Header />
       <main className="bg-white">
         {/* Hero Section - Our Story */}
-        <section className="pt-20 md:pt-28 pb-8 md:pb-12 bg-gradient-to-b from-gray-50 to-white">
+        <section className="pt-16 md:pt-20 pb-3 md:pb-5 bg-gradient-to-b from-gray-50 to-white">
           <div className="container mx-auto px-4">
             <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-start">
                 {/* Left Side - Text Content */}
                 <div 
                   id="section-story"
@@ -111,12 +110,12 @@ export default function AboutPage() {
         </section>
 
         {/* Why Choose Us Section */}
-        <section className="pt-8 md:pt-12 pb-20 bg-white">
+        <section className="pt-3 md:pt-5 pb-10 md:pb-12 bg-white">
           <div className="container mx-auto px-4">
             <div className="max-w-7xl mx-auto">
               <div 
                 id="section-why"
-                className={`text-center mb-16 transition-all duration-1000 ${
+                className={`text-center mb-8 md:mb-10 transition-all duration-1000 ${
                   isVisible["section-why"] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
               >
@@ -131,7 +130,7 @@ export default function AboutPage() {
                   We offer comprehensive solutions designed to enhance your business operations
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
                 {[
                   {
                     id: "quality",
@@ -198,10 +197,10 @@ export default function AboutPage() {
         </section>
 
         {/* Mission & Vision Section */}
-        <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+        <section className="py-10 md:py-12 bg-gradient-to-b from-gray-50 to-white">
           <div className="container mx-auto px-4">
             <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                 {/* Mission */}
                 <div
                   id="section-mission"
@@ -259,10 +258,10 @@ export default function AboutPage() {
         </section>
 
         {/* Call to Action Sections */}
-        <section className="py-20 bg-white">
+        <section className="py-10 md:py-12 bg-white">
           <div className="container mx-auto px-4">
             <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 {/* Feedback Card */}
                 <div
                   id="section-feedback"
@@ -322,7 +321,7 @@ export default function AboutPage() {
         </section>
 
         {/* Social Media Section */}
-        <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+        <section className="py-10 md:py-12 bg-gradient-to-b from-gray-50 to-white">
           <div className="container mx-auto px-4">
             <div className="max-w-5xl mx-auto">
               <div
@@ -374,32 +373,6 @@ export default function AboutPage() {
                         <span className="text-xs font-semibold">Twitter</span>
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Closing Message */}
-        <section className="py-20 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-blue-50">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div
-                id="section-closing"
-                className={`transition-all duration-1000 ${
-                  isVisible["section-closing"] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-              >
-                <Card className="border border-gray-200 shadow-xl bg-white">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500"></div>
-                  <CardContent className="p-12 text-center">
-                    <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-8 shadow-md">
-                      <Building2 className="h-10 w-10 text-white" />
-                    </div>
-                    <p className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 leading-relaxed">
-                      We look forward to welcoming you at <strong className="text-blue-700">AOSS – ADMINZA OFFICE SUPORT SOLUTIONS</strong>.
-                    </p>
                   </CardContent>
                 </Card>
               </div>
