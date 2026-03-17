@@ -29,8 +29,8 @@ export function Footer() {
   }, [])
   return (
     <footer className="border-t border-blue-700 relative z-30" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-       <div className="container mx-auto px-4 py-8">
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_1fr_minmax(0,1.5fr)_minmax(10rem,1fr)] gap-6 lg:gap-x-4">
+       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_minmax(0,1.5fr)_minmax(10rem,1fr)] gap-6 lg:gap-x-4 min-w-0">
           {/* Company Info */}
           <div className="min-w-0">
              <div className="flex flex-col items-center mb-3">
@@ -43,9 +43,9 @@ export function Footer() {
                <span className="text-2xl font-bold text-white">Adminza.in</span>
              </div>
             <div className="space-y-1">
-              <div className="flex items-center text-sm text-gray-300">
-                <MapPin className="h-4 w-4 mr-2" />
-                <span>B-427, Balaji Bhavan, Plot No.42A, Sector-11, CBD Belapur, Navi Mumbai 400614</span>
+              <div className="flex items-start text-sm text-gray-300 gap-2">
+                <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="break-words">B-427, Balaji Bhavan, Plot No.42A, Sector-11, CBD Belapur, Navi Mumbai 400614</span>
               </div>
               <div className="flex items-center text-sm text-gray-300">
                 <Phone className="h-4 w-4 mr-2" />
@@ -59,7 +59,7 @@ export function Footer() {
           </div>
 
           {/* Quick Links */}
-          <div className="mt-8 ml-6 min-w-0 lg:ml-2">
+          <div className="mt-6 sm:mt-8 ml-0 sm:ml-6 min-w-0 lg:ml-2">
              <h3 className="font-semibold mb-3 text-white text-lg">Quick Links</h3>
             <ul className="space-y-2">
               <li>
@@ -96,7 +96,7 @@ export function Footer() {
           </div>
 
           {/* Popular Services - same categories as navbar; grid 5×1, 5×2, or 5×3; each name single line; contained so no overlap */}
-          <div className="mt-8 ml-6 min-w-0 overflow-hidden lg:ml-2 lg:max-w-md">
+          <div className="mt-6 sm:mt-8 ml-0 sm:ml-6 min-w-0 overflow-hidden lg:ml-2 lg:max-w-md">
              <h3 className="font-semibold mb-3 text-white text-lg">Popular Services</h3>
             {(() => {
               const list = navbarCategories.length > 0
@@ -141,7 +141,7 @@ export function Footer() {
           </div>
 
           {/* Legal - pushed right to use space and avoid overlap */}
-          <div className="mt-8 ml-6 min-w-0 lg:ml-8 lg:pl-6 lg:justify-self-end lg:text-right">
+          <div className="mt-6 sm:mt-8 ml-0 sm:ml-6 min-w-0 lg:ml-8 lg:pl-6 lg:justify-self-end lg:text-right">
              <h3 className="font-semibold mb-3 text-white text-lg">Legal</h3>
             <ul className="space-y-2">
               <li>

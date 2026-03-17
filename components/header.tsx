@@ -11,6 +11,7 @@ import { CartDropdown } from "./cart-dropdown"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 
 export function Header() {
@@ -44,6 +45,7 @@ export function Header() {
   })
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     // Check if user is logged in
@@ -297,19 +299,19 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 shadow-lg">
       <div className="bg-gradient-to-r from-primary/10 to-accent/10 border-b border-primary/20 relative">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between py-3 text-sm">
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 text-primary">
-                <Phone className="h-4 w-4" />
-                <span className="font-medium">+91 8433661506</span>
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between py-2 sm:py-3 text-xs sm:text-sm">
+            <div className="flex items-center space-x-3 sm:space-x-6 min-w-0">
+              <div className="flex items-center space-x-1.5 sm:space-x-2 text-primary shrink-0">
+                <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="font-medium truncate">+91 8433661506</span>
               </div>
-              <div className="flex items-center space-x-2 text-primary">
+              <div className="hidden sm:flex items-center space-x-2 text-primary">
                 <Mail className="h-4 w-4" />
-                <span className="font-medium">customer@adminza.com</span>
+                <span className="font-medium truncate">customer@adminza.com</span>
               </div>
             </div>
-            <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
+            <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground shrink-0">
               <span className="font-medium">Free shipping on orders above ₹5,000</span>
               <span>•</span>
               <span className="font-medium">24/7 Customer Support</span>
@@ -318,23 +320,23 @@ export function Header() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20">
-          <Link href="/" className="flex items-center space-x-3">
-              <div className="w-32 h-32 flex items-center justify-center">
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 gap-2 min-w-0">
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3 shrink-0 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 flex items-center justify-center">
                 <img 
                   src="/logo.png" 
                   alt="Adminza Logo" 
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div className="flex flex-col items-start -ml-6">
-                <span className="text-2xl font-bold bg-clip-text text-transparent" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)', WebkitBackgroundClip: 'text'}}>Adminza.in</span>
-                <div className="text-xs text-gray-600 -mt-1">Business Solutions</div>
+              <div className="flex flex-col items-start -ml-1 sm:-ml-2 md:-ml-4">
+                <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-clip-text text-transparent" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)', WebkitBackgroundClip: 'text'}}>Adminza.in</span>
+                <div className="text-[10px] sm:text-xs text-gray-600 -mt-0.5">Business Solutions</div>
               </div>
             </Link>
 
-          <div className="hidden md:flex flex-1 max-w-4xl mx-8">
+          <div className="hidden md:flex flex-1 max-w-4xl mx-4 lg:mx-8 min-w-0">
               <div className="flex w-full items-center bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-primary/30 overflow-hidden shadow-lg hover:border-primary/50 transition-all duration-300">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 z-10" />
@@ -359,8 +361,8 @@ export function Header() {
               </Link>
             </nav>
 
-          <div className="flex items-center space-x-2">
-              {/* User Account Dropdown */}
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
+              {/* User Account Dropdown - desktop */}
               {isLoggedIn ? (
                 <div 
                   className="user-dropdown-container relative"
@@ -460,15 +462,43 @@ export function Header() {
                 <CartDropdown isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} triggerRef={cartButtonRef} />
               </div>
               
-              <Button variant="ghost" size="icon" className="lg:hidden">
-                <Menu className="h-5 w-5" />
-              </Button>
+              {/* Mobile menu */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden rounded-xl">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+                  <nav className="flex flex-col gap-1 pt-4">
+                    <Link href="/about" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
+                    <Link href="/contact" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium" onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
+                    <Link href="/cart" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ShoppingCart className="h-4 w-4" /> Cart {cartItems.length > 0 && `(${cartItems.reduce((t, i) => t + (i.quantity || 1), 0)})`}
+                    </Link>
+                    {isLoggedIn ? (
+                      <>
+                        <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                          <User className="h-4 w-4" /> My Accounts
+                        </Link>
+                        <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-2 w-full">
+                          <LogOut className="h-4 w-4" /> Logout
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2 w-full">
+                        <User className="h-4 w-4" /> Login
+                      </button>
+                    )}
+                  </nav>
+                </SheetContent>
+              </Sheet>
             </div>
         </div>
       </div>
 
-      <div className="border-t bg-card relative overflow-visible">
-        <div className="w-full px-4 overflow-visible">
+      <div className="border-t bg-card relative overflow-x-hidden min-w-0">
+        <div className="w-full min-w-0">
           <SecondaryNavbar />
         </div>
       </div>
@@ -482,7 +512,7 @@ export function Header() {
             style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
           />
           <div 
-            className="z-[101] w-full max-w-md px-4"
+            className="z-[101] w-full max-w-md px-3 sm:px-4 mx-auto max-h-[90vh] overflow-y-auto"
             style={{ 
               position: 'fixed', 
               top: '50%', 
@@ -491,8 +521,8 @@ export function Header() {
             }}
           >
             <Card className="shadow-2xl border-2">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl sm:text-2xl font-bold">Welcome Back</CardTitle>
                 <CardDescription>
                   Enter your credentials to access your account
                 </CardDescription>
@@ -555,19 +585,17 @@ export function Header() {
             style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
           />
           <div 
-            className="z-[101] w-full max-w-2xl px-4"
+            className="z-[101] w-full max-w-2xl px-3 sm:px-4 mx-auto max-h-[90vh] overflow-y-auto"
             style={{ 
               position: 'fixed', 
               top: '50%', 
               left: '50%', 
-              transform: 'translate(-50%, -50%)',
-              maxHeight: '90vh',
-              overflowY: 'auto'
+              transform: 'translate(-50%, -50%)'
             }}
           >
             <Card className="shadow-2xl border-2">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl sm:text-2xl font-bold">Create an Account</CardTitle>
                 <CardDescription>
                   Fill in your details to register
                 </CardDescription>

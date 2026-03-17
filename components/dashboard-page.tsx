@@ -48,6 +48,7 @@ import {
   Lock,
   LogOut,
   X,
+  Menu,
   ArrowRight,
   ArrowLeft,
   Copy,
@@ -737,6 +738,7 @@ export function DashboardPage() {
   const [isCustomerManagementExpanded, setIsCustomerManagementExpanded] = useState(false)
   const [isOrdersExpanded, setIsOrdersExpanded] = useState(false)
   const [isReportsExpanded, setIsReportsExpanded] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
@@ -1502,6 +1504,11 @@ export function DashboardPage() {
       }
     }
   }, [isWarehouseDropdownOpen, isWarehouseDropdownOpen2])
+
+  // Close mobile sidebar when section changes
+  useEffect(() => {
+    setIsSidebarOpen(false)
+  }, [activeSection, activeSubSection])
 
   // Refresh function for Orders tab
   const refreshOrdersData = async () => {
@@ -4878,19 +4885,36 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: '#d1e4f3' }}>
+    <div className="flex h-screen min-h-0 overflow-hidden" style={{ backgroundColor: '#d1e4f3' }}>
+      {/* Mobile sidebar overlay */}
+      <div
+        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        style={{ opacity: isSidebarOpen ? 1 : 0, pointerEvents: isSidebarOpen ? 'auto' : 'none' }}
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
       {/* Sidebar */}
-      <div className="w-64 bg-card border-r">
-        <div className="p-6">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+      <aside
+        className={`
+          w-64 bg-card border-r flex-shrink-0 flex flex-col
+          fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto
+          transform transition-transform duration-200 ease-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        <div className="p-4 lg:p-6 flex items-center justify-between lg:block">
+          <div className="flex items-center space-x-2 min-w-0">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
               <span className="text-primary-foreground font-bold text-lg">A</span>
             </div>
-            <span className="text-xl font-bold">Adminza Dashboard</span>
+            <span className="text-lg lg:text-xl font-bold truncate">Adminza Dashboard</span>
           </div>
+          <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setIsSidebarOpen(false)} aria-label="Close menu">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
-        <nav className="px-4 space-y-2">
+        <nav className="px-4 space-y-2 overflow-y-auto flex-1 min-h-0">
           <Button 
             variant={activeSection === "dashboard" ? "default" : "ghost"} 
             className="w-full justify-start"
@@ -4900,6 +4924,7 @@ export function DashboardPage() {
               setIsCustomerManagementExpanded(false)
               setIsOrdersExpanded(false)
               setIsReportsExpanded(false)
+              setIsSidebarOpen(false)
             }}
           >
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -5268,19 +5293,24 @@ export function DashboardPage() {
             )}
           </div>
         </nav>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-w-0 overflow-auto flex flex-col">
         {/* Header */}
         {activeSection !== "customer-management" && (
-          <header className="bg-card border-b px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Manage your products and services</p>
+          <header className="bg-card border-b px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setIsSidebarOpen(true)} aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold truncate">Dashboard</h1>
+                  <p className="text-sm text-muted-foreground truncate">Manage your products and services</p>
+                </div>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
                 {activeSection === "dashboard" && (
                   <Button
                     onClick={refreshDashboardData}
@@ -5309,7 +5339,7 @@ export function DashboardPage() {
         )}
 
         {/* Dashboard Content */}
-        <main className="p-6 space-y-6" style={{ backgroundColor: '#d1e4f3', minHeight: '100%' }}>
+        <main className="p-4 sm:p-6 space-y-4 sm:space-y-6 min-h-0 min-w-0" style={{ backgroundColor: '#d1e4f3', minHeight: '100%' }}>
           {/* Dashboard Section */}
           {activeSection === "dashboard" && (
             <div className="space-y-6">
@@ -7879,9 +7909,14 @@ export function DashboardPage() {
           {/*my customer Section */}
           {activeSection === "customer-management" && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight">Customer Management</h2>
-                <p className="text-muted-foreground">Manage your customers and their access</p>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={() => setIsSidebarOpen(true)} aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div className="min-w-0">
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">Customer Management</h2>
+                  <p className="text-sm text-muted-foreground truncate">Manage your customers and their access</p>
+                </div>
               </div>
 
               {/* My Customers Tab - Shows E-Shop Inventory */}
