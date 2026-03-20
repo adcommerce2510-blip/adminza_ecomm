@@ -31,8 +31,8 @@ export function BannerSlider() {
   }
 
   return (
-    <section className="relative w-full h-auto bg-background py-0 mt-0">
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 md:px-6 pt-[85px] sm:pt-[110px] md:pt-[130px] lg:pt-[185px]">
+    <section className="relative w-full h-auto bg-background py-10 sm:py-16 lg:py-24 mt-0">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 md:px-6 pt-[100px] sm:pt-[130px] md:pt-[160px] lg:pt-[210px]">
         <div className="relative w-full aspect-[16/3.5] sm:aspect-[16/3.8] md:aspect-[25/5] lg:aspect-[32/5] max-h-[90px] sm:max-h-[140px] md:max-h-[250px] lg:max-h-[300px] rounded-xl sm:rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-white">
           {/* Slider Images */}
           {sliderImages.map((image, index) => (

@@ -497,102 +497,109 @@ export function Header() {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 overflow-y-auto">
-                  <div className="bg-gradient-to-r from-primary to-accent p-6 text-white mb-2">
-                    <h2 className="text-xl font-bold">Categories</h2>
-                    <p className="text-sm opacity-80">Explore our products & services</p>
+                <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 border-r shadow-2xl flex flex-col h-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary to-accent p-6 text-white shrink-0 sticky top-0 z-20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold">Categories</h2>
+                        <p className="text-sm opacity-80">Explore our products & services</p>
+                      </div>
+                    </div>
                   </div>
-                  <nav className="flex flex-col px-2 pb-8">
-                    {/* Primary Links */}
-                    <div className="mb-4 border-b pb-2">
-                      <Link href="/" className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-bold" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
-                <Link href="/about" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>About Us</Link>
-                <Link href="/contact" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
-              </div>
+                  
+                  <div className="flex-1 overflow-y-auto pt-2 bg-white">
+                      <nav className="flex flex-col px-2 pb-12">
+                        {/* Primary Links */}
+                        <div className="mb-4 border-b pb-2">
+                          <Link href="/" className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-bold" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+                          <Link href="/about" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>About Us</Link>
+                          <Link href="/contact" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
+                        </div>
 
-                    {/* Categories Accordion */}
-                    <div className="space-y-1">
-                      {categories.map((category, idx) => (
-                        <div key={idx} className="border-b border-gray-100 last:border-0">
-                          <div 
-                            className="flex items-center justify-between px-4 py-3 text-gray-800 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors"
-                            onClick={() => toggleCategory(category.title)}
-                          >
-                            <span className="font-semibold text-sm">{category.title}</span>
-                            <div className={`transition-transform duration-300 ${expandedCategories[category.title] ? 'rotate-180' : ''}`}>
-                              <ChevronDown className="h-4 w-4 opacity-50" />
-                            </div>
-                          </div>
-                          
-                          {expandedCategories[category.title] && (
-                            <div className="pl-4 pr-1 py-1 bg-gray-50/30 rounded-lg mt-1 space-y-0.5">
-                              {category.subcategories.map((sub: any, subIdx: number) => (
-                                <div key={subIdx}>
-                                  {sub.nested && sub.nested.length > 0 ? (
-                                    <>
-                                      <div 
-                                        className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:text-blue-600 cursor-pointer"
-                                        onClick={() => toggleCategory(`${category.title}-${sub.name}`)}
-                                      >
-                                        <span className="font-medium text-[13px]">{sub.name}</span>
-                                        <div className={`transition-transform duration-200 ${expandedCategories[`${category.title}-${sub.name}`] ? 'rotate-180' : ''}`}>
-                                          <ChevronDown className="h-3 w-3 opacity-40" />
-                                        </div>
-                                      </div>
-                                      {expandedCategories[`${category.title}-${sub.name}`] && (
-                                        <div className="pl-4 border-l-2 border-primary/20 ml-2 space-y-0.5 my-1">
-                                          {sub.nested.map((nested: any, nIdx: number) => (
-                                            <Link 
-                                              key={nIdx}
-                                              href={nested.href}
-                                              className="block px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors"
-                                              onClick={() => setIsMobileMenuOpen(false)}
-                                            >
-                                              {nested.name}
-                                            </Link>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <Link 
-                                      href={sub.href}
-                                      className="block px-3 py-2 text-sm text-gray-600 hover:text-blue-600 text-[13px]"
-                                      onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                      {sub.name}
-                                    </Link>
-                                  )}
+                        {/* Categories Accordion */}
+                        <div className="space-y-1">
+                          {categories.map((category, idx) => (
+                            <div key={idx} className="border-b border-gray-100 last:border-0">
+                              <div 
+                                className="flex items-center justify-between px-4 py-3 text-gray-800 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors"
+                                onClick={() => toggleCategory(category.title)}
+                              >
+                                <span className="font-semibold text-sm">{category.title}</span>
+                                <div className={`transition-transform duration-300 ${expandedCategories[category.title] ? 'rotate-180' : ''}`}>
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
                                 </div>
-                              ))}
+                              </div>
+                              
+                              {expandedCategories[category.title] && (
+                                <div className="pl-4 pr-1 py-1 bg-gray-50/30 rounded-lg mt-1 space-y-0.5">
+                                  {category.subcategories.map((sub: any, subIdx: number) => (
+                                    <div key={subIdx}>
+                                      {sub.nested && sub.nested.length > 0 ? (
+                                        <>
+                                          <div 
+                                            className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:text-blue-600 cursor-pointer"
+                                            onClick={() => toggleCategory(`${category.title}-${sub.name}`)}
+                                          >
+                                            <span className="font-medium text-[13px]">{sub.name}</span>
+                                            <div className={`transition-transform duration-200 ${expandedCategories[`${category.title}-${sub.name}`] ? 'rotate-180' : ''}`}>
+                                              <ChevronDown className="h-3 w-3 opacity-40" />
+                                            </div>
+                                          </div>
+                                          {expandedCategories[`${category.title}-${sub.name}`] && (
+                                            <div className="pl-4 border-l-2 border-primary/20 ml-2 space-y-0.5 my-1">
+                                              {sub.nested.map((nested: any, nIdx: number) => (
+                                                <Link 
+                                                  key={nIdx}
+                                                  href={nested.href}
+                                                  className="block px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                                                  onClick={() => setIsMobileMenuOpen(false)}
+                                                >
+                                                  {nested.name}
+                                                </Link>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <Link 
+                                          href={sub.href}
+                                          className="block px-3 py-2 text-sm text-gray-600 hover:text-blue-600 text-[13px]"
+                                          onClick={() => setIsMobileMenuOpen(false)}
+                                        >
+                                          {sub.name}
+                                        </Link>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
+                          ))}
+                        </div>
+
+                        {/* Account Section */}
+                        <div className="mt-8 border-t pt-4">
+                          <p className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Account</p>
+                          
+                          {isLoggedIn ? (
+                            <>
+                              <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
+                                <User className="h-5 w-5 text-gray-400" /> My Account
+                              </Link>
+                              <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
+                                <LogOut className="h-5 w-5" /> Logout
+                              </button>
+                            </>
+                          ) : (
+                            <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-blue-600 hover:bg-blue-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
+                              <User className="h-5 w-5" /> Login / Register
+                            </button>
                           )}
                         </div>
-                      ))}
+                      </nav>
                     </div>
-
-                    {/* Account Section */}
-                    <div className="mt-8 border-t pt-4">
-                      <p className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Account</p>
-                      
-                      {isLoggedIn ? (
-                        <>
-                          <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-                            <User className="h-5 w-5 text-gray-400" /> My Account
-                          </Link>
-                          <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
-                            <LogOut className="h-5 w-5" /> Logout
-                          </button>
-                        </>
-                      ) : (
-                        <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-blue-600 hover:bg-blue-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
-                          <User className="h-5 w-5" /> Login / Register
-                        </button>
-                      )}
-                    </div>
-                  </nav>
-                </SheetContent>
-              </Sheet>
+                  </SheetContent>
+                </Sheet>
             </div>
         </div>
       </div>
@@ -661,16 +668,16 @@ export function Header() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
-        <DialogContent className="max-w-2xl p-0 border-none bg-white shadow-none !top-0 sm:!top-[40px] !left-0 sm:!left-[50%] !translate-x-0 sm:!translate-x-[-50%] !translate-y-0 h-screen sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden sm:rounded-2xl">
-          <div className="flex-shrink-0 p-6 border-b bg-white relative z-10 sm:rounded-t-2xl">
-            <DialogTitle className="text-xl sm:text-2xl font-bold">Create an Account</DialogTitle>
-            <DialogDescription className="mt-1">
-              Fill in your details to register
-            </DialogDescription>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 bg-white">
+      <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen} modal={false}>
+        <DialogContent className="max-w-2xl p-0 border-none bg-white shadow-none sm:shadow-2xl !absolute sm:!fixed !top-0 sm:!top-[40px] !left-0 sm:!left-[50%] !translate-x-0 sm:!translate-x-[-50%] !translate-y-0 h-auto sm:rounded-2xl z-50">
+          <div className="p-6 pb-20">
+            <div className="mb-6">
+              <DialogTitle className="text-xl sm:text-2xl font-bold text-gray-900">Create an Account</DialogTitle>
+              <DialogDescription className="mt-1 text-gray-500">
+                Fill in your details to register
+              </DialogDescription>
+            </div>
+            
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
@@ -819,21 +826,19 @@ export function Header() {
                 </div>
               </div>
 
-              <div className="pt-2 sticky bottom-0 bg-white pb-2">
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-bold rounded-xl shadow-lg shadow-blue-200" disabled={loading}>
-                  {loading ? "Creating Account..." : "Create Account"}
-                </Button>
-                <p className="text-sm text-center text-gray-600 mt-4">
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={switchToLogin}
-                    className="text-blue-600 hover:underline font-bold"
-                  >
-                    Login here
-                  </button>
-                </p>
-              </div>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-bold rounded-xl mt-4" disabled={loading}>
+                {loading ? "Creating Account..." : "Create Account"}
+              </Button>
+              <p className="text-sm text-center text-gray-600 mt-4">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={switchToLogin}
+                  className="text-blue-600 hover:underline font-bold"
+                >
+                  Login here
+                </button>
+              </p>
             </form>
           </div>
         </DialogContent>

@@ -67,10 +67,10 @@ export function DynamicNavbar() {
   if (loading) {
     return (
       <nav className="hidden lg:flex items-center justify-start w-full">
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-          <div className="animate-pulse bg-gray-200 h-6 w-32 rounded"></div>
-          <div className="animate-pulse bg-gray-200 h-6 w-24 rounded"></div>
-          <div className="animate-pulse bg-gray-200 h-6 w-28 rounded"></div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <div className="animate-pulse bg-gray-200 h-8 w-32 rounded-lg"></div>
+          <div className="animate-pulse bg-gray-200 h-8 w-24 rounded-lg"></div>
+          <div className="animate-pulse bg-gray-200 h-8 w-28 rounded-lg"></div>
         </div>
       </nav>
     )
@@ -85,7 +85,7 @@ export function DynamicNavbar() {
   }
 
   return (
-    <nav className="flex items-center gap-x-2 w-full max-w-full min-w-0 overflow-x-auto no-scrollbar scroll-smooth py-1">
+    <nav className="flex flex-wrap items-center gap-x-2 gap-y-2 w-full max-w-full min-w-0 py-1.5">
       {categories.map((category, index) => (
         <div key={index} className="flex-shrink-0 lg:flex-shrink">
           <NavigationDropdown
