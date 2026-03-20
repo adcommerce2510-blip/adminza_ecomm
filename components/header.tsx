@@ -464,6 +464,29 @@ export function Header() {
                   Login
                 </Button>
               )}
+
+              {/* User Account - mobile */}
+              {!isLoggedIn && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="flex md:hidden rounded-xl"
+                  onClick={() => setIsLoginDialogOpen(true)}
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              )}
+
+              {isLoggedIn && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="flex md:hidden rounded-xl"
+                  onClick={() => router.push('/my-accounts')}
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              )}
               
               {/* Cart Button with Dropdown */}
               <div 
@@ -577,25 +600,6 @@ export function Header() {
                           ))}
                         </div>
 
-                        {/* Account Section */}
-                        <div className="mt-8 border-t pt-4">
-                          <p className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Account</p>
-                          
-                          {isLoggedIn ? (
-                            <>
-                              <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-                                <User className="h-5 w-5 text-gray-400" /> My Account
-                              </Link>
-                              <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
-                                <LogOut className="h-5 w-5" /> Logout
-                              </button>
-                            </>
-                          ) : (
-                            <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-blue-600 hover:bg-blue-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
-                              <User className="h-5 w-5" /> Login / Register
-                            </button>
-                          )}
-                        </div>
                       </nav>
                     </div>
                   </SheetContent>
