@@ -85,13 +85,14 @@ export function DynamicNavbar() {
   }
 
   return (
-    <nav className="hidden lg:flex flex-wrap items-center gap-x-1 gap-y-1 w-full max-w-full min-w-0">
+    <nav className="flex items-center gap-x-2 w-full max-w-full min-w-0 overflow-x-auto no-scrollbar scroll-smooth py-1">
       {categories.map((category, index) => (
-        <NavigationDropdown
-          key={index}
-          title={category.title}
-          subcategories={category.subcategories}
-        />
+        <div key={index} className="flex-shrink-0 lg:flex-shrink">
+          <NavigationDropdown
+            title={category.title}
+            subcategories={category.subcategories}
+          />
+        </div>
       ))}
     </nav>
   )

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Search, ShoppingCart, User, Menu, Phone, Mail, LogOut } from "lucide-react"
+import { Search, ShoppingCart, User, Menu, Phone, Mail, LogOut, ChevronDown, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { DynamicNavbar } from "./dynamic-navbar"
 import { SecondaryNavbar } from "./secondary-navbar"
@@ -12,6 +12,7 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 
 export function Header() {
@@ -46,6 +47,33 @@ export function Header() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [categories, setCategories] = useState<any[]>([])
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories/navbar')
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            setCategories(result.data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching navbar categories:", error)
+      }
+    }
+
+    fetchCategories()
+  }, [])
+
+  const toggleCategory = (title: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }))
+  }
 
   useEffect(() => {
     // Check if user is logged in
@@ -351,7 +379,7 @@ export function Header() {
               </div>
             </div>
 
-            {/* Main Navigation */}
+            {/* Main Navigation - desktop */}
             <nav className="hidden lg:flex items-center space-x-8">
               <Link href="/about" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                 About
@@ -469,27 +497,99 @@ export function Header() {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-                  <nav className="flex flex-col gap-1 pt-4">
-                    <Link href="/about" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
-                    <Link href="/contact" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium" onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
-                    <Link href="/cart" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
-                      <ShoppingCart className="h-4 w-4" /> Cart {cartItems.length > 0 && `(${cartItems.reduce((t, i) => t + (i.quantity || 1), 0)})`}
-                    </Link>
-                    {isLoggedIn ? (
-                      <>
-                        <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
-                          <User className="h-4 w-4" /> My Accounts
-                        </Link>
-                        <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-2 w-full">
-                          <LogOut className="h-4 w-4" /> Logout
+                <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 overflow-y-auto">
+                  <div className="bg-gradient-to-r from-primary to-accent p-6 text-white mb-2">
+                    <h2 className="text-xl font-bold">Categories</h2>
+                    <p className="text-sm opacity-80">Explore our products & services</p>
+                  </div>
+                  <nav className="flex flex-col px-2 pb-8">
+                    {/* Primary Links */}
+                    <div className="mb-4 border-b pb-2">
+                      <Link href="/" className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-bold" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+                <Link href="/about" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>About Us</Link>
+                <Link href="/contact" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium block" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
+              </div>
+
+                    {/* Categories Accordion */}
+                    <div className="space-y-1">
+                      {categories.map((category, idx) => (
+                        <div key={idx} className="border-b border-gray-100 last:border-0">
+                          <div 
+                            className="flex items-center justify-between px-4 py-3 text-gray-800 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors"
+                            onClick={() => toggleCategory(category.title)}
+                          >
+                            <span className="font-semibold text-sm">{category.title}</span>
+                            <div className={`transition-transform duration-300 ${expandedCategories[category.title] ? 'rotate-180' : ''}`}>
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </div>
+                          </div>
+                          
+                          {expandedCategories[category.title] && (
+                            <div className="pl-4 pr-1 py-1 bg-gray-50/30 rounded-lg mt-1 space-y-0.5">
+                              {category.subcategories.map((sub: any, subIdx: number) => (
+                                <div key={subIdx}>
+                                  {sub.nested && sub.nested.length > 0 ? (
+                                    <>
+                                      <div 
+                                        className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:text-blue-600 cursor-pointer"
+                                        onClick={() => toggleCategory(`${category.title}-${sub.name}`)}
+                                      >
+                                        <span className="font-medium text-[13px]">{sub.name}</span>
+                                        <div className={`transition-transform duration-200 ${expandedCategories[`${category.title}-${sub.name}`] ? 'rotate-180' : ''}`}>
+                                          <ChevronDown className="h-3 w-3 opacity-40" />
+                                        </div>
+                                      </div>
+                                      {expandedCategories[`${category.title}-${sub.name}`] && (
+                                        <div className="pl-4 border-l-2 border-primary/20 ml-2 space-y-0.5 my-1">
+                                          {sub.nested.map((nested: any, nIdx: number) => (
+                                            <Link 
+                                              key={nIdx}
+                                              href={nested.href}
+                                              className="block px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                                              onClick={() => setIsMobileMenuOpen(false)}
+                                            >
+                                              {nested.name}
+                                            </Link>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <Link 
+                                      href={sub.href}
+                                      className="block px-3 py-2 text-sm text-gray-600 hover:text-blue-600 text-[13px]"
+                                      onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                      {sub.name}
+                                    </Link>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Account Section */}
+                    <div className="mt-8 border-t pt-4">
+                      <p className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Account</p>
+                      
+                      {isLoggedIn ? (
+                        <>
+                          <Link href="/my-accounts" className="px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
+                            <User className="h-5 w-5 text-gray-400" /> My Account
+                          </Link>
+                          <button type="button" onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
+                            <LogOut className="h-5 w-5" /> Logout
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-blue-600 hover:bg-blue-50 rounded-lg font-medium flex items-center gap-3 w-full mt-2">
+                          <User className="h-5 w-5" /> Login / Register
                         </button>
-                      </>
-                    ) : (
-                      <button type="button" onClick={() => { setIsLoginDialogOpen(true); setIsMobileMenuOpen(false); }} className="px-4 py-3 text-left text-gray-700 hover:bg-gray-100 rounded-lg font-medium flex items-center gap-2 w-full">
-                        <User className="h-4 w-4" /> Login
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </nav>
                 </SheetContent>
               </Sheet>
@@ -497,266 +597,247 @@ export function Header() {
         </div>
       </div>
 
-      <div className="border-t bg-card relative overflow-x-hidden min-w-0">
+      <div className="border-t bg-card relative overflow-x-hidden min-w-0 hidden lg:block">
         <div className="w-full min-w-0">
           <SecondaryNavbar />
         </div>
       </div>
 
-      {/* Login Card Popup */}
-      {isLoginDialogOpen && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/20 z-[100] backdrop-blur-sm" 
-            onClick={() => setIsLoginDialogOpen(false)}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-          />
-          <div 
-            className="z-[101] w-full max-w-md px-3 sm:px-4 mx-auto max-h-[90vh] overflow-y-auto"
-            style={{ 
-              position: 'fixed', 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <Card className="shadow-2xl border-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl sm:text-2xl font-bold">Welcome Back</CardTitle>
-                <CardDescription>
-                  Enter your credentials to access your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  {error && (
-                    <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                      {error}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="login-username">Username</Label>
-                    <Input
-                      id="login-username"
-                      type="text"
-                      placeholder="Enter your username"
-                      value={loginForm.username}
-                      onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                      required
-                    />
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none !top-[80px] sm:!top-[100px] !translate-y-0">
+          <Card className="shadow-2xl border-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl sm:text-2xl font-bold">Welcome Back</CardTitle>
+              <CardDescription>
+                Enter your credentials to access your account
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {error && (
+                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                    {error}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-                    {loading ? "Logging in..." : "Login"}
-                  </Button>
-                  <p className="text-sm text-center text-gray-600">
-                    Don't have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={switchToRegister}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      Register here
-                    </button>
-                  </p>
-                </form>
-              </CardContent>
-            </Card>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="login-username">Username</Label>
+                  <Input
+                    id="login-username"
+                    type="text"
+                    placeholder="Enter your username"
+                    value={loginForm.username}
+                    onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Password</Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
+                  {loading ? "Logging in..." : "Login"}
+                </Button>
+                <p className="text-sm text-center text-gray-600">
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={switchToRegister}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    Register here
+                  </button>
+                </p>
+              </form>
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+        <DialogContent className="max-w-2xl p-0 border-none bg-white shadow-none !top-0 sm:!top-[40px] !left-0 sm:!left-[50%] !translate-x-0 sm:!translate-x-[-50%] !translate-y-0 h-screen sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden sm:rounded-2xl">
+          <div className="flex-shrink-0 p-6 border-b bg-white relative z-10 sm:rounded-t-2xl">
+            <DialogTitle className="text-xl sm:text-2xl font-bold">Create an Account</DialogTitle>
+            <DialogDescription className="mt-1">
+              Fill in your details to register
+            </DialogDescription>
           </div>
-        </>
-      )}
+          
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 bg-white">
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-name">Full Name *</Label>
+                  <Input
+                    id="register-name"
+                    type="text"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Enter your full name"
+                    value={registerForm.name}
+                    onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-username">Username *</Label>
+                  <Input
+                    id="register-username"
+                    type="text"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Enter your username"
+                    value={registerForm.username}
+                    onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-      {/* Register Card Popup */}
-      {isRegisterDialogOpen && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/20 z-[100] backdrop-blur-sm" 
-            onClick={() => setIsRegisterDialogOpen(false)}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-          />
-          <div 
-            className="z-[101] w-full max-w-2xl px-3 sm:px-4 mx-auto max-h-[90vh] overflow-y-auto"
-            style={{ 
-              position: 'fixed', 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <Card className="shadow-2xl border-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl sm:text-2xl font-bold">Create an Account</CardTitle>
-                <CardDescription>
-                  Fill in your details to register
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                  {error && (
-                    <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                      {error}
-                    </div>
-                  )}
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-name">Full Name *</Label>
-                      <Input
-                        id="register-name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={registerForm.name}
-                        onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-username">Username *</Label>
-                      <Input
-                        id="register-username"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={registerForm.username}
-                        onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email *</Label>
+                  <Input
+                    id="register-email"
+                    type="email"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Enter your email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-phone">Phone *</Label>
+                  <Input
+                    id="register-phone"
+                    type="tel"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Enter your phone number"
+                    value={registerForm.phone}
+                    onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email">Email *</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-phone">Phone *</Label>
-                      <Input
-                        id="register-phone"
-                        type="tel"
-                        placeholder="Enter your phone number"
-                        value={registerForm.phone}
-                        onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-address">Address</Label>
+                <Input
+                  id="register-address"
+                  type="text"
+                  className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                  placeholder="Enter your address"
+                  value={registerForm.address}
+                  onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="register-address">Address</Label>
-                    <Input
-                      id="register-address"
-                      type="text"
-                      placeholder="Enter your address"
-                      value={registerForm.address}
-                      onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-city">City</Label>
+                  <Input
+                    id="register-city"
+                    type="text"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="City"
+                    value={registerForm.city}
+                    onChange={(e) => setRegisterForm({ ...registerForm, city: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-state">State</Label>
+                  <Input
+                    id="register-state"
+                    type="text"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="State"
+                    value={registerForm.state}
+                    onChange={(e) => setRegisterForm({ ...registerForm, state: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-zipCode">ZIP Code</Label>
+                  <Input
+                    id="register-zipCode"
+                    type="text"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="ZIP"
+                    value={registerForm.zipCode}
+                    onChange={(e) => setRegisterForm({ ...registerForm, zipCode: e.target.value })}
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-city">City</Label>
-                      <Input
-                        id="register-city"
-                        type="text"
-                        placeholder="City"
-                        value={registerForm.city}
-                        onChange={(e) => setRegisterForm({ ...registerForm, city: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-state">State</Label>
-                      <Input
-                        id="register-state"
-                        type="text"
-                        placeholder="State"
-                        value={registerForm.state}
-                        onChange={(e) => setRegisterForm({ ...registerForm, state: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-zipCode">ZIP Code</Label>
-                      <Input
-                        id="register-zipCode"
-                        type="text"
-                        placeholder="ZIP"
-                        value={registerForm.zipCode}
-                        onChange={(e) => setRegisterForm({ ...registerForm, zipCode: e.target.value })}
-                      />
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-gstNumber">GST Number (Optional)</Label>
+                <Input
+                  id="register-gstNumber"
+                  type="text"
+                  className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                  placeholder="Enter GST Number (e.g., 27XXXXX1234X1Z5)"
+                  value={registerForm.gstNumber}
+                  onChange={(e) => setRegisterForm({ ...registerForm, gstNumber: e.target.value })}
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="register-gstNumber">GST Number (Optional)</Label>
-                    <Input
-                      id="register-gstNumber"
-                      type="text"
-                      placeholder="Enter GST Number (e.g., 27XXXXX1234X1Z5)"
-                      value={registerForm.gstNumber}
-                      onChange={(e) => setRegisterForm({ ...registerForm, gstNumber: e.target.value })}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">Password *</Label>
+                  <Input
+                    id="register-password"
+                    type="password"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Create a password"
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-confirmPassword">Confirm Password *</Label>
+                  <Input
+                    id="register-confirmPassword"
+                    type="password"
+                    className="h-11 border-gray-300 focus:border-blue-500 rounded-lg"
+                    placeholder="Confirm your password"
+                    value={registerForm.confirmPassword}
+                    onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password">Password *</Label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        placeholder="Create a password"
-                        value={registerForm.password}
-                        onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-confirmPassword">Confirm Password *</Label>
-                      <Input
-                        id="register-confirmPassword"
-                        type="password"
-                        placeholder="Confirm your password"
-                        value={registerForm.confirmPassword}
-                        onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-                    {loading ? "Creating Account..." : "Create Account"}
-                  </Button>
-                  <p className="text-sm text-center text-gray-600">
-                    Already have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={switchToLogin}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      Login here
-                    </button>
-                  </p>
-                </form>
-              </CardContent>
-            </Card>
+              <div className="pt-2 sticky bottom-0 bg-white pb-2">
+                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-bold rounded-xl shadow-lg shadow-blue-200" disabled={loading}>
+                  {loading ? "Creating Account..." : "Create Account"}
+                </Button>
+                <p className="text-sm text-center text-gray-600 mt-4">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={switchToLogin}
+                    className="text-blue-600 hover:underline font-bold"
+                  >
+                    Login here
+                  </button>
+                </p>
+              </div>
+            </form>
           </div>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }

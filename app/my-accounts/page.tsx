@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Menu } from "lucide-react"
 
 export default function MyAccountsPage() {
   const router = useRouter()
@@ -21,6 +23,7 @@ export default function MyAccountsPage() {
   const [userEmail, setUserEmail] = useState("")
   const [userData, setUserData] = useState<any>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   
   // View details states
   const [viewingOrder, setViewingOrder] = useState<any>(null)
@@ -261,70 +264,124 @@ export default function MyAccountsPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <div className="w-64 bg-card border-r fixed left-0 top-0 z-10 h-screen overflow-y-auto">
+      {/* Mobile Sticky Header */}
+      <div className="lg:hidden sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center space-x-3">
+          <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-lg h-10 w-10">
+                <Menu className="h-6 w-6 text-gray-700" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] p-0 border-r-0 shadow-2xl">
+              <div className="p-6 bg-gradient-to-br from-primary to-primary/90 text-primary-foreground">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                    <User className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold block leading-tight">My Account</span>
+                    <span className="text-[10px] opacity-70 uppercase tracking-widest font-medium">Customer Portal</span>
+                  </div>
+                </div>
+              </div>
+              <nav className="p-4 space-y-1.5 mt-2">
+                {[
+                  { id: "profile", label: "Profile", icon: User },
+                  { id: "orders", label: "Orders", icon: ShoppingCart },
+                  { id: "quotations", label: "Quotations", icon: FileText },
+                  { id: "enquiries", label: "Enquiries", icon: Mail },
+                  { id: "stock", label: "Stock in Hand", icon: Package },
+                ].map((item) => (
+                  <Button 
+                    key={item.id}
+                    variant={activeSection === item.id ? "default" : "ghost"} 
+                    className={`w-full justify-start h-12 rounded-xl transition-all ${activeSection === item.id ? 'shadow-md shadow-primary/20' : 'hover:bg-gray-100'}`}
+                    onClick={() => { setActiveSection(item.id); setIsDrawerOpen(false); }}
+                  >
+                    <item.icon className={`h-5 w-5 mr-3 ${activeSection === item.id ? 'text-primary-foreground' : 'text-gray-500'}`} />
+                    <span className="font-semibold">{item.label}</span>
+                  </Button>
+                ))}
+                <div className="pt-4 mt-6 border-t px-2 text-xs font-bold text-gray-400 uppercase">Other</div>
+                <Button variant="ghost" className="w-full justify-start h-12 rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 mt-1" onClick={handleLogout}>
+                  <LogOut className="h-5 w-5 mr-3" />
+                  <span className="font-semibold">Logout</span>
+                </Button>
+              </nav>
+            </SheetContent>
+          </Sheet>
+          <div>
+            <span className="font-extrabold text-lg text-gray-800 capitalize tracking-tight">{activeSection}</span>
+            <div className="h-1 w-full bg-primary/20 rounded-full mt-0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-1 relative">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-64 bg-card border-r fixed left-0 top-[0] z-10 h-screen overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">M</span>
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <User className="h-6 w-6 text-primary" />
               </div>
-              <span className="text-xl font-bold">My Account</span>
+              <span className="text-xl font-bold">Account</span>
             </div>
           </div>
 
           <nav className="px-4 space-y-2 pb-6">
             <Button 
               variant={activeSection === "profile" ? "default" : "ghost"} 
-              className="w-full justify-start"
+              className="w-full justify-start py-6 rounded-xl"
               onClick={() => setActiveSection("profile")}
             >
-                <User className="h-4 w-4 mr-2" />
-                Profile
+                <User className="h-5 w-5 mr-3" />
+                <span className="font-semibold">Profile</span>
             </Button>
             
             <Button 
               variant={activeSection === "orders" ? "default" : "ghost"} 
-              className="w-full justify-start"
+              className="w-full justify-start py-6 rounded-xl"
               onClick={() => setActiveSection("orders")}
             >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Orders
+                <ShoppingCart className="h-5 w-5 mr-3" />
+                <span className="font-semibold">Orders</span>
             </Button>
             
             <Button 
               variant={activeSection === "quotations" ? "default" : "ghost"} 
-              className="w-full justify-start"
+              className="w-full justify-start py-6 rounded-xl"
               onClick={() => setActiveSection("quotations")}
             >
-                <FileText className="h-4 w-4 mr-2" />
-                Quotations
+                <FileText className="h-5 w-5 mr-3" />
+                <span className="font-semibold">Quotations</span>
             </Button>
             
             <Button 
               variant={activeSection === "enquiries" ? "default" : "ghost"} 
-              className="w-full justify-start"
+              className="w-full justify-start py-6 rounded-xl"
               onClick={() => setActiveSection("enquiries")}
             >
-                <Mail className="h-4 w-4 mr-2" />
-                Enquiries
+                <Mail className="h-5 w-5 mr-3" />
+                <span className="font-semibold">Enquiries</span>
             </Button>
             
             <Button 
               variant={activeSection === "stock" ? "default" : "ghost"} 
-              className="w-full justify-start"
+              className="w-full justify-start py-6 rounded-xl"
               onClick={() => setActiveSection("stock")}
             >
-              <Package className="h-4 w-4 mr-2" />
-              Stock in Hand
+              <Package className="h-5 w-5 mr-3" />
+              <span className="font-semibold">Stock in Hand</span>
             </Button>
           </nav>
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 ml-64">
-          <div className="container mx-auto px-4 py-8">
-            <div className="mb-6 flex justify-between items-center">
+        <main className="flex-1 lg:ml-64 bg-gray-50/50 min-w-0">
+          <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 min-w-0">
+            <div className="mb-6 hidden lg:flex justify-between items-center">
               <Link href="/">
                 <Button variant="outline" className="text-orange-600 border-orange-600 hover:bg-orange-50">
                   <ArrowLeft className="h-4 w-4 mr-2" />
