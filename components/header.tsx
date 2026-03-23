@@ -520,7 +520,7 @@ export function Header() {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 border-r shadow-2xl flex flex-col h-full overflow-hidden">
+                <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 border-r shadow-2xl flex flex-col h-[100dvh] max-h-screen">
                   <div className="bg-gradient-to-r from-primary to-accent p-6 text-white shrink-0 sticky top-0 z-20">
                     <div className="flex items-center justify-between">
                       <div>
@@ -530,8 +530,8 @@ export function Header() {
                     </div>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto pt-2 bg-white">
-                      <nav className="flex flex-col px-2 pb-12">
+                  <div className="flex-1 overflow-y-auto pt-2 bg-white overscroll-contain touch-pan-y no-scrollbar">
+                      <nav className="flex flex-col px-2 pb-24">
                         {/* Primary Links */}
                         <div className="mb-4 border-b pb-2">
                           <Link href="/" className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-bold" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
