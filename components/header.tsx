@@ -365,14 +365,15 @@ export function Header() {
             </Link>
 
           <div className="hidden md:flex flex-1 max-w-4xl mx-4 lg:mx-8 min-w-0">
-              <div className="flex w-full items-center bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-primary/30 overflow-hidden shadow-lg hover:border-primary/50 transition-all duration-300">
+              <div className="flex w-full items-center bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-primary/30 overflow-hidden shadow-lg hover:border-primary/70 focus-within:border-primary/80 focus-within:ring-4 focus-within:ring-primary/10 transition-all duration-300">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 z-10" />
                   <Input
                     placeholder="Search for products, services, or vendors..."
-                    className="pl-12 pr-4 h-12 text-base bg-transparent border-0 focus:ring-0 focus:outline-none w-full placeholder:text-gray-500"
+                    className="pl-12 pr-4 h-12 text-base bg-transparent border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 w-full placeholder:text-gray-500 shadow-none shadow-transparent"
                   />
                 </div>
+
                 <Button size="sm" className="rounded-l-none rounded-r-2xl px-6 h-12 text-sm font-medium flex-shrink-0">
                   Search
                 </Button>
@@ -555,7 +556,9 @@ export function Header() {
                               
                               {expandedCategories[category.title] && (
                                 <div className="pl-4 pr-1 py-1 bg-gray-50/30 rounded-lg mt-1 space-y-0.5">
-                                  {category.subcategories.map((sub: any, subIdx: number) => (
+                                  {category.subcategories
+                                    .filter((sub: any) => !sub.name.toLowerCase().includes('view all'))
+                                    .map((sub: any, subIdx: number) => (
                                     <div key={subIdx}>
                                       {sub.nested && sub.nested.length > 0 ? (
                                         <>

@@ -16,6 +16,7 @@ import { MessageCircle, Star, Search, Filter, Grid, List, Clock, MapPin } from "
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toSlug } from "@/lib/slug"
 
 interface Service {
   _id: string
@@ -292,7 +293,7 @@ export default function AllServicesPage() {
           }>
             {sortedServices.map((service) => (
               <Card key={service._id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <Link href={`/service/${service._id}`}>
+                <Link href={`/${toSlug(service.name)}`}>
                   <CardContent className="p-0">
                     {/* Image */}
                     <div className="aspect-square bg-gray-100 overflow-hidden relative">

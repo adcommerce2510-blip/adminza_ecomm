@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShoppingCart, Star, Search, Filter, Grid, List } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { toSlug } from "@/lib/slug"
 
 interface Product {
   _id: string
@@ -291,7 +292,7 @@ export default function AllProductsPage() {
           }>
             {sortedProducts.map((product) => (
               <Card key={product._id} className="overflow-hidden hover:shadow-lg transition-shadow" style={{ overflow: 'hidden' }}>
-                <Link href={`/product/${product._id}`} style={{ display: 'block', overflow: 'hidden' }}>
+                <Link href={`/${toSlug(product.name)}`} style={{ display: 'block', overflow: 'hidden' }}>
                   <CardContent className="p-0 overflow-hidden" style={{ overflow: 'hidden' }}>
                     {/* Image */}
                     <div className="aspect-square bg-gray-100 overflow-hidden relative" style={{ overflow: 'hidden !important', isolation: 'isolate', position: 'relative', contain: 'layout style paint' }}>

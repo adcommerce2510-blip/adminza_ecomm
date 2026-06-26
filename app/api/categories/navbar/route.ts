@@ -4,12 +4,12 @@ import Category from '@/models/Category'
 import SubCategory from '@/models/SubCategory'
 import Level2Category from '@/models/Level2Category'
 
+import { toSlug } from '@/lib/slug'
+
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
   } catch (connectionError) {
-    // When MongoDB is unreachable (no internet, DNS, or Atlas down), return empty data
-    // so the navbar still loads and the site doesn't break with 500
     console.warn('Navbar: MongoDB unreachable, returning empty categories.', connectionError instanceof Error ? connectionError.message : connectionError)
     return NextResponse.json({ success: true, data: [] })
   }
@@ -31,10 +31,10 @@ export async function GET(request: NextRequest) {
 
         return {
           name: sub.name,
-          href: `/products?category=${encodeURIComponent(category.name)}&subcategory=${encodeURIComponent(sub.name)}`,
+          href: `/${toSlug(sub.name)}`,
           nested: subLevel2Categories.length > 0 ? subLevel2Categories.map(level2 => ({
             name: level2.name,
-            href: `/products?category=${encodeURIComponent(category.name)}&subcategory=${encodeURIComponent(sub.name)}&subSubcategory=${encodeURIComponent(level2.name)}`
+            href: `/${toSlug(level2.name)}`
           })) : undefined
         }
       })
@@ -42,15 +42,10 @@ export async function GET(request: NextRequest) {
       return {
         title: category.name,
         subcategories: [
-          {
-            name: `View All ${category.mainUse?.toLowerCase() === 'service' ? 'Services' : 'Products'}`,
-            href: category.mainUse?.toLowerCase() === 'service' ? `/services?category=${encodeURIComponent(category.name)}` : `/products?category=${encodeURIComponent(category.name)}`
-          },
+
           ...categorySubcategories.map(sub => ({
             ...sub,
-            href: category.mainUse?.toLowerCase() === 'service' 
-              ? `/services?category=${encodeURIComponent(category.name)}&subcategory=${encodeURIComponent(sub.name)}`
-              : sub.href
+            href: `/${toSlug(sub.name)}`
           }))
         ]
       }
@@ -60,6 +55,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: navbarData
     })
+
   } catch (error) {
     console.error('Error fetching navbar data:', error)
     return NextResponse.json(

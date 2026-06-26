@@ -94,9 +94,7 @@ function NestedMenuItem({ subcategory }: { subcategory: SubCategory }) {
             style={nestedStyle}
           >
             <div className="py-3 px-2 max-h-[70vh] overflow-y-auto">
-              <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
-                {subcategory.name}
-              </div>
+              {/* Sub-header removed for consistency */}
               {subcategory.nested.map((nestedItem, index) => (
                 <Link
                   key={index}
@@ -177,10 +175,10 @@ export function NavigationDropdown({ title, subcategories }: NavigationDropdownP
             style={dropdownStyle}
           >
             <div className="py-3 px-2 max-h-[70vh] overflow-y-auto">
-              <div className="text-sm text-gray-700 font-medium mb-3 px-3 py-2 bg-gray-50 rounded-md mx-2">
-                {title} Categories
-              </div>
-              {subcategories.map((subcategory, index) => (
+              {/* Header removed as requested */}
+              {subcategories
+                .filter(sub => !sub.name.toLowerCase().includes('view all'))
+                .map((subcategory, index) => (
                 <NestedMenuItem key={index} subcategory={subcategory} />
               ))}
             </div>

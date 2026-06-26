@@ -134,99 +134,68 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section className="py-24 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 relative overflow-hidden">
-          {/* Background decorative elements */}
+        <section className="py-12 bg-[#020617] relative overflow-hidden">
+          {/* Extremely compact background elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full blur-2xl animate-pulse"></div>
-            <div className="absolute bottom-20 right-10 w-40 h-40 bg-gradient-to-br from-accent/10 to-primary/10 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-br from-primary/5 to-accent/5 rounded-full blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
+            <div className="absolute top-0 left-0 w-full h-full opacity-[0.01]" style={{ backgroundImage: 'radial-gradient(#3b82f6 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+            <div className="absolute top-5 left-5 w-32 h-32 bg-blue-600/10 rounded-full blur-[80px] animate-pulse"></div>
+            <div className="absolute bottom-5 right-5 w-48 h-48 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse" style={{animationDelay: '1.5s'}}></div>
           </div>
 
           <div className="container mx-auto px-4 relative z-10">
             <AnimatedWrapper animation="fade-in-down">
-              <div className="text-center max-w-4xl mx-auto mb-20">
+              <div className="text-center max-w-4xl mx-auto mb-10">
                 <AnimatedWrapper animation="scale-in" delay={200}>
-                  <Badge className="mb-6 px-4 py-2 text-white font-semibold rounded-full hover-bounce how-it-works-badge" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                    Simple Process
+                  <Badge className="mb-4 px-3 py-1 bg-blue-500/10 text-blue-400 border-blue-500/20 font-bold rounded-full uppercase tracking-[0.2em] text-[8px]">
+                    Process
                   </Badge>
                 </AnimatedWrapper>
                 <AnimatedWrapper animation="fade-in-up" delay={400}>
-                  <h2 className="text-5xl md:text-6xl font-bold mb-8 leading-tight">
-                    How It <span className="gradient-text bg-gradient-to-r from-teal-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">Works</span>
+                  <h2 className="text-4xl md:text-5xl font-black mb-6 leading-none tracking-tighter text-white">
+                    Four Steps To <span className="text-blue-500">Excellence</span>
                   </h2>
                 </AnimatedWrapper>
                 <AnimatedWrapper animation="fade-in-up" delay={600}>
-                  <p className="text-xl text-slate-600 leading-relaxed font-medium">
-                    Getting started with Adminza is quick and easy. Follow these simple steps.
+                  <p className="text-base md:text-lg text-slate-400 leading-relaxed font-medium max-w-xl mx-auto opacity-80">
+                    Seamless integration designed to streamline your business procurement.
                   </p>
                 </AnimatedWrapper>
               </div>
             </AnimatedWrapper>
 
-            <StaggeredContainer className="grid md:grid-cols-4 gap-8 max-w-7xl mx-auto" staggerDelay={200}>
+            <StaggeredContainer className="grid grid-cols-1 md:grid-cols-4 gap-x-12 gap-y-16 max-w-6xl mx-auto" staggerDelay={150}>
               {[
-                {
-                  step: "01",
-                  title: "Browse Categories",
-                  description: "Explore our wide range of products and services across 50+ categories.",
-                  icon: "🔍"
-                },
-                {
-                  step: "02",
-                  title: "Select & Compare",
-                  description: "Compare vendors, check reviews, and choose the best option for your needs.",
-                  icon: "⚖️"
-                },
-                {
-                  step: "03",
-                  title: "Place Order",
-                  description: "Add to cart, review your order, and proceed with secure payment.",
-                  icon: "🛒"
-                },
-                {
-                  step: "04",
-                  title: "Get Delivered",
-                  description: "Receive your order with tracking updates and quality assurance.",
-                  icon: "🚚"
-                }
+                { step: "01", title: "Browse", description: "Explore our catalog of premium office products." },
+                { step: "02", title: "Select", description: "Leverage verified vendor insights for informed decisions." },
+                { step: "03", title: "Execute", description: "Streamlined procurement with secure payments." },
+                { step: "04", title: "Deliver", description: "Timely logistics ensures your operations miss no beats." }
               ].map((step, index) => (
-                <div key={index} className="relative how-it-works-step">
-                  <div className="text-center relative">
-                    {/* Step number circle */}
-                    <div className="w-24 h-24 mx-auto mb-8 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-2xl how-it-works-circle relative overflow-hidden" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-                      <span className="relative z-10">{step.step}</span>
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-full"></div>
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>
+                <div key={index} className="relative group">
+                  <div className="text-center flex flex-col items-center">
+                    {/* Architectural Step Indicator */}
+                    <div className="w-16 h-16 mb-8 rounded-full flex items-center justify-center text-white font-black text-xl relative transition-all duration-500 group-hover:scale-110 border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg">
+                      <div className="absolute inset-0 bg-blue-600 rounded-full opacity-5 group-hover:opacity-20 transition-opacity"></div>
+                      <span className="relative z-10 text-blue-500">{step.step}</span>
                     </div>
                     
-                    {/* Step title */}
-                    <h3 className="text-2xl font-bold mb-4 text-slate-800 how-it-works-title">{step.title}</h3>
-                    
-                    {/* Step description */}
-                    <p className="text-slate-600 leading-relaxed text-base font-medium how-it-works-description">{step.description}</p>
-                    
-                    {/* Decorative icon */}
-                    <div className="mt-6 text-3xl opacity-20 hover-bounce">{step.icon}</div>
+                    <h3 className="text-lg font-bold mb-3 text-white tracking-tight">{step.title}</h3>
+                    <p className="text-slate-400 leading-relaxed text-sm lg:text-base font-medium opacity-80 px-4">{step.description}</p>
                   </div>
                   
-                  {/* Connecting line */}
+                  {/* Architectural Connecting Line */}
                   {index < 3 && (
-                    <div className="hidden md:block absolute top-12 left-[75%] w-[50%] h-1 rounded-full opacity-40 how-it-works-line" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-                      <div className="absolute inset-0 rounded-full animate-pulse opacity-60" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}></div>
-                    </div>
+                    <div className="hidden md:block absolute top-8 left-[65%] w-[70%] h-px bg-gradient-to-r from-blue-500/30 to-transparent"></div>
                   )}
                 </div>
               ))}
             </StaggeredContainer>
 
             <AnimatedWrapper animation="fade-in-up" delay={800}>
-              <div className="text-center mt-16">
+              <div className="text-center mt-12 pb-4">
                 <Link href="/categories">
-                  <Button size="lg" className="text-xl px-12 py-6 rounded-2xl text-white font-bold shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-105 how-it-works-button" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
+                  <Button size="lg" className="h-14 px-12 rounded-full border border-blue-500/30 bg-blue-600/5 text-blue-400 font-black hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-[0_10px_40px_-15px_rgba(37,99,235,0.3)] hover:shadow-[0_20px_50px_-10px_rgba(37,99,235,0.5)] group/cta">
                     Get Started Now
-                    <ArrowRight className="ml-3 h-6 w-6 animate-bounce" />
+                    <ArrowRight className="ml-3 h-5 w-5 group-hover/cta:translate-x-1.5 transition-transform" strokeWidth={3} />
                   </Button>
                 </Link>
               </div>
@@ -235,31 +204,30 @@ export default function HomePage() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-24 bg-gradient-to-br from-slate-50 to-gray-100 relative overflow-hidden">
-          {/* Background decorative elements */}
+        <section className="py-28 bg-white border-t border-slate-100 relative overflow-hidden">
+          {/* Professional background decorative elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-10 right-20 w-32 h-32 bg-gradient-to-br from-primary/5 to-accent/5 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-10 left-20 w-40 h-40 bg-gradient-to-br from-accent/5 to-primary/5 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
-            <div className="absolute top-1/3 right-1/3 w-24 h-24 bg-gradient-to-br from-primary/3 to-accent/3 rounded-full blur-2xl animate-pulse" style={{animationDelay: '3s'}}></div>
+            <div className="absolute top-0 left-0 w-full h-full opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#0300ff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+            <div className="absolute top-20 right-10 w-64 h-64 bg-blue-600/5 rounded-full blur-[100px] animate-pulse"></div>
+            <div className="absolute bottom-20 left-10 w-96 h-96 bg-indigo-600/5 rounded-full blur-[120px] animate-pulse" style={{animationDelay: '1.5s'}}></div>
           </div>
 
           <div className="container mx-auto px-4 relative z-10">
             <AnimatedWrapper animation="fade-in-down">
               <div className="text-center max-w-4xl mx-auto mb-20">
                 <AnimatedWrapper animation="scale-in" delay={200}>
-                  <Badge className="mb-6 px-4 py-2 text-white font-semibold rounded-full hover-bounce testimonials-badge" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)'}}>
-                    <Star className="w-4 h-4 mr-2" />
-                    Testimonials
+                  <Badge className="mb-6 bg-blue-600/10 text-blue-700 border-none px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-[11px]" variant="outline">
+                    Client Success
                   </Badge>
                 </AnimatedWrapper>
                 <AnimatedWrapper animation="fade-in-up" delay={400}>
-                  <h2 className="text-5xl md:text-6xl font-bold mb-8 leading-tight">
-                    What Our <span className="gradient-text bg-clip-text text-transparent" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)', WebkitBackgroundClip: 'text'}}>Customers Say</span>
+                  <h2 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 tracking-tighter leading-[1.05]">
+                    Trusted By <span className="bg-gradient-to-r from-blue-700 to-indigo-800 bg-clip-text text-transparent">Industry Leaders</span>
                   </h2>
                 </AnimatedWrapper>
                 <AnimatedWrapper animation="fade-in-up" delay={600}>
-                  <p className="text-xl text-slate-600 leading-relaxed font-medium">
-                    Don't just take our word for it. Here's what businesses across India say about us.
+                  <p className="text-lg md:text-xl text-slate-600 leading-relaxed font-medium max-w-2xl mx-auto">
+                    Discover how businesses across the nation leverage our comprehensive solutions to achieve operational excellence.
                   </p>
                 </AnimatedWrapper>
               </div>

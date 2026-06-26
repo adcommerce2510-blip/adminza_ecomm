@@ -1,12 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRightIcon } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
-import { AnimatedWrapper, StaggeredContainer } from "@/components/animated-wrapper"
 
 interface Category {
   _id: string
@@ -15,37 +11,25 @@ interface Category {
   image?: string
 }
 
-// Mapping category names to their images
-const getCategoryImage = (categoryName: string): string => {
-  const categoryImageMap: { [key: string]: string } = {
-    "Office Stationery": "/office-stationery-bundle.jpg",
-    "IT Support": "/it-network-setup-office.jpg",
-    "IT Support & Network": "/it-network-setup-office.jpg",
-    "Cleaning Solutions": "/office-cleaning.png",
-    "Business Promotion": "/corporate-branding-materials.jpg",
-    "Office Support Solutions": "/modern-office-desk-setup.jpg",
-    "Office Furniture & Interior": "/modern-office-desk-front-view.jpg",
-    "Printing Solutions": "/large-format-printing-banners.jpg",
-    "AMC Services": "/ergonomic-office-chair.png",
-    "Corporate Gifting": "/desk-organizer-set.jpg"
+// Professional Unsplash fallbacks for categories
+const getPublicImage = (categoryName: string): string => {
+  const imageMap: { [key: string]: string } = {
+    "Office Stationery": "https://images.unsplash.com/photo-1542744094-3a31f272c490?q=80&w=1000&auto=format&fit=crop",
+    "IT Support": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000&auto=format&fit=crop",
+    "IT Support & Network": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop",
+    "Cleaning Solutions": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1000&auto=format&fit=crop",
+    "Business Promotion": "https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop",
+    "Office Support Solutions": "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop",
+    "Office Furniture & Interior": "https://images.unsplash.com/photo-1531973576160-7125cd663d86?q=80&w=1000&auto=format&fit=crop",
+    "Printing Solutions": "https://images.unsplash.com/photo-1562654501-a0ccc0af3fb1?q=80&w=1000&auto=format&fit=crop",
+    "AMC Services": "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=1000&auto=format&fit=crop",
+    "Corporate Gifting": "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?q=80&w=1000&auto=format&fit=crop"
   }
   
-  return categoryImageMap[categoryName] || "/placeholder.jpg"
+  return imageMap[categoryName] || "https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1000&auto=format&fit=crop"
 }
 
-// Check if category needs upward shift
-const shouldShiftImageUp = (categoryName: string): boolean => {
-  const categoriesToShiftUp = [
-    "Office Stationery",
-    "Printing Solutions",
-    "Business Promotion",
-    "IT Support",
-    "Office Support Solutions",
-    "Office Furniture & Interior"
-  ]
-  
-  return categoriesToShiftUp.includes(categoryName)
-}
+import { toSlug } from "@/lib/slug"
 
 export function DynamicCategoriesSection() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -73,20 +57,11 @@ export function DynamicCategoriesSection() {
 
   if (loading) {
     return (
-      <section className="py-8 bg-white">
+      <section className="pt-2 pb-20 bg-white relative z-10">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <div className="animate-pulse bg-gray-200 h-8 w-64 mx-auto mb-4 rounded"></div>
-            <div className="animate-pulse bg-gray-200 h-4 w-96 mx-auto rounded"></div>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 h-48 rounded-lg mb-4"></div>
-                <div className="bg-gray-200 h-6 w-3/4 mb-2 rounded"></div>
-                <div className="bg-gray-200 h-4 w-full mb-2 rounded"></div>
-                <div className="bg-gray-200 h-4 w-2/3 rounded"></div>
-              </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-[450px] rounded-xl bg-slate-50 animate-pulse"></div>
             ))}
           </div>
         </div>
@@ -95,88 +70,61 @@ export function DynamicCategoriesSection() {
   }
 
   return (
-    <section className="py-2 bg-white">
-      <div className="container mx-auto px-4">
-        <AnimatedWrapper animation="fade-in-up">
-          <div className="text-center max-w-3xl mx-auto mb-6 pt-4">
-            <AnimatedWrapper animation="fade-in" delay={200}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                Explore Our <span className="gradient-text bg-clip-text text-transparent" style={{background: 'linear-gradient(135deg, #000000 0%, #0300ff 100%)', WebkitBackgroundClip: 'text'}}>Categories</span>
-              </h2>
-            </AnimatedWrapper>
-            <AnimatedWrapper animation="fade-in-up" delay={400}>
-              <p className="text-xl text-gray-600 leading-relaxed">
-                Discover a wide range of products and services tailored for your business needs
-              </p>
-            </AnimatedWrapper>
-          </div>
-        </AnimatedWrapper>
+    <section className="pt-2 pb-20 bg-white relative z-10">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="text-blue-600 font-bold uppercase tracking-[0.2em] text-[10px] block mb-4">Our Excellence</span>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tighter uppercase leading-tight">
+            Explore Categories
+          </h2>
+          <div className="w-12 h-1 bg-blue-600 mx-auto rounded-full opacity-80"></div>
+        </div>
 
-        <StaggeredContainer>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {categories.map((category, index) => {
-              const categorySlug = category.name.toLowerCase().replace(/\s+/g, '-')
-              
-              return (
-                <AnimatedWrapper key={category._id} animation="fade-in-up" delay={index * 100}>
-                  <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden bg-white rounded-lg" style={{ overflow: 'hidden' }}>
-                    <CardContent className="p-0 overflow-hidden relative rounded-lg" style={{ overflow: 'hidden' }}>
-                      <div className="h-1.5 bg-white overflow-hidden"></div>
-                      <div className="relative w-full bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden z-0 rounded-t-lg" style={{ height: '192px', width: '100%', maxHeight: '192px', minHeight: '192px', overflow: 'hidden', clipPath: 'inset(0 0 0 0)' }}>
-                        <div className="absolute left-0 right-0 overflow-hidden rounded-t-lg" style={{ 
-                          width: '100%',
-                          ...(shouldShiftImageUp(category.name) ? {
-                            top: '-80px',
-                            height: 'calc(100% + 80px)'
-                          } : {
-                            top: '0',
-                            bottom: '0',
-                            height: '192px',
-                            maxHeight: '192px'
-                          }),
-                          clipPath: 'inset(0 0 0 0)'
-                        }}>
-                          <Image
-                            src={category.image && category.image.trim() ? category.image : getCategoryImage(category.name)}
-                            alt={category.name}
-                            fill
-                            className="object-cover z-0"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            style={{ 
-                              objectFit: 'cover', 
-                              objectPosition: 'top'
-                            }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.jpg"
-                            }}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="p-6 relative z-20 bg-white rounded-b-lg overflow-hidden">
-                        <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
-                          {category.name}
-                        </h3>
-                        
-                        <p className="text-gray-600 mb-6 leading-relaxed">
-                          {category.description || `Explore our comprehensive range of ${category.name.toLowerCase()} products and services designed for your business needs.`}
-                        </p>
-                        
-                        <Link href={`/categories/${categorySlug}`}>
-                          <Button className="w-full group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 bg-gray-100 text-gray-700 hover:bg-gray-200">
-                            Explore Category
-                            <ArrowRightIcon className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </AnimatedWrapper>
-              )
-            })}
-          </div>
-        </StaggeredContainer>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
+          {categories.map((category) => {
+            const bgUrl = getPublicImage(category.name)
+            
+            return (
+              <Link 
+                key={category._id} 
+                href={`/${toSlug(category.name)}`} 
+                className="group relative block h-[450px] w-full rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700"
+              >
+
+                {/* Image Layer - Strictly clipped by parent rounded-2xl */}
+                <div 
+                  className="absolute inset-0 w-full h-full bg-cover transition-transform duration-1000 group-hover:scale-105"
+                  style={{ 
+                    backgroundImage: `url(${bgUrl})`,
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  {/* Subtle darkening overlay for readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/10 to-transparent opacity-70 group-hover:opacity-85 transition-opacity duration-500"></div>
+                </div>
+
+                {/* Content Overlay */}
+                <div className="absolute inset-x-0 bottom-0 p-8 pt-20 flex flex-col justify-end text-white transform transition-transform duration-500 group-hover:-translate-y-2">
+                  <h3 className="text-3xl lg:text-4xl font-extrabold mb-5 uppercase tracking-tighter leading-none break-words drop-shadow-lg">
+                    {category.name}
+                  </h3>
+                  
+                  <div className="flex items-center gap-2 group-hover:gap-4 transition-all duration-500">
+                    <span className="text-[10px] font-black tracking-[0.25em] uppercase opacity-70 group-hover:opacity-100 transition-opacity">
+                      Experience Quality
+                    </span>
+                    <div className="h-px w-6 bg-blue-600 group-hover:w-10 transition-all duration-500"></div>
+                    <ArrowRightIcon className="w-4 h-4 text-blue-600 transition-transform" strokeWidth={3} />
+                  </div>
+                </div>
+
+                {/* Inset Border on Hover */}
+                <div className="absolute inset-0 border-[6px] border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"></div>
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </section>
   )

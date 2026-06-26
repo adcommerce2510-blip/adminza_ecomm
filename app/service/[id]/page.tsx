@@ -169,7 +169,7 @@ export default function ServiceDetailPage({ params }: { params: { id: string } }
     )
   }
 
-  const images = service.images && service.images.length > 0 ? service.images : ["/placeholder.jpg"]
+   const images = service.images && service.images.length > 0 ? service.images : ["/placeholder.jpg"]
 
   return (
     <div className="min-h-screen">
