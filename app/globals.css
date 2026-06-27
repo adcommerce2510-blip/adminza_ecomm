@@ -1127,8 +1127,9 @@ div[data-radix-dialog-content]:has(.add-inventory-modal) {
     overflow-x: hidden;
   }
 
-  /* Ensure no parent containers clip the toast */
-  * {
+  /* Ensure toast notifications are not clipped by parents */
+  .toast-container,
+  .toast-container * {
     overflow: visible !important;
   }
 
@@ -1524,17 +1525,10 @@ header .cart-dropdown-container .cart-dropdown {
   width: 100% !important;
 }
 
-/* CRITICAL: Force ALL images in all dialog content to be small */
+/* CRITICAL: Force images in dialog content only — do NOT apply globally */
 [data-radix-dialog-content] img {
   max-height: 48px !important;
   overflow: hidden !important;
-  object-fit: cover !important;
-}
-
-/* ABSOLUTE OVERRIDE: Force ALL img tags to not overflow */
-img {
-  overflow: hidden !important;
-  max-height: 48px !important;
   object-fit: cover !important;
 }
 
@@ -1613,4 +1607,97 @@ form img,
 
 .service-description-scroll::-webkit-scrollbar-corner {
   background: #f1f5f9 !important;
+}
+
+/* Explore Categories - simple image + title cards */
+.explore-categories-section {
+  position: relative;
+  z-index: 10;
+  background: #ffffff;
+  padding: 3rem 0 4rem;
+}
+
+.explore-categories-section__inner {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.explore-categories-section__title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2.5rem;
+}
+
+.explore-categories-grid {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .explore-categories-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .explore-categories-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+.explore-category-card {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  text-decoration: none !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease;
+}
+
+.explore-category-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.explore-category-card__media {
+  display: block !important;
+  width: 100% !important;
+  height: 200px !important;
+  flex: 0 0 200px !important;
+  overflow: hidden !important;
+  background-color: #f1f5f9;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+.explore-category-card__label {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  padding: 14px 16px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  line-height: 1.4 !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.explore-category-card--loading {
+  height: 260px;
+  background: #f1f5f9;
+  animation: pulse 2s ease-in-out infinite;
 }

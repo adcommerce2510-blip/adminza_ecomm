@@ -7367,16 +7367,45 @@ export function DashboardPage() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="category-image">Image URL (for Explore Our Categories on home page)</Label>
+                                <Label htmlFor="category-image">Category Image (shown on home page)</Label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full"
+                                  disabled={uploading}
+                                  onClick={() => document.getElementById("category-file-upload")?.click()}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  {uploading ? "Uploading..." : "Upload Image"}
+                                </Button>
                                 <Input
-                                  id="category-image"
-                                  placeholder="e.g., /office-stationery.jpg or https://..."
-                                  value={categoryForm.image}
-                                  onChange={(e) => setCategoryForm({ ...categoryForm, image: e.target.value })}
+                                  id="category-file-upload"
+                                  type="file"
+                                  accept="image/*"
+                                  className="sr-only"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) {
+                                      const url = await handleImageUpload(file, "categories")
+                                      if (url) setCategoryForm({ ...categoryForm, image: url })
+                                    }
+                                    e.target.value = ""
+                                  }}
                                 />
                                 {categoryForm.image && (
-                                  <div className="relative w-full h-20 rounded border overflow-hidden bg-muted">
-                                    <img src={categoryForm.image} alt="Preview" className="object-cover w-full h-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                  <div className="flex items-center justify-between rounded border bg-gray-50 p-2">
+                                    <span className="text-sm text-gray-700 truncate flex-1">
+                                      {categoryForm.image.split("/").pop() || categoryForm.image}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="ml-2 h-6 w-6 rounded-full p-0 text-red-500 hover:text-red-700"
+                                      onClick={() => setCategoryForm({ ...categoryForm, image: "" })}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
                                   </div>
                                 )}
                               </div>

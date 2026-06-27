@@ -196,12 +196,10 @@ export default function SlugPage({ params }: { params: { slug: string } }) {
             <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
               <div className="aspect-square relative overflow-hidden">
                 {images.length > 0 ? (
-                  <div className="absolute inset-0" style={{ transform: 'translateY(42%)' }}>
-                    <Image
-                      src={images[selectedImage]} alt={item.name} fill
-                      className="object-cover" style={{ objectPosition: 'center' }}
-                    />
-                  </div>
+                  <Image
+                    src={images[selectedImage]} alt={item.name} fill
+                    className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ShoppingCart className="h-24 w-24 text-gray-300" />

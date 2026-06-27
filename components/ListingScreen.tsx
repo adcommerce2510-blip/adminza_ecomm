@@ -175,9 +175,7 @@ export function ListingScreen({
                   <CardContent className="p-0">
                     <div className="aspect-square bg-gray-100 relative overflow-hidden">
                       {item.images?.[0] ? (
-                        <div className="absolute inset-0" style={{ transform: 'translateY(40%)' }}>
-                          <Image src={item.images[0]} alt={item.name} fill className="object-cover" />
-                        </div>
+                        <Image src={item.images[0]} alt={item.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
                           {mainUse === 'product' ? <ShoppingCart className="h-12 w-12" /> : <MessageCircle className="h-12 w-12" />}
