@@ -31,7 +31,7 @@ export function BannerSlider() {
   }
 
   return (
-    <section className="relative w-full bg-background pt-[130px] sm:pt-[140px] md:pt-[160px] lg:pt-[180px] overflow-hidden">
+    <section className="relative w-full bg-background overflow-hidden">
       <div className="w-full">
         <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] md:aspect-[21/9] lg:aspect-[24/7] max-h-[70vh] bg-slate-50">
           {/* Slider Images */}
