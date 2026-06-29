@@ -1701,3 +1701,18 @@ form img,
   background: #f1f5f9;
   animation: pulse 2s ease-in-out infinite;
 }
+
+/* Dashboard table text truncation (overrides global overflow: visible) */
+.dashboard-text-truncate {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.dashboard-table-wrap {
+  overflow-x: auto !important;
+  width: 100%;
+}

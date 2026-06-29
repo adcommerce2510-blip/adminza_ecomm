@@ -573,7 +573,10 @@ const InvoiceReportsSection = ({
       {/* Filter Section */}
       <Card className="border-orange-200">
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-orange-600" />
+            Filters
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -705,6 +708,408 @@ const InvoiceReportsSection = ({
   )
 }
 
+// Supplier Reports Section Component
+const SupplierReportsSection = ({
+  purchaseOrders,
+  wasteEntries,
+  startDate,
+  endDate,
+  selectedSupplier,
+  entryType,
+  onStartDateChange,
+  onEndDateChange,
+  onSupplierChange,
+  onEntryTypeChange,
+  generatingReport,
+  onGenerateReport,
+}: {
+  purchaseOrders: any[]
+  wasteEntries: any[]
+  startDate: string
+  endDate: string
+  selectedSupplier: string
+  entryType: string
+  onStartDateChange: (date: string) => void
+  onEndDateChange: (date: string) => void
+  onSupplierChange: (supplier: string) => void
+  onEntryTypeChange: (type: string) => void
+  generatingReport: boolean
+  onGenerateReport: (generating: boolean) => void
+}) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 5
+
+  const allRows = [
+    ...purchaseOrders.flatMap((po: any) =>
+      (po.items || []).map((item: any) => ({
+        supplierName: po.supplierName || 'Unknown',
+        productName: item.productName,
+        qty: item.quantity,
+        type: 'Purchase' as const,
+        status: po.status || 'pending',
+        reason: po.deliveryType === 'direct_to_customer' ? 'Direct to customer' : 'To warehouse',
+        date: po.createdAt || po.updatedAt || new Date().toISOString(),
+      }))
+    ),
+    ...wasteEntries.map((we: any) => ({
+      supplierName: we.supplierName || 'Unknown',
+      productName: we.productName,
+      qty: -Math.abs(we.quantity || 0),
+      type: 'Waste' as const,
+      status: we.reason || 'waste',
+      reason: we.description || we.reason || 'Waste entry',
+      date: we.date || we.createdAt || new Date().toISOString(),
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const uniqueSuppliers = Array.from(
+    new Set(allRows.map((row) => row.supplierName).filter(Boolean))
+  ).sort()
+
+  const filteredRows = allRows.filter((row) => {
+    let dateMatch = true
+    if (startDate && endDate) {
+      const rowDate = new Date(row.date)
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      dateMatch = rowDate >= start && rowDate <= end
+    }
+
+    const supplierMatch = !selectedSupplier || row.supplierName === selectedSupplier
+    const typeMatch =
+      entryType === 'all' ||
+      (entryType === 'purchase' && row.type === 'Purchase') ||
+      (entryType === 'waste' && row.type === 'Waste')
+
+    return dateMatch && supplierMatch && typeMatch
+  })
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const startIndex = (safePage - 1) * perPage
+  const paginatedRows = filteredRows.slice(startIndex, startIndex + perPage)
+
+  const purchaseCount = allRows.filter((r) => r.type === 'Purchase').length
+  const wasteCount = allRows.filter((r) => r.type === 'Waste').length
+
+  const generateExcelReport = () => {
+    if (!startDate && !endDate && !selectedSupplier && entryType === 'all') {
+      alert('Please apply at least one filter before generating a report.')
+      return
+    }
+
+    if (filteredRows.length === 0) {
+      alert('No supplier entries found matching the selected filters.')
+      return
+    }
+
+    onGenerateReport(true)
+
+    try {
+      const excelData = filteredRows.map((row, index) => ({
+        'SR. NO': index + 1,
+        SUPPLIER: row.supplierName,
+        PRODUCT: row.productName,
+        QUANTITY: row.qty,
+        TYPE: row.type,
+        STATUS: row.status,
+        'STATUS / REASON': row.reason,
+        'DATE & TIME': new Date(row.date).toLocaleString('en-IN'),
+      }))
+
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      ws['!cols'] = [
+        { wch: 8 },
+        { wch: 22 },
+        { wch: 28 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 30 },
+        { wch: 22 },
+      ]
+      XLSX.utils.book_append_sheet(wb, ws, 'Supplier Report')
+
+      let filename = 'Supplier_Report'
+      if (startDate && endDate) {
+        const start = new Date(startDate).toLocaleDateString('en-GB').replace(/\//g, '-')
+        const end = new Date(endDate).toLocaleDateString('en-GB').replace(/\//g, '-')
+        filename += `_${start}_to_${end}`
+      }
+      if (selectedSupplier) {
+        filename += `_${selectedSupplier.replace(/[^a-zA-Z0-9]/g, '_')}`
+      }
+      if (entryType !== 'all') {
+        filename += `_${entryType}`
+      }
+      filename += '.xlsx'
+
+      XLSX.writeFile(wb, filename)
+      onGenerateReport(false)
+    } catch (error) {
+      console.error('Error generating supplier report:', error)
+      alert('Error generating report. Please try again.')
+      onGenerateReport(false)
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [startDate, endDate, selectedSupplier, entryType])
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-indigo-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Entries</p>
+                <p className="text-2xl font-bold">{allRows.length}</p>
+              </div>
+              <Package className="h-8 w-8 text-indigo-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Purchase Entries</p>
+                <p className="text-2xl font-bold">{purchaseCount}</p>
+              </div>
+              <ShoppingCart className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Waste Entries</p>
+                <p className="text-2xl font-bold">{wasteCount}</p>
+              </div>
+              <Trash2 className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-indigo-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-indigo-600" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="supplier-start-date">Start Date</Label>
+              <Input
+                id="supplier-start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => onStartDateChange(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="supplier-end-date">End Date</Label>
+              <Input
+                id="supplier-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => onEndDateChange(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="supplier-select">Supplier</Label>
+              <Select
+                value={selectedSupplier || 'all'}
+                onValueChange={(value) => onSupplierChange(value === 'all' ? '' : value)}
+              >
+                <SelectTrigger className="mt-1 w-full min-w-0">
+                  <SelectValue placeholder="All Suppliers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Suppliers</SelectItem>
+                  {uniqueSuppliers.map((supplier) => (
+                    <SelectItem key={supplier} value={supplier}>
+                      {supplier}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="entry-type">Entry Type</Label>
+              <Select value={entryType} onValueChange={onEntryTypeChange}>
+                <SelectTrigger className="mt-1 w-full min-w-0">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="purchase">Purchase Only</SelectItem>
+                  <SelectItem value="waste">Waste Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredRows.length} entr{filteredRows.length === 1 ? 'y' : 'ies'}
+              {(startDate || endDate || selectedSupplier || entryType !== 'all') && (
+                <span className="ml-2">
+                  (Filtered
+                  {startDate && endDate && `: ${startDate} to ${endDate}`}
+                  {selectedSupplier && `, Supplier: ${selectedSupplier}`}
+                  {entryType !== 'all' && `, Type: ${entryType}`})
+                </span>
+              )}
+            </div>
+            <Button
+              onClick={generateExcelReport}
+              disabled={
+                generatingReport ||
+                (!startDate && !endDate && !selectedSupplier && entryType === 'all')
+              }
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {generatingReport ? 'Generating...' : 'Generate Report'}
+              <Download className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-indigo-200">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Supplier Entries</CardTitle>
+            <div className="text-sm text-muted-foreground">
+              {filteredRows.length === 0
+                ? '0 entries'
+                : `${startIndex + 1}-${Math.min(startIndex + perPage, filteredRows.length)} of ${filteredRows.length}`}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="dashboard-table-wrap">
+            <Table className="min-w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status / Reason</TableHead>
+                  <TableHead>Date & Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="text-muted-foreground">
+                        <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No supplier entries found</p>
+                        <p className="text-sm">
+                          {allRows.length === 0
+                            ? 'Purchase orders and waste entries will appear here.'
+                            : 'No entries match the selected filters.'}
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedRows.map((row, idx) => (
+                    <TableRow key={`${row.supplierName}-${row.productName}-${startIndex + idx}`}>
+                      <TableCell className="font-medium max-w-[160px]">
+                        <span className="dashboard-text-truncate" title={row.supplierName}>
+                          {row.supplierName}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <span className="dashboard-text-truncate" title={row.productName}>
+                          {row.productName}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={row.qty < 0 ? 'destructive' : 'default'}>{row.qty}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={row.type === 'Waste' ? 'destructive' : 'secondary'}>
+                          {row.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                        <span
+                          className="dashboard-text-truncate"
+                          title={`${row.status}${row.reason ? ` - ${row.reason}` : ''}`}
+                        >
+                          {row.status}
+                          {row.reason ? ` - ${row.reason}` : ''}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {new Date(row.date).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {filteredRows.length > perPage && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {safePage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safePage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={safePage === page ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="min-w-[40px]"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={safePage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const [products, setProducts] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
@@ -734,10 +1139,20 @@ export function DashboardPage() {
   const serviceExcelFileInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState("dashboard")
   const [activeSubSection, setActiveSubSection] = useState("all-items")
-  const [isProductsManagementExpanded, setIsProductsManagementExpanded] = useState(false)
-  const [isCustomerManagementExpanded, setIsCustomerManagementExpanded] = useState(false)
-  const [isOrdersExpanded, setIsOrdersExpanded] = useState(false)
-  const [isReportsExpanded, setIsReportsExpanded] = useState(false)
+  const [expandedSidebarSection, setExpandedSidebarSection] = useState<string | null>(null)
+
+  const toggleSidebarSection = (section: string) => {
+    setExpandedSidebarSection((prev) => (prev === section ? null : section))
+  }
+
+  const openSidebarSection = (section: string) => {
+    setExpandedSidebarSection(section)
+  }
+
+  const closeSidebarSections = () => {
+    setExpandedSidebarSection(null)
+  }
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [categories, setCategories] = useState<any[]>([])
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
@@ -872,6 +1287,11 @@ export function DashboardPage() {
   const [invoiceEndDate, setInvoiceEndDate] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState("")
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [supplierStartDate, setSupplierStartDate] = useState("")
+  const [supplierEndDate, setSupplierEndDate] = useState("")
+  const [selectedSupplierReport, setSelectedSupplierReport] = useState("")
+  const [supplierEntryType, setSupplierEntryType] = useState("all")
+  const [generatingSupplierReport, setGeneratingSupplierReport] = useState(false)
   const [isViewProductDetailsDialogOpen, setIsViewProductDetailsDialogOpen] = useState(false)
   const [viewingProductDetails, setViewingProductDetails] = useState<any>(null)
   const viewProductModalRef = useRef<HTMLDivElement>(null)
@@ -911,7 +1331,6 @@ export function DashboardPage() {
   const [eshopEditForm, setEshopEditForm] = useState<{ id: string; productName: string; quantity: number; price: number; notes?: string }>({ id: "", productName: "", quantity: 1, price: 0, notes: "" })
 
   // Inventory Management States
-  const [isInventoryManagementExpanded, setIsInventoryManagementExpanded] = useState(false)
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
   const [currentPOPage, setCurrentPOPage] = useState(1)
   const poPerPage = 5
@@ -1095,7 +1514,7 @@ export function DashboardPage() {
       
       // Handle specific subsections
       if (section === 'customer-management') {
-        setIsCustomerManagementExpanded(true)
+        openSidebarSection('customer-management')
         if (subsection === 'my-customers') {
           setActiveSubSection('my-customers')
         }
@@ -3137,6 +3556,79 @@ export function DashboardPage() {
     }
   }
 
+  // Download Excel template for bulk upload
+  const downloadExcelTemplate = (
+    headers: string[],
+    sampleRow: (string | number)[],
+    filename: string
+  ) => {
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, sampleRow])
+    worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(header.length + 4, 16) }))
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
+    XLSX.writeFile(workbook, filename)
+  }
+
+  const downloadProductExcelTemplate = () => {
+    downloadExcelTemplate(
+      [
+        'Product Name',
+        'Main Category',
+        'Sub Category',
+        'Level2 Category',
+        'MRP',
+        'Offer Price',
+        'GST in %',
+        'Stocks Quantity',
+        'Description',
+        'HSL Code',
+        'Images',
+      ],
+      [
+        'Sample Product',
+        'Office Stationery',
+        'Pens',
+        '',
+        100,
+        80,
+        18,
+        50,
+        'Sample product description',
+        '',
+        'product-image.jpg',
+      ],
+      'product-upload-template.xlsx'
+    )
+  }
+
+  const downloadServiceExcelTemplate = () => {
+    downloadExcelTemplate(
+      [
+        'Service Name',
+        'Main Category',
+        'Sub Category',
+        'Level 2 Category',
+        'Price',
+        'Duration',
+        'Location',
+        'Description',
+        'Images',
+      ],
+      [
+        'Sample Service',
+        'IT Support',
+        'Network Setup',
+        '',
+        5000,
+        '2-3 days',
+        'Mumbai',
+        'Sample service description',
+        'service-image.jpg',
+      ],
+      'service-upload-template.xlsx'
+    )
+  }
+
   // Handle Excel file upload and parse
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -4896,13 +5388,13 @@ export function DashboardPage() {
       {/* Sidebar */}
       <aside
         className={`
-          w-64 bg-card border-r flex-shrink-0 flex flex-col
-          fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto
+          w-64 bg-card border-r flex flex-col h-screen
+          fixed inset-y-0 left-0 z-50 shadow-lg
           transform transition-transform duration-200 ease-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        <div className="p-4 lg:p-6 flex items-center justify-between lg:block">
+        <div className="p-4 lg:p-6 flex items-center justify-between lg:block shrink-0 border-b">
           <div className="flex items-center space-x-2 min-w-0">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
               <span className="text-primary-foreground font-bold text-lg">A</span>
@@ -4914,16 +5406,13 @@ export function DashboardPage() {
           </Button>
         </div>
 
-        <nav className="px-4 space-y-2 overflow-y-auto flex-1 min-h-0">
+        <nav className="px-4 py-3 space-y-2">
           <Button 
             variant={activeSection === "dashboard" ? "default" : "ghost"} 
             className="w-full justify-start"
             onClick={() => {
               setActiveSection("dashboard")
-              setIsProductsManagementExpanded(false)
-              setIsCustomerManagementExpanded(false)
-              setIsOrdersExpanded(false)
-              setIsReportsExpanded(false)
+              closeSidebarSections()
               setIsSidebarOpen(false)
             }}
           >
@@ -4938,7 +5427,7 @@ export function DashboardPage() {
                 variant="ghost" 
                 className="w-full justify-start"
                 onClick={() => {
-                  setIsProductsManagementExpanded(!isProductsManagementExpanded)
+                  toggleSidebarSection('products-management')
                 }}
               >
                 <Package className="h-4 w-4 mr-2" />
@@ -4948,14 +5437,14 @@ export function DashboardPage() {
                 variant="ghost" 
                 size="sm" 
                 className="p-1"
-                onClick={() => setIsProductsManagementExpanded(!isProductsManagementExpanded)}
+                onClick={() => toggleSidebarSection('products-management')}
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isProductsManagementExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${expandedSidebarSection === 'products-management' ? 'rotate-180' : ''}`} />
               </Button>
             </div>
             
             {/* Sub-items - Only show when expanded */}
-            {isProductsManagementExpanded && (
+            {expandedSidebarSection === 'products-management' && (
               <div className="ml-6 space-y-1">
                 <Button 
                   variant={activeSubSection === "categories" ? "default" : "ghost"} 
@@ -5023,7 +5512,7 @@ export function DashboardPage() {
                 variant="ghost" 
                 className="w-full justify-start"
                 onClick={() => {
-                  setIsCustomerManagementExpanded(!isCustomerManagementExpanded)
+                  toggleSidebarSection('customer-management')
                 }}
               >
                 <Users className="h-4 w-4 mr-2" />
@@ -5033,14 +5522,14 @@ export function DashboardPage() {
                 variant="ghost" 
                 size="sm" 
                 className="p-1"
-                onClick={() => setIsCustomerManagementExpanded(!isCustomerManagementExpanded)}
+                onClick={() => toggleSidebarSection('customer-management')}
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isCustomerManagementExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${expandedSidebarSection === 'customer-management' ? 'rotate-180' : ''}`} />
               </Button>
             </div>
             
             {/* Sub-items - Only show when expanded */}
-            {isCustomerManagementExpanded && (
+            {expandedSidebarSection === 'customer-management' && (
               <div className="ml-6 space-y-1">
                 <Button 
                   variant={activeSubSection === "my-customers" ? "default" : "ghost"} 
@@ -5100,7 +5589,7 @@ export function DashboardPage() {
                 variant="ghost" 
                 className="w-full justify-start"
                 onClick={() => {
-                  setIsInventoryManagementExpanded(!isInventoryManagementExpanded)
+                  toggleSidebarSection('inventory-management')
                 }}
               >
                 <Package className="h-4 w-4 mr-2" />
@@ -5110,14 +5599,14 @@ export function DashboardPage() {
                 variant="ghost" 
                 size="sm" 
                 className="p-1"
-                onClick={() => setIsInventoryManagementExpanded(!isInventoryManagementExpanded)}
+                onClick={() => toggleSidebarSection('inventory-management')}
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isInventoryManagementExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${expandedSidebarSection === 'inventory-management' ? 'rotate-180' : ''}`} />
               </Button>
             </div>
             
             {/* Sub-items - Only show when expanded */}
-            {isInventoryManagementExpanded && (
+            {expandedSidebarSection === 'inventory-management' && (
               <div className="ml-6 space-y-1">
                 <Button 
                   variant={activeSubSection === "purchase-orders" ? "default" : "ghost"} 
@@ -5185,7 +5674,7 @@ export function DashboardPage() {
                 variant="ghost" 
                 className="w-full justify-start"
                 onClick={() => {
-                  setIsOrdersExpanded(!isOrdersExpanded)
+                  toggleSidebarSection('orders')
                 }}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
@@ -5195,14 +5684,14 @@ export function DashboardPage() {
                 variant="ghost" 
                 size="sm" 
                 className="p-1"
-                onClick={() => setIsOrdersExpanded(!isOrdersExpanded)}
+                onClick={() => toggleSidebarSection('orders')}
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOrdersExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${expandedSidebarSection === 'orders' ? 'rotate-180' : ''}`} />
               </Button>
             </div>
             
             {/* Sub-items - Only show when expanded */}
-            {isOrdersExpanded && (
+            {expandedSidebarSection === 'orders' && (
               <div className="ml-6 space-y-1">
                 <Button 
                   variant={activeSubSection === "all-orders" ? "default" : "ghost"} 
@@ -5248,7 +5737,7 @@ export function DashboardPage() {
                 variant="ghost" 
                 className="w-full justify-start"
                 onClick={() => {
-                  setIsReportsExpanded(!isReportsExpanded)
+                  toggleSidebarSection('reports')
                 }}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -5258,14 +5747,14 @@ export function DashboardPage() {
                 variant="ghost" 
                 size="sm" 
                 className="p-1"
-                onClick={() => setIsReportsExpanded(!isReportsExpanded)}
+                onClick={() => toggleSidebarSection('reports')}
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isReportsExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform ${expandedSidebarSection === 'reports' ? 'rotate-180' : ''}`} />
               </Button>
             </div>
             
             {/* Sub-items - Only show when expanded */}
-            {isReportsExpanded && (
+            {expandedSidebarSection === 'reports' && (
               <div className="ml-6 space-y-1">
                 <Button 
                   variant={activeSubSection === "invoice-reports" ? "default" : "ghost"} 
@@ -5296,7 +5785,7 @@ export function DashboardPage() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 min-w-0 overflow-auto flex flex-col">
+      <div className="flex-1 min-w-0 overflow-auto flex flex-col w-full lg:pl-64">
         {/* Header */}
         {activeSection !== "customer-management" && (
           <header className="bg-card border-b px-4 sm:px-6 py-3 sm:py-4 shrink-0">
@@ -5438,7 +5927,7 @@ export function DashboardPage() {
                   <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle>Services</CardTitle>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <input
                             ref={serviceExcelFileInputRef}
                             type="file"
@@ -5447,6 +5936,14 @@ export function DashboardPage() {
                             onChange={handleServiceExcelUpload}
                             disabled={uploadingServiceExcel}
                           />
+                          <Button
+                            variant="outline"
+                            onClick={downloadServiceExcelTemplate}
+                            className="border-green-600 text-green-600 hover:bg-green-50"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Template
+                          </Button>
                           <Button
                             variant="outline"
                             onClick={() => serviceExcelFileInputRef.current?.click()}
@@ -6221,7 +6718,7 @@ export function DashboardPage() {
                   <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle>Products</CardTitle>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <input
                             ref={excelFileInputRef}
                             type="file"
@@ -6230,6 +6727,14 @@ export function DashboardPage() {
                             onChange={handleExcelUpload}
                             disabled={uploadingExcel}
                           />
+                          <Button
+                            variant="outline"
+                            onClick={downloadProductExcelTemplate}
+                            className="border-green-600 text-green-600 hover:bg-green-50"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Template
+                          </Button>
                           <Button
                             variant="outline"
                             onClick={() => excelFileInputRef.current?.click()}
@@ -9003,11 +9508,20 @@ export function DashboardPage() {
                                       {customer.phone}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
-                                    <div className="flex items-center gap-2 text-sm max-w-xs truncate">
-                                      <MapPin className="h-4 w-4 text-orange-500" />
-                                      {customer.address ? `${customer.address}, ${customer.city || ''}` : '-'}
-                                    </div>
+                                  <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4 max-w-[200px]">
+                                    {(() => {
+                                      const addressText = customer.address
+                                        ? [customer.address, customer.city].filter(Boolean).join(', ')
+                                        : '-'
+                                      return (
+                                        <div className="flex items-center gap-2 text-sm min-w-0">
+                                          <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                                          <span className="dashboard-text-truncate" title={addressText}>
+                                            {addressText}
+                                          </span>
+                                        </div>
+                                      )
+                                    })()}
                                   </TableCell>
                                   <TableCell className="text-slate-700 group-hover:text-slate-900 transition-colors py-4">
                                     <div className="flex items-center gap-2 text-sm">
@@ -10854,17 +11368,17 @@ export function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-visible">
-                  <Table>
+                  <div className="dashboard-table-wrap">
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow className="transition-all duration-200" style={{ backgroundColor: '#1e2961' }}>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Order No</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Customer Name</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Address</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Total Price</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Date & Time</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Status</TableHead>
-                        <TableHead className="font-bold py-4" style={{ color: '#ffffff' }}>Actions</TableHead>
+                        <TableHead className="font-bold py-4 w-[120px]" style={{ color: '#ffffff' }}>Order No</TableHead>
+                        <TableHead className="font-bold py-4 w-[180px]" style={{ color: '#ffffff' }}>Customer Name</TableHead>
+                        <TableHead className="font-bold py-4 w-[220px]" style={{ color: '#ffffff' }}>Address</TableHead>
+                        <TableHead className="font-bold py-4 w-[110px]" style={{ color: '#ffffff' }}>Total Price</TableHead>
+                        <TableHead className="font-bold py-4 w-[130px]" style={{ color: '#ffffff' }}>Date & Time</TableHead>
+                        <TableHead className="font-bold py-4 w-[140px]" style={{ color: '#ffffff' }}>Status</TableHead>
+                        <TableHead className="font-bold py-4 w-[100px]" style={{ color: '#ffffff' }}>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -10930,16 +11444,23 @@ export function DashboardPage() {
                                   {order.customerPhone || order.phone || order.userEmail || ''}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4">
-                                <div className="flex items-center gap-2 text-sm min-w-[200px] max-w-md">
-                                  <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0" />
-                                  <span className="break-words">
-                                  {order.shippingAddress?.street || order.shippingAddress?.city 
-                                    ? `${order.shippingAddress.street || ''}, ${order.shippingAddress.city || ''}`
-                                    : '-'
-                                  }
-                                  </span>
-                                </div>
+                              <TableCell className="text-slate-600 group-hover:text-slate-800 transition-colors py-4 max-w-[220px]">
+                                {(() => {
+                                  const addressText =
+                                    order.shippingAddress?.street || order.shippingAddress?.city
+                                      ? [order.shippingAddress.street, order.shippingAddress.city, order.shippingAddress.state]
+                                          .filter(Boolean)
+                                          .join(', ')
+                                      : '-'
+                                  return (
+                                    <div className="flex items-center gap-2 text-sm min-w-0">
+                                      <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                                      <span className="dashboard-text-truncate" title={addressText}>
+                                        {addressText}
+                                      </span>
+                                    </div>
+                                  )
+                                })()}
                               </TableCell>
                               <TableCell className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors py-4">
                                 <div>
@@ -10956,7 +11477,7 @@ export function DashboardPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="py-4">
-                                <div className="flex items-center space-x-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <Badge 
                                     variant={order.status === "Confirmed" ? "default" : "secondary"}
                                     className={order.status === "Confirmed" ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200 transition-colors" : ""}
@@ -10983,7 +11504,7 @@ export function DashboardPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <Button 
                                     variant="ghost"
                                       size="sm"
@@ -12259,7 +12780,7 @@ export function DashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Badge variant={enquiry.status === 'responded' ? 'default' : 'secondary'}>
                                 {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
                               </Badge>
@@ -12279,7 +12800,7 @@ export function DashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -13016,8 +13537,14 @@ export function DashboardPage() {
           {activeSection === "reports" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-3xl font-bold tracking-tight">Invoice Reports</h2>
-                <p className="text-muted-foreground">View analytics and generate reports for invoices</p>
+                <h2 className="text-3xl font-bold tracking-tight">
+                  {activeSubSection === "supplier-reports" ? "Supplier Reports" : "Invoice Reports"}
+                </h2>
+                <p className="text-muted-foreground">
+                  {activeSubSection === "supplier-reports"
+                    ? "Track supplier purchases, waste entries, and generate filtered reports"
+                    : "View analytics and generate reports for invoices"}
+                </p>
               </div>
 
               {/* Invoice Reports Tab */}
@@ -13037,97 +13564,20 @@ export function DashboardPage() {
 
               {/* Supplier Reports Tab */}
               {activeSubSection === "supplier-reports" && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Supplier Reports</CardTitle>
-                    <CardDescription>
-                      Track products received from suppliers, including damaged/lost entries with timestamps.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <Table className="min-w-full">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Supplier</TableHead>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Qty</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Status / Reason</TableHead>
-                            <TableHead>Date & Time</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(() => {
-                            const rows = [
-                              // Purchase order items
-                              ...purchaseOrders.flatMap((po: any) =>
-                                (po.items || []).map((item: any) => ({
-                                  supplierName: po.supplierName || 'Unknown',
-                                  productName: item.productName,
-                                  qty: item.quantity,
-                                  type: 'Purchase',
-                                  status: po.status || 'pending',
-                                  reason: po.deliveryType === 'direct_to_customer' ? 'Direct to customer' : 'To warehouse',
-                                  date: po.createdAt || po.updatedAt || new Date().toISOString(),
-                                  isDamage: false
-                                }))
-                              ),
-                              // Waste entries (damaged/lost)
-                              ...wasteEntries.map((we: any) => ({
-                                supplierName: we.supplierName || 'Unknown',
-                                productName: we.productName,
-                                qty: -Math.abs(we.quantity || 0),
-                                type: 'Waste',
-                                status: we.reason || 'waste',
-                                reason: we.description || we.reason || 'Waste entry',
-                                date: we.date || we.createdAt || new Date().toISOString(),
-                                isDamage: true
-                              }))
-                            ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-                            if (rows.length === 0) {
-                              return (
-                                <TableRow>
-                                  <TableCell colSpan={6} className="text-center py-8">
-                                    <div className="text-muted-foreground">
-                                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                      <p>No supplier entries found</p>
-                                      <p className="text-sm">Purchase orders and waste entries will appear here.</p>
-            </div>
-                                  </TableCell>
-                                </TableRow>
-                              )
-                            }
-
-                            return rows.map((row, idx) => (
-                              <TableRow key={`${row.supplierName}-${row.productName}-${idx}`}>
-                                <TableCell className="font-medium">{row.supplierName}</TableCell>
-                                <TableCell>{row.productName}</TableCell>
-                                <TableCell>
-                                  <Badge variant={row.qty < 0 ? "destructive" : "default"}>
-                                    {row.qty}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={row.type === 'Waste' ? "destructive" : "secondary"}>
-                                    {row.type}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {row.status}{row.reason ? ` - ${row.reason}` : ''}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {new Date(row.date).toLocaleString()}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          })()}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
+                <SupplierReportsSection
+                  purchaseOrders={purchaseOrders}
+                  wasteEntries={wasteEntries}
+                  startDate={supplierStartDate}
+                  endDate={supplierEndDate}
+                  selectedSupplier={selectedSupplierReport}
+                  entryType={supplierEntryType}
+                  onStartDateChange={setSupplierStartDate}
+                  onEndDateChange={setSupplierEndDate}
+                  onSupplierChange={setSelectedSupplierReport}
+                  onEntryTypeChange={setSupplierEntryType}
+                  generatingReport={generatingSupplierReport}
+                  onGenerateReport={setGeneratingSupplierReport}
+                />
               )}
             </div>
           )}
@@ -13139,33 +13589,33 @@ export function DashboardPage() {
                 <DialogTitle>Create Purchase Order</DialogTitle>
               </DialogHeader>
               <form onSubmit={handlePOSubmit} className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="min-w-0">
                     <Label>PO Type *</Label>
                     <Select
                       value={poForm.poType}
                       onValueChange={(value: any) => setPOForm({...poForm, poType: value})}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="standard">Standard PO</SelectItem>
-                        <SelectItem value="reference">Reference PO (Record Only)</SelectItem>
+                        <SelectItem value="reference">Reference PO</SelectItem>
                       </SelectContent>
                     </Select>
                     {poForm.poType === 'reference' && (
-                      <p className="text-xs text-muted-foreground mt-1">For audit/document matching only</p>
+                      <p className="text-xs text-muted-foreground mt-1">Record only — for audit/document matching</p>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <Label>Supplier Name *</Label>
                     <Select
                       value={poForm.supplierName}
                       onValueChange={(value) => setPOForm({...poForm, supplierName: value})}
                       required
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full min-w-0">
                         <SelectValue placeholder="Select supplier" />
                       </SelectTrigger>
                       <SelectContent>
@@ -13177,13 +13627,13 @@ export function DashboardPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <Label>Delivery Type *</Label>
                     <Select
                       value={poForm.deliveryType}
                       onValueChange={(value: any) => setPOForm({...poForm, deliveryType: value})}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -13379,7 +13829,7 @@ export function DashboardPage() {
                         setIsGRNTypeDialogOpen(false)
                         setActiveSection("inventory-management")
                         setActiveSubSection("inward")
-                        setIsInventoryManagementExpanded(true)
+                        openSidebarSection('inventory-management')
                       }}
                     >
                       Go to Inward Tab
@@ -13985,7 +14435,7 @@ export function DashboardPage() {
                   // Redirect back to Purchase Orders tab
                   setActiveSection("inventory-management")
                   setActiveSubSection("purchase-orders")
-                  setIsInventoryManagementExpanded(true)
+                  openSidebarSection('inventory-management')
                 }}
               />
               
@@ -14008,7 +14458,7 @@ export function DashboardPage() {
                       // Redirect back to Purchase Orders tab
                       setActiveSection("inventory-management")
                       setActiveSubSection("purchase-orders")
-                      setIsInventoryManagementExpanded(true)
+                      openSidebarSection('inventory-management')
                     }}
                     className="h-8 w-8 p-0"
                   >
@@ -14113,7 +14563,7 @@ export function DashboardPage() {
                         // Redirect back to Purchase Orders tab
                         setActiveSection("inventory-management")
                         setActiveSubSection("purchase-orders")
-                        setIsInventoryManagementExpanded(true)
+                        openSidebarSection('inventory-management')
                       }}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
@@ -14128,7 +14578,7 @@ export function DashboardPage() {
                           // Navigate to Warehouse Stock tab to accept
                           setActiveSection("inventory-management")
                           setActiveSubSection("warehouse-stock")
-                          setIsInventoryManagementExpanded(true)
+                          openSidebarSection('inventory-management')
                         }}
                       >
                         Go to Warehouse Stock to Accept
