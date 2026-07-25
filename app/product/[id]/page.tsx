@@ -9,6 +9,7 @@ import { ShoppingCart, Star, Truck, Shield, Clock, Package, ChevronLeft, Chevron
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { isObjectId, toSlug } from "@/lib/slug"
 
 interface Product {
   _id: string
@@ -24,7 +25,7 @@ interface Product {
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const productId = params.id
+  const productKey = params.id
   
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,18 +45,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     const fetchProduct = async () => {
-      if (!productId) {
+      if (!productKey) {
         setLoading(false)
         return
       }
 
-      // Fetch specific product by ID
       try {
-        const response = await fetch(`/api/products/${productId}`)
+        // Prefer slug URL; still support old ID URLs
+        const endpoint = isObjectId(productKey)
+          ? `/api/products/${productKey}`
+          : `/api/products/by-slug/${encodeURIComponent(productKey)}`
+
+        const response = await fetch(endpoint)
         if (response.ok) {
           const result = await response.json()
           if (result.success && result.data) {
             setProduct(result.data)
+
+            // Rewrite ID URLs to clean name slug
+            if (isObjectId(productKey) && result.data.name) {
+              const cleanSlug = toSlug(result.data.name)
+              if (cleanSlug) {
+                router.replace(`/${cleanSlug}`)
+              }
+            }
           }
         }
       } catch (error) {
@@ -66,7 +79,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchProduct()
-  }, [productId])
+  }, [productKey, router])
 
   const addToCart = () => {
     if (!product) return
@@ -153,22 +166,20 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12 max-w-7xl">
-        <div className="grid lg:grid-cols-2 gap-16">
-          {/* Left - Image Gallery */}
-          <div>
+        <div className="grid lg:grid-cols-2 gap-16 items-start">
+          {/* Left - Image Gallery (sticky on desktop) */}
+          <div className="lg:sticky lg:top-28 self-start">
             {/* Main Image */}
-            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
+            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group max-w-[360px] w-full">
               <div className="aspect-square relative overflow-hidden">
                 {images.length > 0 ? (
-                  <div className="absolute inset-0" style={{ transform: 'translateY(42%)' }}>
-                    <Image
-                      src={images[selectedImage]}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                      style={{ objectPosition: 'center' }}
-                    />
-                  </div>
+                  <Image
+                    src={images[selectedImage]}
+                    alt={product.name}
+                    fill
+                    className="object-contain p-4"
+                    sizes="360px"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ShoppingCart className="h-24 w-24 text-gray-300" />

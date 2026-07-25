@@ -7,6 +7,7 @@ import { Star, ShoppingCart, Heart, Package, TrendingUp, Search } from "lucide-r
 import { useState } from "react"
 import Link from "next/link"
 import { Toast, useToast } from "@/components/toast"
+import { toSlug } from "@/lib/slug"
 
 const stationeryProducts = [
   {
@@ -241,7 +242,7 @@ export function OfficeStationeryGrid() {
             </div>
 
             <CardContent className="p-4">
-              <Link href={`/product/${product.id}`}>
+              <Link href={`/${toSlug(product.name)}`}>
                 <h3 className="font-bold text-sm mb-1 text-gray-900 group-hover:text-primary transition-colors line-clamp-2">
                   {product.name}
                 </h3>

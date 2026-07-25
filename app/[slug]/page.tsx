@@ -167,6 +167,174 @@ export default function SlugPage({ params }: { params: { slug: string } }) {
 
   const images = item.images && item.images.length > 0 ? item.images : []
   const isProduct = itemType === "product"
+  const categoryLabel = item.category?.replace(/>/g, " / ").replace(/\//g, " / ") || ""
+
+  // ── Improved Service Details Layout ─────────────────────────────
+  if (!isProduct) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+
+        <div className="border-b bg-slate-50">
+          <div className="container mx-auto px-4 sm:px-6 py-3 max-w-6xl">
+            <nav className="flex items-center gap-2 text-sm text-slate-500">
+              <Link href="/" className="hover:text-blue-600">Home</Link>
+              <span>/</span>
+              <Link href="/services" className="hover:text-blue-600">Services</Link>
+              <span>/</span>
+              <span className="text-slate-800 font-medium truncate">{item.name}</span>
+            </nav>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 sm:px-6 py-8 md:py-12 max-w-6xl">
+          <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-8 lg:gap-12 items-start">
+            {/* Image - sticky on desktop */}
+            <div className="lg:sticky lg:top-28 self-start">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+                <div className="relative aspect-[4/3] w-full">
+                  {images.length > 0 ? (
+                    <Image
+                      src={images[selectedImage]}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 560px"
+                      priority
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Package className="h-20 w-20 text-slate-300" />
+                    </div>
+                  )}
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setSelectedImage(p => p === 0 ? images.length - 1 : p - 1)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft className="h-5 w-5 text-slate-700" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedImage(p => p === images.length - 1 ? 0 : p + 1)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        aria-label="Next image"
+                      >
+                        <ChevronRight className="h-5 w-5 text-slate-700" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {images.length > 1 && (
+                <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                  {images.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedImage(i)}
+                      className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
+                        selectedImage === i ? "border-blue-600" : "border-slate-200 hover:border-slate-400"
+                      }`}
+                    >
+                      <Image src={img} alt={`View ${i + 1}`} fill className="object-cover" sizes="64px" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Info */}
+            <div>
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Service
+              </span>
+              {categoryLabel && (
+                <p className="mt-3 text-sm text-slate-500">{categoryLabel}</p>
+              )}
+              <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight text-slate-900 leading-tight">
+                {item.name}
+              </h1>
+
+              <div className="mt-4 flex items-center gap-2">
+                <div className="flex">{[1,2,3,4,5].map(s => <Star key={s} className="h-4 w-4 fill-yellow-400 text-yellow-400" />)}</div>
+                <span className="text-sm text-slate-500">4.9 (87 reviews)</span>
+              </div>
+
+              {(item.duration || item.location) && (
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {item.duration && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-blue-600 mb-1">
+                        <Clock className="h-4 w-4" />
+                        <span className="text-xs font-semibold uppercase tracking-wide">Duration</span>
+                      </div>
+                      <p className="text-base font-semibold text-slate-900">{item.duration}</p>
+                    </div>
+                  )}
+                  {item.location && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-blue-600 mb-1">
+                        <Truck className="h-4 w-4" />
+                        <span className="text-xs font-semibold uppercase tracking-wide">Service Area</span>
+                      </div>
+                      <p className="text-base font-semibold text-slate-900">{item.location}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6">
+                <Button
+                  onClick={() => router.push(`/enquiry?itemType=service&id=${item._id}`)}
+                  className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold shadow-sm"
+                >
+                  <MessageCircle className="h-5 w-5 mr-2" /> Place Enquiry
+                </Button>
+                <p className="mt-2 text-center text-xs text-slate-500">
+                  Get a custom quote — our team will respond shortly
+                </p>
+              </div>
+
+              <div className="mt-8 border-t border-slate-200 pt-6">
+                <h2 className="text-lg font-bold text-slate-900 mb-3">About this service</h2>
+                <p className="text-slate-600 leading-7 text-[15px]">
+                  {item.description || "Professional service tailored to your business needs."}
+                </p>
+              </div>
+
+              <div className="mt-8 grid grid-cols-2 gap-3">
+                {[
+                  { icon: Shield, title: "Quality Assured", sub: "Verified delivery" },
+                  { icon: Clock, title: "On-time", sub: "Reliable timelines" },
+                  { icon: Star, title: "Expert Team", sub: "Skilled professionals" },
+                  { icon: Phone, title: "Support", sub: "Quick assistance" },
+                ].map(({ icon: Icon, title, sub }) => (
+                  <div key={title} className="rounded-xl border border-slate-200 p-3">
+                    <Icon className="h-4 w-4 text-blue-600 mb-2" />
+                    <p className="text-sm font-semibold text-slate-900">{title}</p>
+                    <p className="text-xs text-slate-500">{sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 rounded-xl bg-slate-900 text-white p-5">
+                <h3 className="font-semibold mb-3">Need help deciding?</h3>
+                <div className="space-y-2 text-sm text-slate-200">
+                  <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-blue-300" /> +91-8433661506</div>
+                  <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-blue-300" /> customer@adminza.com</div>
+                  <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-blue-300" /> Mon–Fri, 9:00 AM – 6:00 PM</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen">
@@ -178,9 +346,7 @@ export default function SlugPage({ params }: { params: { slug: string } }) {
           <nav className="flex items-center space-x-2 text-sm text-gray-600">
             <Link href="/" className="hover:text-blue-600">Home</Link>
             <span>/</span>
-            <Link href={isProduct ? "/products" : "/services"} className="hover:text-blue-600">
-              {isProduct ? "Products" : "Services"}
-            </Link>
+            <Link href="/products" className="hover:text-blue-600">Products</Link>
             <span>/</span>
             <span className="text-gray-900">{item.name}</span>
           </nav>
@@ -189,16 +355,16 @@ export default function SlugPage({ params }: { params: { slug: string } }) {
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12 max-w-7xl">
-        <div className="grid lg:grid-cols-2 gap-16">
+        <div className="grid lg:grid-cols-2 gap-16 items-start">
 
-          {/* Left – Image Gallery */}
-          <div>
-            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
+          {/* Left – Image Gallery (sticky on desktop) */}
+          <div className="lg:sticky lg:top-28 self-start">
+            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group max-w-[360px] w-full">
               <div className="aspect-square relative overflow-hidden">
                 {images.length > 0 ? (
                   <Image
                     src={images[selectedImage]} alt={item.name} fill
-                    className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-contain p-4" sizes="360px"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -241,98 +407,62 @@ export default function SlugPage({ params }: { params: { slug: string } }) {
 
             <div className="flex items-center gap-3 mb-6 pb-6 border-b">
               <div className="flex">{[1,2,3,4,5].map(s => <Star key={s} className="h-4 w-4 fill-yellow-400 text-yellow-400" />)}</div>
-              <span className="text-sm text-gray-600">{isProduct ? "4.8 (124 reviews)" : "4.9 (87 reviews)"}</span>
+              <span className="text-sm text-gray-600">4.8 (124 reviews)</span>
             </div>
 
-            {/* ── Product-only: Price + Add to Cart ── */}
-            {isProduct && (
-              <>
-                <div className="mb-6">
-                  <span className="text-4xl font-semibold text-gray-900">
-                    ₹{(item.finalPrice || item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  <p className="text-sm text-gray-600 mt-1">Inclusive of all taxes (GST included)</p>
-                </div>
+            <div className="mb-6">
+              <span className="text-4xl font-semibold text-gray-900">
+                ₹{(item.finalPrice || item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-sm text-gray-600 mt-1">Inclusive of all taxes (GST included)</p>
+            </div>
 
-                <div className="mb-6">
-                  <label className="text-sm font-medium text-gray-900 mb-3 block">Quantity</label>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}
-                      className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50">
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="w-12 text-center text-lg font-medium">{quantity}</span>
-                    <button onClick={() => setQuantity(q => Math.min(item.stock ?? 99, q + 1))} disabled={quantity >= (item.stock ?? 99)}
-                      className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50">
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-8 pb-8 border-b">
-                  <Button onClick={addToCart} disabled={(item.stock ?? 0) === 0} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white">
-                    <ShoppingCart className="h-5 w-5 mr-2" /> Add to Cart
-                  </Button>
-                </div>
-
-                <div className="mb-6">
-                  {(item.stock ?? 0) > 0
-                    ? <div className="flex items-center gap-2 text-green-600"><Check className="h-5 w-5" /><span className="font-medium">In Stock ({item.stock} units)</span></div>
-                    : <span className="font-medium text-red-600">Out of Stock</span>
-                  }
-                </div>
-              </>
-            )}
-
-            {/* ── Service-only: Enquiry button ── */}
-            {!isProduct && (
-              <div className="mb-8">
-                <Button onClick={() => router.push(`/enquiry?itemType=service&id=${item._id}`)}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold">
-                  <MessageCircle className="h-5 w-5 mr-2" /> Place Enquiry
-                </Button>
-                {(item.duration || item.location) && (
-                  <div className="mt-4 space-y-3">
-                    {item.duration && <div className="flex items-center gap-3"><Clock className="h-5 w-5 text-blue-600" /><div><p className="text-sm font-medium">Duration</p><p className="text-sm text-gray-600">{item.duration}</p></div></div>}
-                    {item.location && <div className="flex items-center gap-3"><Truck className="h-5 w-5 text-blue-600" /><div><p className="text-sm font-medium">Service Area</p><p className="text-sm text-gray-600">{item.location}</p></div></div>}
-                  </div>
-                )}
+            <div className="mb-6">
+              <label className="text-sm font-medium text-gray-900 mb-3 block">Quantity</label>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}
+                  className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50">
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="w-12 text-center text-lg font-medium">{quantity}</span>
+                <button onClick={() => setQuantity(q => Math.min(item.stock ?? 99, q + 1))} disabled={quantity >= (item.stock ?? 99)}
+                  className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50">
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* Description */}
+            <div className="mb-8 pb-8 border-b">
+              <Button onClick={addToCart} disabled={(item.stock ?? 0) === 0} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white">
+                <ShoppingCart className="h-5 w-5 mr-2" /> Add to Cart
+              </Button>
+            </div>
+
+            <div className="mb-6">
+              {(item.stock ?? 0) > 0
+                ? <div className="flex items-center gap-2 text-green-600"><Check className="h-5 w-5" /><span className="font-medium">In Stock ({item.stock} units)</span></div>
+                : <span className="font-medium text-red-600">Out of Stock</span>
+              }
+            </div>
+
             <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                About this {isProduct ? "product" : "service"}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">About this product</h2>
               <p className="text-gray-700 leading-relaxed">{item.description}</p>
             </div>
 
-            {/* Features / Contact */}
-            {isProduct ? (
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { icon: Truck, title: "Fast Delivery", sub: "2-3 business days" },
-                  { icon: Shield, title: "Secure Payment", sub: "100% safe & secure" },
-                  { icon: Star, title: "Quality Assured", sub: "Premium products" },
-                  { icon: Clock, title: "24/7 Support", sub: "Always available" },
-                ].map(({ icon: Icon, title, sub }) => (
-                  <div key={title} className="flex items-center gap-3">
-                    <Icon className="h-5 w-5 text-blue-600" />
-                    <div><p className="text-sm font-medium text-gray-900">{title}</p><p className="text-xs text-gray-600">{sub}</p></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Get in Touch</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3"><Phone className="h-5 w-5 text-blue-600" /><span className="text-sm text-gray-700">+91-8433661506</span></div>
-                  <div className="flex items-center gap-3"><Mail className="h-5 w-5 text-blue-600" /><span className="text-sm text-gray-700">customer@adminza.com</span></div>
-                  <div className="flex items-center gap-3"><Clock className="h-5 w-5 text-blue-600" /><span className="text-sm text-gray-700">Mon - Fri: 9:00 AM - 6:00 PM</span></div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { icon: Truck, title: "Fast Delivery", sub: "2-3 business days" },
+                { icon: Shield, title: "Secure Payment", sub: "100% safe & secure" },
+                { icon: Star, title: "Quality Assured", sub: "Premium products" },
+                { icon: Clock, title: "24/7 Support", sub: "Always available" },
+              ].map(({ icon: Icon, title, sub }) => (
+                <div key={title} className="flex items-center gap-3">
+                  <Icon className="h-5 w-5 text-blue-600" />
+                  <div><p className="text-sm font-medium text-gray-900">{title}</p><p className="text-xs text-gray-600">{sub}</p></div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
       </div>

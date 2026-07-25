@@ -7,6 +7,7 @@ import { Star, ShoppingCart, Heart, Package, TrendingUp, Phone, Mail, Search } f
 import { useState } from "react"
 import Link from "next/link"
 import { Toast, useToast } from "@/components/toast"
+import { toSlug } from "@/lib/slug"
 
 interface Product {
   id: number
@@ -222,7 +223,7 @@ export function CategoryPageTemplate({
                 </div>
 
                 <CardContent className="p-4">
-                  <Link href={`/product/${product.id}`}>
+                  <Link href={`/${toSlug(product.name)}`}>
                     <h3 className="font-bold text-sm mb-1 text-gray-900 group-hover:text-primary transition-colors line-clamp-2">
                       {product.name}
                     </h3>

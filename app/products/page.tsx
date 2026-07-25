@@ -13,7 +13,6 @@ import { ShoppingCart, Star, Search, Filter, Grid, List } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { toSlug } from "@/lib/slug"
-
 interface Product {
   _id: string
   name: string
@@ -295,25 +294,15 @@ export default function AllProductsPage() {
                 <Link href={`/${toSlug(product.name)}`} style={{ display: 'block', overflow: 'hidden' }}>
                   <CardContent className="p-0 overflow-hidden" style={{ overflow: 'hidden' }}>
                     {/* Image */}
-                    <div className="aspect-square bg-gray-100 overflow-hidden relative" style={{ overflow: 'hidden !important', isolation: 'isolate', position: 'relative', contain: 'layout style paint' }}>
+                    <div className="aspect-square bg-gray-100 overflow-hidden relative">
                       {product.images && product.images.length > 0 ? (
-                        <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden" style={{ 
-                          transform: 'translateY(40%)', 
-                          height: '100%',
-                          width: '100%',
-                          maxHeight: '100%',
-                          maxWidth: '100%',
-                          clipPath: 'inset(0 0 0 0)'
-                        }}>
-                          <Image
-                            src={product.images[0]}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                            style={{ objectPosition: 'center' }}
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          />
-                        </div>
+                        <Image
+                          src={product.images[0]}
+                          alt={product.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <ShoppingCart className="h-16 w-16 text-gray-400" />

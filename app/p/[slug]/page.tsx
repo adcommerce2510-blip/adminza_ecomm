@@ -115,15 +115,13 @@ export default function ProductSlugPage({ params }: { params: { slug: string } }
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12 max-w-7xl">
-        <div className="grid lg:grid-cols-2 gap-16">
-          {/* Left - Image Gallery */}
-          <div>
-            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group">
+        <div className="grid lg:grid-cols-2 gap-16 items-start">
+          {/* Left - Image Gallery (sticky on desktop) */}
+          <div className="lg:sticky lg:top-28 self-start">
+            <div className="relative bg-gray-50 rounded-lg overflow-hidden mb-4 group max-w-[360px] w-full">
               <div className="aspect-square relative overflow-hidden">
                 {images.length > 0 ? (
-                  <div className="absolute inset-0" style={{ transform: 'translateY(42%)' }}>
-                    <Image src={images[selectedImage]} alt={product.name} fill className="object-cover" style={{ objectPosition: 'center' }} />
-                  </div>
+                  <Image src={images[selectedImage]} alt={product.name} fill className="object-contain p-4" sizes="360px" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ShoppingCart className="h-24 w-24 text-gray-300" />

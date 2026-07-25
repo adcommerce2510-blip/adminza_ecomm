@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongodb'
 import Product from '@/models/Product'
-
-// Helper: convert slug back to a regex that can match the original name
-function slugToNameRegex(slug: string): RegExp {
-  // Replace hyphens with spaces or hyphens
-  const escaped = slug.replace(/-/g, '[\\s\\-]')
-  return new RegExp(`^${escaped}$`, 'i')
-}
+import { isObjectId, toSlug } from '@/lib/slug'
 
 export async function GET(
   request: NextRequest,
@@ -17,22 +11,27 @@ export async function GET(
     await dbConnect()
 
     const { slug } = params
+    const decodedSlug = decodeURIComponent(slug)
 
-    // First try to find by _id (backward compat for 24-char hex ids)
     let product = null
-    if (/^[a-f\d]{24}$/i.test(slug)) {
-      product = await Product.findById(slug)
+    if (isObjectId(decodedSlug)) {
+      product = await Product.findById(decodedSlug)
     }
 
-    // Fallback: find by name slug match
     if (!product) {
-      const nameRegex = slugToNameRegex(slug)
-      product = await Product.findOne({ name: nameRegex, status: 'active' })
+      const products = await Product.find({ status: 'active' }).lean()
+      product = products.find((p: any) => toSlug(p.name) === toSlug(decodedSlug)) || null
+    }
+
+    // Fallback: ignore status for older records
+    if (!product) {
+      const products = await Product.find({}).lean()
+      product = products.find((p: any) => toSlug(p.name) === toSlug(decodedSlug)) || null
     }
 
     if (!product) {
       return NextResponse.json(
-        { error: 'Product not found' },
+        { success: false, error: 'Product not found' },
         { status: 404 }
       )
     }
@@ -41,7 +40,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching product by slug:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch product' },
+      { success: false, error: 'Failed to fetch product' },
       { status: 500 }
     )
   }

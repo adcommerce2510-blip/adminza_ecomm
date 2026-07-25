@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongodb'
 import Service from '@/models/Service'
-
-function slugToNameRegex(slug: string): RegExp {
-  const escaped = slug.replace(/-/g, '[\\s\\-]')
-  return new RegExp(`^${escaped}$`, 'i')
-}
+import { isObjectId, toSlug } from '@/lib/slug'
 
 export async function GET(
   request: NextRequest,
@@ -15,20 +11,26 @@ export async function GET(
     await dbConnect()
 
     const { slug } = params
+    const decodedSlug = decodeURIComponent(slug)
 
     let service = null
-    if (/^[a-f\d]{24}$/i.test(slug)) {
-      service = await Service.findById(slug)
+    if (isObjectId(decodedSlug)) {
+      service = await Service.findById(decodedSlug)
     }
 
     if (!service) {
-      const nameRegex = slugToNameRegex(slug)
-      service = await Service.findOne({ name: nameRegex, status: 'active' })
+      const services = await Service.find({ status: 'active' }).lean()
+      service = services.find((s: any) => toSlug(s.name) === toSlug(decodedSlug)) || null
+    }
+
+    if (!service) {
+      const services = await Service.find({}).lean()
+      service = services.find((s: any) => toSlug(s.name) === toSlug(decodedSlug)) || null
     }
 
     if (!service) {
       return NextResponse.json(
-        { error: 'Service not found' },
+        { success: false, error: 'Service not found' },
         { status: 404 }
       )
     }
@@ -37,7 +39,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching service by slug:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch service' },
+      { success: false, error: 'Failed to fetch service' },
       { status: 500 }
     )
   }

@@ -17,7 +17,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toSlug } from "@/lib/slug"
-
 interface Service {
   _id: string
   name: string
@@ -298,16 +297,13 @@ export default function AllServicesPage() {
                     {/* Image */}
                     <div className="aspect-square bg-gray-100 overflow-hidden relative">
                       {service.images && service.images.length > 0 ? (
-                        <div className="absolute inset-0" style={{ transform: 'translateY(40%)' }}>
-                          <Image
-                            src={service.images[0]}
-                            alt={service.name}
-                            fill
-                            className="object-cover"
-                            style={{ objectPosition: 'center' }}
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          />
-                        </div>
+                        <Image
+                          src={service.images[0]}
+                          alt={service.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <MessageCircle className="h-16 w-16 text-gray-400" />

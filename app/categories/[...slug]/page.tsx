@@ -12,6 +12,7 @@ import { ShoppingCart, Search, Package, Star, MapPin, Clock } from "lucide-react
 import Image from "next/image"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
+import { toSlug } from "@/lib/slug"
 
 interface Product {
   _id: string
@@ -242,32 +243,22 @@ export default function CategoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredItems.map((item) => {
               const isProduct = products.some(p => p._id === item._id)
-              const detailUrl = isProduct ? `/product/${item._id}` : `/service/${item._id}`
+              const detailUrl = `/${toSlug(item.name)}`
               
               return (
                 <Card key={item._id} className="overflow-hidden hover:shadow-lg transition-shadow" style={{ overflow: 'hidden' }}>
                   <Link href={detailUrl} style={{ display: 'block', overflow: 'hidden' }}>
                       <CardContent className="p-0 overflow-hidden" style={{ overflow: 'hidden' }}>
                       {/* Image */}
-                        <div className="aspect-square bg-gray-900 overflow-hidden relative" style={{ overflow: 'hidden !important', isolation: 'isolate', position: 'relative', contain: 'layout style paint' }}>
+                        <div className="aspect-square bg-gray-100 overflow-hidden relative">
                           {item.images && item.images.length > 0 ? (
-                            <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden" style={{ 
-                              transform: 'translateY(45%)', 
-                              height: '100%',
-                              width: '100%',
-                              maxHeight: '100%',
-                              maxWidth: '100%',
-                              clipPath: 'inset(0 0 0 0)'
-                            }}>
-                              <Image
-                                src={item.images[0]}
-                                alt={item.name}
-                                fill
-                                className="object-cover"
-                                style={{ objectPosition: 'center' }}
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                              />
-                            </div>
+                            <Image
+                              src={item.images[0]}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <ShoppingCart className="h-16 w-16 text-gray-400" />
